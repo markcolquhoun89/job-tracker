@@ -81,26 +81,28 @@ class SyncEngine {
       }
       
       let changesDetected = false;
-      const mergedJobIds = new Set();
+      const beforeCount = window.state && window.state.jobs ? window.state.jobs.length : 0;
 
       // Merge with local jobs using conflict resolution
       for (const remoteJob of remoteJobs) {
-        mergedJobIds.add(remoteJob.id);
         const changed = await this.mergeJob(remoteJob, 'remote');
         if (changed) changesDetected = true;
       }
       
-      // Sync merged jobs back to app.js global state
-      console.log('[SyncEngine] Final state - app.js:', window.state ? window.state.jobs.length : '?', 'jobs, modular:', this.state ? this.state.jobs.length : '?');
+      const afterCount = window.state && window.state.jobs ? window.state.jobs.length : 0;
+      console.log(`[SyncEngine] Job count before: ${beforeCount}, after: ${afterCount}`);
       
-      // Only re-render if there were actual changes
-      if (changesDetected) {
-        if (window.state) {
-          console.log('[SyncEngine] Re-rendering with app.js state');
-          // Make sure app.js re-renders with the merged data
-          if (window.render && typeof window.render === 'function') {
-            window.render(true); // soft update
-          }
+      // Detect changes by count or explicit flag
+      if (afterCount > beforeCount) {
+        changesDetected = true;
+        console.log('[SyncEngine] Detected changes by job count increase');
+      }
+      
+      // Always re-render if we pulled any jobs (even if count didn't change, they might need to display)
+      if (remoteJobs.length > 0) {
+        console.log('[SyncEngine] Re-rendering after pulling jobs');
+        if (window.render && typeof window.render === 'function') {
+          window.render(true); // soft update
         }
       }
       
@@ -405,18 +407,36 @@ class SyncEngine {
    */
   async mergeJob(remoteJob, source = 'remote') {
     // Only work with app.js state - simplified approach
-    if (!window.state || !window.state.jobs) {
-      console.warn('[SyncEngine] window.state not available');
+    let stateRef = window.state;
+    
+    if (!stateRef) {
+      console.warn('[SyncEngine] window.state not available, checking for fallback...');
+      // Fallback - try modular state
+      if (this.state && this.state.jobs) {
+        stateRef = { jobs: this.state.jobs };
+      } else {
+        console.error('[SyncEngine] No state available at all!');
+        return false;
+      }
+    }
+
+    if (!stateRef.jobs) {
+      console.warn('[SyncEngine] No jobs array in state');
       return false;
     }
 
-    let localJob = window.state.jobs.find(j => j.id === remoteJob.id);
+    let localJob = stateRef.jobs.find(j => j.id === remoteJob.id);
 
     if (!localJob) {
       // New remote job - create locally
       const newJob = this.reconstructJobFromCloud(remoteJob);
-      window.state.jobs.push(newJob);
-      localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+      stateRef.jobs.push(newJob);
+      
+      // Update localStorage
+      if (window.state) {
+        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+      }
+      
       console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id}`);
       return true; // change detected
     } else {
@@ -428,7 +448,11 @@ class SyncEngine {
         console.log(`[SyncEngine] Updating job ${remoteJob.id} - remote is newer (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
         const updatedJob = this.reconstructJobFromCloud(remoteJob);
         Object.assign(localJob, updatedJob);
-        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        
+        if (window.state) {
+          localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        }
+        
         console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id}`);
         return true; // change detected
       } else {

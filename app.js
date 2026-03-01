@@ -13,6 +13,9 @@
         range: 'day',
         activeTab: 'jobs'
     };
+    
+    // Expose state globally for sync engine and bridge
+    window.state = state;
     const noteTemplates = {
         'Cable Fault': 'Issue: [Describe the cable fault]\nLocation: [Cable location/route]\nResolution: [How the issue was resolved]\nTime: [Duration of repair]',
         'New Install': 'Type: [Type of installation]\nLocation: [Installation site]\nEquipment: [Equipment used]\nCompletion: [Installation status]',
