@@ -11,8 +11,9 @@ class SyncEngine {
     this.state = jobTrackerState;
     this.isSyncing = false;
     this.lastSyncTime = localStorage.getItem('nx_last_sync_time') ? new Date(localStorage.getItem('nx_last_sync_time')) : null;
-    this.syncInterval = 5000; // 5 seconds - faster for near real-time sync
+    this.syncInterval = 30000; // 30 seconds
     this.lastRemoteCheckTime = null;
+    this.lastRemoteCount = 0;
 
     console.log('[SyncEngine] Initialized');
   }
@@ -33,6 +34,12 @@ class SyncEngine {
     // Pull any remote changes
     await this.pullRemoteJobs();
     
+    // Initialize remote count tracker
+    const remoteJobs = await this.supabase.select('jobs', {
+      eq: { user_id: this.supabase.userId }
+    });
+    this.lastRemoteCount = Array.isArray(remoteJobs) ? remoteJobs.length : 0;
+    
     // Start periodic sync (faster interval for real-time-ish feel)
     this.startPeriodicSync();
     
@@ -50,7 +57,7 @@ class SyncEngine {
   async pullRemoteJobs() {
     if (!this.supabase.isOnline) {
       console.log('[SyncEngine] Offline, skipping pull');
-      return;
+      return false;
     }
 
     console.log('[SyncEngine] Pulling remote jobs');
@@ -62,23 +69,48 @@ class SyncEngine {
 
       if (!Array.isArray(remoteJobs)) {
         console.warn('[SyncEngine] No remote jobs found or fetch failed');
-        return;
+        return false;
       }
 
       console.log(`[SyncEngine] Pulled ${remoteJobs.length} remote jobs`);
+      
+      let changesDetected = false;
+      const mergedJobIds = new Set();
 
       // Merge with local jobs using conflict resolution
       for (const remoteJob of remoteJobs) {
-        await this.mergeJob(remoteJob, 'remote');
+        mergedJobIds.add(remoteJob.id);
+        const changed = await this.mergeJob(remoteJob, 'remote');
+        if (changed) changesDetected = true;
       }
       
-      // After pull, render the UI to show new changes
-      if (window.render && typeof window.render === 'function') {
+      // Sync merged jobs back to app.js global state
+      if (window.state && this.state && this.state.jobs) {
+        console.log('[SyncEngine] Synchronizing jobs to app.js state:', this.state.jobs.length, 'jobs');
+        
+        // Rebuild state.jobs with merged data
+        const syncedJobs = [];
+        for (const stateJob of this.state.jobs) {
+          syncedJobs.push({...stateJob}); // clone to avoid reference issues
+        }
+        
+        window.state.jobs = syncedJobs;
+        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        console.log('[SyncEngine] Synced to app.js state');
+        changesDetected = true;
+      }
+      
+      // Only re-render if there were actual changes
+      if (changesDetected && window.render && typeof window.render === 'function') {
+        console.log('[SyncEngine] Re-rendering after sync changes');
         window.render(true); // soft update
       }
+      
+      return changesDetected;
 
     } catch (error) {
       console.error('[SyncEngine] Pull failed:', error);
+      return false;
     }
   }
   
@@ -86,17 +118,24 @@ class SyncEngine {
    * Check for remote updates since last sync
    */
   async hasRemoteUpdates() {
-    if (!this.supabase.isOnline || !this.lastSyncTime) {
+    if (!this.supabase.isOnline) {
       return false;
     }
 
     try {
-      // Query jobs updated since last sync
+      // Query jobs updated since last sync or just check count
       const remoteJobs = await this.supabase.select('jobs', {
         eq: { user_id: this.supabase.userId }
       });
 
       if (!Array.isArray(remoteJobs)) return false;
+
+      // Check if count has changed
+      if (remoteJobs.length !== this.lastRemoteCount) {
+        console.log('[SyncEngine] Remote job count changed:', this.lastRemoteCount, '->', remoteJobs.length);
+        this.lastRemoteCount = remoteJobs.length;
+        return true;
+      }
 
       // Check if any remote job is newer than local equivalent
       for (const remoteJob of remoteJobs) {
@@ -107,12 +146,6 @@ class SyncEngine {
           console.log('[SyncEngine] Detected remote update for job:', remoteJob.id);
           return true;
         }
-      }
-
-      // Also check if local count differs from remote count
-      if (remoteJobs.length !== this.state.jobs.length) {
-        console.log('[SyncEngine] Job count mismatch - local:', this.state.jobs.length, 'remote:', remoteJobs.length);
-        return true;
       }
 
       return false;
@@ -354,6 +387,7 @@ class SyncEngine {
       this.state.jobs.push(newJob);
       await this.db.saveJob(newJob);
       console.log(`[SyncEngine] Merged new job from ${source}: ${remoteJob.id}`);
+      return true; // change detected
     } else {
       // Update if remote is newer
       const localTime = new Date(localJob.updated_at || 0);
@@ -363,8 +397,11 @@ class SyncEngine {
         Object.assign(localJob, this.reconstructJobFromCloud(remoteJob));
         await this.db.saveJob(localJob);
         console.log(`[SyncEngine] Merged update from ${source}: ${remoteJob.id}`);
+        return true; // change detected
       }
     }
+    
+    return false; // no change
   }
 
   /**
@@ -411,8 +448,8 @@ class SyncEngine {
       if (this.supabase.isOnline && !this.isSyncing) {
         // Quick check for remote updates first
         if (await this.hasRemoteUpdates()) {
-          console.log('[SyncEngine] Remote updates detected, syncing...');
-          await this.fullSync();
+          console.log('[SyncEngine] Remote updates detected, pulling...');
+          await this.pullRemoteJobs();
         }
       }
     }, this.syncInterval);

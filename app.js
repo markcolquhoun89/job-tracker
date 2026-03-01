@@ -2539,14 +2539,14 @@
         state.jobs = JSON.parse(localStorage.getItem(key) || '[]');
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
         
-        // Pull remote jobs if authenticated
+        render();
+        
+        // Pull remote jobs if authenticated (async, after initial render)
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated && window.syncEngine) {
             console.log('[App] Pulling remote jobs after account load');
             window.syncEngine.pullRemoteJobs().catch(err => console.warn('Pull failed:', err));
         }
-        
-        render();
     }
     function save() { 
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
@@ -2561,11 +2561,15 @@
             }).catch(err => console.warn('IndexedDB clear failed:', err));
         }
         
-        // Trigger sync if authenticated and sync engine exists
+        // Debounce sync requests - only sync after 1 second of no changes
+        if (window._syncTimeout) clearTimeout(window._syncTimeout);
+        
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated && window.syncEngine) {
-            console.log('[App] Triggering sync after save');
-            window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
+            window._syncTimeout = setTimeout(() => {
+                console.log('[App] Triggering sync after save');
+                window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
+            }, 1000);
         }
         
         render(); 
