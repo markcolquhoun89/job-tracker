@@ -14,8 +14,8 @@ const APP_CONFIG = {
   OFFLINE_FIRST: true,
   
   // Environment
-  ENVIRONMENT: process.env.NODE_ENV || 'development',
-  IS_PRODUCTION: process.env.NODE_ENV === 'production',
+  ENVIRONMENT: 'production',
+  IS_PRODUCTION: true,
   
   // App version
   APP_VERSION: '2.0.0',
@@ -29,7 +29,7 @@ const APP_CONFIG = {
   USE_LOCALSTORAGE: true,
   
   // Logging
-  DEBUG: process.env.DEBUG === 'true' || process.env.NODE_ENV !== 'production',
+  DEBUG: false,
   
   /**
    * Validate configuration
