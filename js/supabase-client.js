@@ -63,24 +63,28 @@ class SupabaseClient {
       });
 
       const data = await response.json();
+      console.log('[Supabase] Signup response:', JSON.stringify(data));
       if (!response.ok) throw new Error(data.message || 'Signup failed');
 
-      // Supabase returns user and session (session may be null if email confirmation required)
-      if (data.session && data.session.access_token) {
-        this.token = data.session.access_token;
-        this.userId = data.user.id;
-        localStorage.setItem('nx_supabase_session', JSON.stringify({
-          access_token: data.session.access_token,
-          user: data.user
-        }));
-        console.log('[Supabase] Signup successful:', this.userId);
-        return { success: true, user: data.user };
-      } else if (data.user) {
-        // User created but email confirmation required
-        console.log('[Supabase] Signup successful - email confirmation required');
-        return { success: true, user: data.user, message: 'Please confirm your email' };
+      // Supabase signup returns user object (sometimes at top level, sometimes nested)
+      const user = data.user || data;
+      if (user && user.id) {
+        this.token = data.access_token || (data.session && data.session.access_token) || null;
+        this.userId = user.id;
+        
+        if (this.token) {
+          localStorage.setItem('nx_supabase_session', JSON.stringify({
+            access_token: this.token,
+            user: user
+          }));
+          console.log('[Supabase] Signup successful - authenticated:', this.userId);
+        } else {
+          console.log('[Supabase] Signup successful - awaiting email confirmation:', this.userId);
+        }
+        
+        return { success: true, user: user };
       } else {
-        throw new Error('Invalid signup response');
+        throw new Error('No user in response');
       }
     } catch (error) {
       console.error('[Supabase] Signup failed:', error);
