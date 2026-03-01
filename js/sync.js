@@ -177,14 +177,16 @@ class SyncEngine {
         if (!remoteJob || remoteJob.length === 0) {
           // New job - insert
           const jobData = this.prepareJobForCloud(localJob);
-          console.log('[SyncEngine] Inserting new job:', localJob.id, jobData);
+          console.log('[SyncEngine] Inserting new job:', localJob.id, 'type:', jobData.job_type);
           const result = await this.supabase.insert('jobs', jobData);
           
           if (result.success) {
             console.log(`[SyncEngine] ✓ Pushed new job: ${localJob.id}`);
-            // Update local timestamp
+            // Mark as synced
             localJob.synced_at = new Date().toISOString();
-            await this.db.saveJob(localJob);
+            if (window.state) {
+              localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+            }
           } else {
             console.warn(`[SyncEngine] ✗ Failed to push job ${localJob.id}:`, result);
           }
@@ -202,7 +204,9 @@ class SyncEngine {
             if (result.success) {
               console.log(`[SyncEngine] ✓ Pushed update to job: ${localJob.id}`);
               localJob.synced_at = new Date().toISOString();
-              await this.db.saveJob(localJob);
+              if (window.state) {
+                localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+              }
             }
           }
         }
@@ -275,7 +279,9 @@ class SyncEngine {
         const result = await this.supabase.insert('jobs', jobData);
         if (result.success) {
           localJob.synced_at = new Date().toISOString();
-          await this.db.saveJob(localJob);
+          if (window.state) {
+            localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+          }
         }
       } else {
         // Existing job
@@ -289,7 +295,9 @@ class SyncEngine {
           const result = await this.supabase.update('jobs', jobData, { id: jobId });
           if (result.success) {
             localJob.synced_at = new Date().toISOString();
-            await this.db.saveJob(localJob);
+            if (window.state) {
+              localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+            }
           }
         }
       }
@@ -337,7 +345,9 @@ class SyncEngine {
       localJob.chargeback = remoteJob.chargeback;
       localJob.updated_at = remoteJob.updated_at;
       localJob.synced_at = new Date().toISOString();
-      await this.db.saveJob(localJob);
+      if (window.state) {
+        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+      }
     }
   }
 
@@ -394,34 +404,20 @@ class SyncEngine {
    * Merge remote job into local state
    */
   async mergeJob(remoteJob, source = 'remote') {
-    // Try to find in app.js state first if available
-    let localJob = null;
-    let stateLocation = 'modular';
-    
-    if (window.state && window.state.jobs) {
-      localJob = window.state.jobs.find(j => j.id === remoteJob.id);
-      stateLocation = 'app.js';
-    } 
-    
-    if (!localJob && this.state && this.state.jobs) {
-      localJob = this.state.getJob(remoteJob.id);
-      stateLocation = 'modular';
+    // Only work with app.js state - simplified approach
+    if (!window.state || !window.state.jobs) {
+      console.warn('[SyncEngine] window.state not available');
+      return false;
     }
 
+    let localJob = window.state.jobs.find(j => j.id === remoteJob.id);
+
     if (!localJob) {
-      // New remote job - create locally (prefer app.js location if available)
+      // New remote job - create locally
       const newJob = this.reconstructJobFromCloud(remoteJob);
-      
-      if (window.state && window.state.jobs) {
-        window.state.jobs.push(newJob);
-        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
-        console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id} (to app.js)`);
-      } else if (this.state && this.state.jobs) {
-        this.state.jobs.push(newJob);
-        await this.db.saveJob(newJob);
-        console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id} (to modular)`);
-      }
-      
+      window.state.jobs.push(newJob);
+      localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+      console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id}`);
       return true; // change detected
     } else {
       // Update if remote is newer
@@ -432,14 +428,8 @@ class SyncEngine {
         console.log(`[SyncEngine] Updating job ${remoteJob.id} - remote is newer (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
         const updatedJob = this.reconstructJobFromCloud(remoteJob);
         Object.assign(localJob, updatedJob);
-        
-        if (stateLocation === 'app.js' && window.state) {
-          localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
-        } else if (stateLocation === 'modular') {
-          await this.db.saveJob(localJob);
-        }
-        
-        console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id} (to ${stateLocation})`);
+        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id}`);
         return true; // change detected
       } else {
         console.log(`[SyncEngine] Skipping job ${remoteJob.id} - local is up to date`);
