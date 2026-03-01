@@ -2427,7 +2427,6 @@
         // Also save to modular IndexedDB for sync engine
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
             window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
-            window.JobTrackerDB.bulkPut('types', Object.keys(state.types).map(key => ({ id: key, ...state.types[key] }))).catch(err => console.warn('IndexedDB types save failed:', err));
         }
         
         render(true); 
