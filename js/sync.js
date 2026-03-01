@@ -383,4 +383,3 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Ensure global availability in browser
 window.SyncEngine = SyncEngine;
-}
