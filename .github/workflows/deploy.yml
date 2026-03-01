@@ -11,23 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      deployments: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Validate Cloudflare secrets
         if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' || secrets.CLOUDFLARE_ACCOUNT_ID == '' }}
         run: |
           echo "Cloudflare deploy skipped: missing required GitHub secrets."
           echo "Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in repo Settings > Secrets and variables > Actions."
+          exit 1
 
       - name: Deploy to Cloudflare Pages
         if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
-        uses: cloudflare/pages-action@v1
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: job-tracker
-          directory: ./
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy . --project-name=job-tracker --branch=main
+
+      - name: Show deployment URL
+        if: ${{ success() && steps.deploy.outputs.deployment-url != '' }}
+        run: echo "Deployment URL: ${{ steps.deploy.outputs.deployment-url }}"
