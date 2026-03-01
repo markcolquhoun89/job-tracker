@@ -228,7 +228,7 @@ class SyncEngine {
         console.log('[SyncEngine] Pushing', deletedJobIds.length, 'deleted jobs to cloud');
         for (const deletedId of deletedJobIds) {
           try {
-            const result = await this.supabase.delete('jobs', { eq: { id: deletedId } });
+            const result = await this.supabase.delete('jobs', { id: deletedId });
             if (result.success) {
               console.log(`[SyncEngine] ✓ Deleted job from cloud: ${deletedId}`);
             } else {
