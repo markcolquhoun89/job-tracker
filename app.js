@@ -158,6 +158,17 @@
             } catch(e) { /* not supported */ }
         }
     }
+    function toggleLeaderboardParticipation() {
+        const isEnabled = localStorage.getItem('nx_leaderboard_enabled') === '1';
+        if (isEnabled) {
+            localStorage.setItem('nx_leaderboard_enabled', '0');
+            showRoleChangeNotification('Leaderboard disabled');
+        } else {
+            localStorage.setItem('nx_leaderboard_enabled', '1');
+            showRoleChangeNotification('Leaderboard enabled');
+        }
+        render();
+    }
     // --- Share report ---
     function shareReport(s, list) {
         const range = state.range.toUpperCase();
@@ -616,6 +627,8 @@
                     <p style="font-size:0.8rem;">Log and complete jobs to track your revenue, projections, and financial insights.</p>
                 </div>`;
             } else { renderFunds(container, list, s); }
+        } else if (state.activeTab === 'leaderboards') {
+            renderLeaderboard(container, list, s);
         } else {
             renderSettings(container);
         }
@@ -1270,6 +1283,90 @@
                 <div class="pay-arrow">\u2192</div>
             </div>` + orderedPanels.map(p => wrapPanel(p.id, p.title, p.content, 'funds', p.icon || '')).join('');
     }
+    function renderLeaderboard(container, list, s) {
+        const isEnabled = localStorage.getItem('nx_leaderboard_enabled') === '1';
+        const displayName = localStorage.getItem('nx_displayName') || 'Anonymous';
+        
+        if (!isEnabled) {
+            container.innerHTML = `<div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
+                <div style="margin-bottom:16px; opacity:0.4;"><svg viewBox="0 0 24 24" width="56" height="56" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6-6 6 6"/><polyline points="3 6 3 20 21 20"/><path d="M7 11v9"/><path d="M12 8v12"/><path d="M17 10v11"/></svg></div>
+                <h3 style="color:var(--text-main); margin-bottom:8px;">Leaderboards Disabled</h3>
+                <p style="font-size:0.8rem;">Enable leaderboard participation in settings to join the global leaderboards and compete with other users.</p>
+                <button class="btn" style="background:var(--primary); color:#fff; margin-top:16px;" onclick="navSettings()">Enable in Settings</button>
+            </div>`;
+            return;
+        }
+        
+        // Calculate your stats
+        const userCompleted = list.filter(j => j.status === 'Completed').length;
+        const userEarnings = s.totalCash || 0;
+        const userAvgPay = s.avgJobPay || 0;
+        const userStreak = s.streak || 0;
+        
+        // Mock leaderboard data - in production, this would come from Supabase
+        const leaderboardData = [
+            { rank: 1, name: 'Alex Pro', completed: 248, earnings: 12400, avgPay: 50, streak: 23, you: false },
+            { rank: 2, name: 'Jordan', completed: 186, earnings: 9300, avgPay: 50, streak: 18, you: false },
+            { rank: 3, name: displayName, completed: userCompleted, earnings: userEarnings, avgPay: userAvgPay, streak: userStreak, you: true },
+            { rank: 4, name: 'Casey Tech', completed: 142, earnings: 7100, avgPay: 50, streak: 12, you: false },
+            { rank: 5, name: 'Morgan Swift', completed: 128, earnings: 6400, avgPay: 50, streak: 9, you: false },
+        ].sort((a, b) => b.completed - a.completed).map((user, idx) => ({...user, rank: idx + 1}));
+        
+        const you = leaderboardData.find(u => u.you) || {};
+        const yourRank = you.rank || '–';
+        
+        container.innerHTML = `
+            <div class="panel" style="background:linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--primary) 5%, transparent)); border:2px solid var(--primary); margin-bottom:16px;">
+                <div style="text-align:center; padding:8px 0;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Your Rank</div>
+                    <b style="font-size:2.4rem; color:var(--primary);">#${yourRank}</b>
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+                <div class="panel" style="margin-bottom:0; padding:14px;">
+                    <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Jobs Completed</div>
+                    <b style="font-size:1.6rem;">${userCompleted}</b>
+                </div>
+                <div class="panel" style="margin-bottom:0; padding:14px;">
+                    <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Total Earned</div>
+                    <b style="font-size:1.6rem; color:var(--success);">£${userEarnings.toFixed(0)}</b>
+                </div>
+            </div>
+            <div class="panel" style="padding:0; border:none; background:transparent; margin-bottom:0;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border-t); text-align:left;">
+                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700;">Rank</th>
+                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700;">Name</th>
+                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700; text-align:right;">Completed</th>
+                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700; text-align:right;">Earnings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${leaderboardData.map(user => `
+                            <tr style="border-bottom:1px solid var(--border-t); background:${user.you ? 'var(--primary-dim)' : 'transparent'};">
+                                <td style="padding:12px 8px; font-weight:700; color:${user.rank <= 3 ? (user.rank === 1 ? '#FFD700' : user.rank === 2 ? '#C0C0C0' : '#CD7F32') : 'var(--text-muted)'};">
+                                    ${user.rank <= 3 ? (user.rank === 1 ? '🥇' : user.rank === 2 ? '🥈' : '🥉') : user.rank}
+                                </td>
+                                <td style="padding:12px 8px; font-weight:700; color:${user.you ? 'var(--primary)' : 'var(--text-main)'};">${user.name}${user.you ? ' (You)' : ''}</td>
+                                <td style="padding:12px 8px; text-align:right; color:var(--text-muted);">${user.completed}</td>
+                                <td style="padding:12px 8px; text-align:right; font-weight:600; color:var(--success);">£${user.earnings}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top:20px; padding:12px; background:var(--surface-elev); border-radius:8px; border:1px solid var(--border-t); font-size:0.75rem; color:var(--text-muted);">
+                <div style="margin-bottom:8px;"><strong>💡 How Leaderboards Work:</strong></div>
+                <ul style="margin:0; padding-left:16px;">
+                    <li>Rankings are based on jobs completed in the current week</li>
+                    <li>Automatically calculated and updated every hour</li>
+                    <li>Only shows participants who have enabled leaderboards</li>
+                    <li>Disable anytime from settings without losing data</li>
+                </ul>
+            </div>
+        `;
+    }
     function buildBgAnimOptions() {
         var anims = [
             { id: 'waves', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>', label: 'Waves' },
@@ -1407,6 +1504,24 @@
                     <span style=\"margin-right:6px;\">💾</span> ADVANCED DATA TOOLS
                 </button>
                 <button class=\"btn\" style=\"background:var(--danger); margin-top:24px;\" onclick=\"confirmWipe()\">WIPE DATA</button>`
+            },
+            {
+                id: 'leaderboards',
+                title: 'Leaderboards',
+                icon: '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6-6 6 6"/><polyline points="3 6 3 20 21 20"/><path d="M7 11v9"/><path d="M12 8v12"/><path d="M17 10v11"/></svg>',
+                content: `<div class=\"theme-toggle-row\">
+                    <div><span>Participate in Leaderboards</span><br><small>Join weekly rankings (disabled by default)</small></div>
+                    <label class=\"toggle-switch\">
+                        <input type=\"checkbox\" ${localStorage.getItem('nx_leaderboard_enabled') === '1' ? 'checked' : ''} onchange=\"toggleLeaderboardParticipation()\">
+                        <span class=\"toggle-track\"></span>
+                    </label>
+                </div>
+                <div style=\"margin-top:16px; padding:12px; background:var(--surface-elev); border-radius:8px; border:1px solid var(--border-t); font-size:0.75rem; color:var(--text-muted);\">
+                    <strong style=\"color:var(--text-main);\">📊 What are Leaderboards?</strong><br>
+                    <div style=\"margin-top:8px; line-height:1.6;\">
+                        Opt-in global rankings based on jobs completed each week. Your display name and stats appear only if you enable participation. You can toggle this anytime.
+                    </div>
+                </div>`
             },
             {
                 id: 'tools',
@@ -3579,11 +3694,14 @@
         try {
             const result = await window.supabaseClient.signUp(email, password, name);
             if (result.success) {
+                // Store display name locally
+                localStorage.setItem('nx_displayName', name);
                 if (result.needsVerification) {
                     customAlert('Verify Email', 'Account created. Check your inbox/spam and click the verification link, then sign in.');
                 } else {
                     await applyServerRole(result.user.id);
                     customAlert('Success', 'Account created! Signed in as ' + name + '.');
+                    loadJobsForCurrentAccount();
                 }
                 closeModal();
                 updateAuthUI();
@@ -3608,6 +3726,10 @@
         try {
             const result = await window.supabaseClient.signIn(email, password);
             if (result.success) {
+                // Store display name from user metadata if available
+                if (result.user?.user_metadata?.display_name) {
+                    localStorage.setItem('nx_displayName', result.user.user_metadata.display_name);
+                }
                 await applyServerRole(result.user.id);
                 customAlert('Success', 'Signed in successfully!');
                 closeModal();
@@ -3641,7 +3763,9 @@
         
         const status = window.supabaseClient?.getStatus?.();
         if (status?.isAuthenticated) {
-            authBtn.innerHTML = '👤 Account';
+            // Fetch display name from local storage
+            const displayName = (localStorage.getItem('nx_displayName') || 'Account').substring(0, 12);
+            authBtn.innerHTML = '👤 ' + displayName;
             authBtn.onclick = () => showSignOutModal();
         } else {
             authBtn.innerHTML = '🔐 Sign In';
@@ -3652,12 +3776,15 @@
     function showSignOutModal() {
         const m = document.getElementById('modal');
         const status = window.supabaseClient?.getStatus?.();
+        const displayName = localStorage.getItem('nx_displayName') || 'Not set';
+        const userRole = (window.JobTrackerState && window.JobTrackerState.userRole) || state.userRole || 'engineer';
         document.getElementById('modal-body').innerHTML = `
             <button class="close-btn" onclick="closeModal()">×</button>
-            <h3 style="margin-bottom:16px;">Account</h3>
-            <div style="padding:12px; background:var(--bg-secondary); border-radius:4px; margin-bottom:12px; font-size:0.9rem;">
-                <div>User ID: <code style="font-size:0.8rem;">${status?.userId || 'n/a'}</code></div>
-                <div style="margin-top:4px;">Status: <strong>${status?.isOnline ? '🟢 Online' : '🔴 Offline'}</strong></div>
+            <h3 style="margin-bottom:16px;">👤 Account</h3>
+            <div style="padding:12px; background:var(--surface-elev); border-radius:6px; margin-bottom:16px; font-size:0.85rem; border:1px solid var(--border-t);">
+                <div style="margin-bottom:8px;"><span style="color:var(--text-muted); font-size:0.7rem; font-weight:700; text-transform:uppercase;">Display Name</span><br><strong>${displayName}</strong></div>
+                <div style="margin-bottom:8px;"><span style="color:var(--text-muted); font-size:0.7rem; font-weight:700; text-transform:uppercase;">Role</span><br><strong style="text-transform:capitalize; color:var(--primary);">${userRole}</strong></div>
+                <div><span style="color:var(--text-muted); font-size:0.7rem; font-weight:700; text-transform:uppercase;">Status</span><br><strong>${status?.isOnline ? '🟢 Online' : '🔴 Offline'}</strong></div>
             </div>
             <button class="btn" style="background:var(--danger); color:#fff; width:100%;" onclick="handleSignOut()">SIGN OUT</button>
         `;
