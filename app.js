@@ -3501,6 +3501,129 @@
             }
         });
     })();
+    
+    // --- Authentication Functions ---
+    async function showSignUpModal() {
+        const m = document.getElementById('modal');
+        document.getElementById('modal-body').innerHTML = `
+            <button class="close-btn" onclick="closeModal()">×</button>
+            <h3 style="margin-bottom:16px;">Sign Up</h3>
+            <input type="email" id="signup-email" class="input-box" placeholder="Email" style="margin-bottom:8px;">
+            <input type="password" id="signup-password" class="input-box" placeholder="Password" style="margin-bottom:8px;">
+            <input type="text" id="signup-name" class="input-box" placeholder="Display Name" style="margin-bottom:12px;">
+            <button class="btn" style="background:var(--primary); color:#fff; width:100%; margin-bottom:8px;" onclick="handleSignUp()">SIGN UP</button>
+            <button class="btn" style="background:var(--border); color:var(--text-main); width:100%;" onclick="showSignInModal()">Already have an account? Sign in</button>
+        `;
+        m.style.display = 'flex';
+    }
+    
+    async function showSignInModal() {
+        const m = document.getElementById('modal');
+        document.getElementById('modal-body').innerHTML = `
+            <button class="close-btn" onclick="closeModal()">×</button>
+            <h3 style="margin-bottom:16px;">Sign In</h3>
+            <input type="email" id="signin-email" class="input-box" placeholder="Email" style="margin-bottom:8px;">
+            <input type="password" id="signin-password" class="input-box" placeholder="Password" style="margin-bottom:12px;">
+            <button class="btn" style="background:var(--primary); color:#fff; width:100%; margin-bottom:8px;" onclick="handleSignIn()">SIGN IN</button>
+            <button class="btn" style="background:var(--border); color:var(--text-main); width:100%;" onclick="showSignUpModal()">Need an account? Sign up</button>
+        `;
+        m.style.display = 'flex';
+    }
+    
+    async function handleSignUp() {
+        const email = document.getElementById('signup-email').value.trim();
+        const password = document.getElementById('signup-password').value.trim();
+        const name = document.getElementById('signup-name').value.trim();
+        
+        if (!email || !password || !name) {
+            customAlert('Error', 'Please fill in all fields.');
+            return;
+        }
+        
+        try {
+            const result = await window.supabaseClient.signUp(email, password, name);
+            if (result.success) {
+                customAlert('Success', 'Account created! Signed in as ' + name + '.');
+                closeModal();
+                updateAuthUI();
+                render();
+            } else {
+                customAlert('Error', result.error || 'Sign up failed');
+            }
+        } catch (err) {
+            customAlert('Error', 'Sign up failed: ' + err.message);
+        }
+    }
+    
+    async function handleSignIn() {
+        const email = document.getElementById('signin-email').value.trim();
+        const password = document.getElementById('signin-password').value.trim();
+        
+        if (!email || !password) {
+            customAlert('Error', 'Please fill in all fields.');
+            return;
+        }
+        
+        try {
+            const result = await window.supabaseClient.signIn(email, password);
+            if (result.success) {
+                customAlert('Success', 'Signed in successfully!');
+                closeModal();
+                updateAuthUI();
+                render();
+            } else {
+                customAlert('Error', result.error || 'Sign in failed');
+            }
+        } catch (err) {
+            customAlert('Error', 'Sign in failed: ' + err.message);
+        }
+    }
+    
+    async function handleSignOut() {
+        if (!confirm('Sign out?')) return;
+        try {
+            await window.supabaseClient.signOut();
+            customAlert('Signed Out', 'You have been signed out.');
+            updateAuthUI();
+        } catch (err) {
+            customAlert('Error', 'Sign out failed: ' + err.message);
+        }
+    }
+    
+    function updateAuthUI() {
+        const authBtn = document.getElementById('auth-btn');
+        if (!authBtn) return;
+        
+        const status = window.supabaseClient?.getStatus?.();
+        if (status?.isAuthenticated) {
+            authBtn.innerHTML = '👤 ' + (status.userId?.substring(0, 8) || 'User');
+            authBtn.onclick = () => showSignOutModal();
+        } else {
+            authBtn.innerHTML = '🔐 Sign In';
+            authBtn.onclick = () => showSignInModal();
+        }
+    }
+    
+    function showSignOutModal() {
+        const m = document.getElementById('modal');
+        const status = window.supabaseClient?.getStatus?.();
+        document.getElementById('modal-body').innerHTML = `
+            <button class="close-btn" onclick="closeModal()">×</button>
+            <h3 style="margin-bottom:16px;">Account</h3>
+            <div style="padding:12px; background:var(--bg-secondary); border-radius:4px; margin-bottom:12px; font-size:0.9rem;">
+                <div>User ID: <code style="font-size:0.8rem;">${status?.userId || 'n/a'}</code></div>
+                <div style="margin-top:4px;">Status: <strong>${status?.isOnline ? '🟢 Online' : '🔴 Offline'}</strong></div>
+            </div>
+            <button class="btn" style="background:var(--danger); color:#fff; width:100%;" onclick="handleSignOut()">SIGN OUT</button>
+        `;
+        m.style.display = 'flex';
+    }
+    
+    // Update auth UI on page load
+    setTimeout(() => {
+        updateAuthUI();
+    }, 500);
+    
     normalizeSaturdayFees();
     render();
     // Show idle notifications if there's activity since last sync
