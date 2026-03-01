@@ -3493,10 +3493,7 @@
     // Show idle notifications if there's activity since last sync
     // NOTE: Disabled during testing phase - will enable when login system is added
     // setTimeout(() => showIdleNotifications(), 500);
-    // Service Worker registration (only when served over HTTP/HTTPS)
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
-    }
+    // Service Worker registration disabled for cloud deployment stability
     // Wake lock auto-restore
     if (localStorage.getItem('nx_wakelock') === '1') {
         toggleWakeLock();
