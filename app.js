@@ -2426,7 +2426,10 @@
         
         // Also save to modular IndexedDB for sync engine
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
-            window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
+            // Clear the store first to remove deleted jobs
+            window.JobTrackerDB.clear('jobs').then(() => {
+                window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
+            }).catch(err => console.warn('IndexedDB clear failed:', err));
         }
         
         render(true); 

@@ -276,6 +276,25 @@ class Database {
     }
 
     /**
+     * Clear all items from a store
+     */
+    async clear(storeName) {
+        if (this.useLocalStorage) {
+            localStorage.removeItem(storeName);
+            return;
+        }
+
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.clear();
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
      * Query items by index
      */
     async queryByIndex(storeName, indexName, value) {
@@ -414,6 +433,7 @@ window.JobTrackerDB = {
     put: (...args) => db.put(...args),
     bulkPut: (...args) => db.bulkPut(...args),
     delete: (...args) => db.delete(...args),
+    clear: (...args) => db.clear(...args),
     queryByIndex: (...args) => db.queryByIndex(...args),
     exportData: () => db.exportData(),
     importData: (data) => db.importData(data)
