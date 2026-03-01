@@ -302,13 +302,8 @@
     let currentJobId = null;
     function generateID() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
     function getScope() {
-        // Use modular state if available, fallback to legacy state  
-        const sourceState = (window.JobTrackerState && window.JobTrackerState.jobs && window.JobTrackerState.jobs.length > 0)
-            ? window.JobTrackerState
-            : state;
-        
         const d = new Date(state.viewDate);
-        return sourceState.jobs.filter(j => {
+        return state.jobs.filter(j => {
             const jd = new Date(j.date + 'T00:00:00'); jd.setHours(0,0,0,0);
             const ref = new Date(d); ref.setHours(0,0,0,0);
             if (state.range === 'day') return jd.getTime() === ref.getTime();
@@ -1487,11 +1482,8 @@
         }
         */
         
-        // Fallback to original implementation - use MODULAR state directly since it has the actual data
-        // The modular system loads from IndexedDB, so JobTrackerState.jobs is authoritative
-        const stateToUse = (window.JobTrackerState && window.JobTrackerState.jobs && window.JobTrackerState.jobs.length > 0) 
-            ? window.JobTrackerState 
-            : state;
+        // Fallback to original implementation - use app state as single source of truth
+        const stateToUse = state;
         
         console.log('editJob called with ID:', id);
         console.log('Using state with', stateToUse.jobs.length, 'jobs');
@@ -2420,9 +2412,23 @@
         state.jobs.push({ id: generateID(), date: state.viewDate.toISOString().split('T')[0], type, status: 'Pending', fee: 0, notes: '', isUpgraded: false, jobID });
         closeModal(); save();
     }
+    function getJobsStorageKey() {
+        const authStatus = window.supabaseClient?.getStatus?.();
+        if (authStatus?.isAuthenticated && authStatus.userId) {
+            return `nx_jobs_user_${authStatus.userId}`;
+        }
+        return 'nx_jobs_anon';
+    }
+    function loadJobsForCurrentAccount() {
+        const key = getJobsStorageKey();
+        state.jobs = JSON.parse(localStorage.getItem(key) || '[]');
+        localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
+        render();
+    }
     function save() { 
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
         localStorage.setItem('nx_types', JSON.stringify(state.types)); 
+        localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         
         // Also save to modular IndexedDB for sync engine
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
@@ -3573,8 +3579,9 @@
             if (result.success) {
                 customAlert('Success', 'Signed in successfully!');
                 closeModal();
+                localStorage.setItem('nx_active_user_id', result.user.id);
                 updateAuthUI();
-                render();
+                loadJobsForCurrentAccount();
             } else {
                 customAlert('Error', result.error || 'Sign in failed');
             }
@@ -3587,8 +3594,10 @@
         if (!confirm('Sign out?')) return;
         try {
             await window.supabaseClient.signOut();
+            localStorage.removeItem('nx_active_user_id');
             customAlert('Signed Out', 'You have been signed out.');
             updateAuthUI();
+            loadJobsForCurrentAccount();
         } catch (err) {
             customAlert('Error', 'Sign out failed: ' + err.message);
         }
@@ -3623,9 +3632,15 @@
         m.style.display = 'flex';
     }
     
+    // One-time migration from legacy key
+    if (!localStorage.getItem('nx_jobs_anon')) {
+        localStorage.setItem('nx_jobs_anon', localStorage.getItem('nx_jobs') || '[]');
+    }
+
     // Update auth UI on page load
     setTimeout(() => {
         updateAuthUI();
+        loadJobsForCurrentAccount();
     }, 500);
     
     normalizeSaturdayFees();
