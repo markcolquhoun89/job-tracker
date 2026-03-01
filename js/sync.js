@@ -91,38 +91,17 @@ class SyncEngine {
       }
       
       // Sync merged jobs back to app.js global state
-      if (window.state) {
-        console.log('[SyncEngine] Syncing to app.js - before:', window.state.jobs.length, 'jobs from modular:', this.state.jobs.length);
-        
-        // If modular state has more jobs or different jobs, sync them
-        if (this.state.jobs.length > 0) {
-          // Create a merged set of jobs with modular as source of truth
-          const mergedJobs = {};
-          
-          // Add modular jobs
-          for (const job of this.state.jobs) {
-            mergedJobs[job.id] = {...job};
-          }
-          
-          // Convert back to array and update app.js state
-          window.state.jobs = Object.values(mergedJobs);
-          localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
-          localStorage.setItem('nx_jobs_anon', JSON.stringify(window.state.jobs)); // Also save to anon key in case
-          
-          const key = window.getJobsStorageKey ? window.getJobsStorageKey() : 'nx_jobs';
-          localStorage.setItem(key, JSON.stringify(window.state.jobs));
-          
-          console.log('[SyncEngine] After sync:', window.state.jobs.length, 'jobs in app.js');
-          changesDetected = true;
-        }
-      } else {
-        console.warn('[SyncEngine] window.state not available!');
-      }
+      console.log('[SyncEngine] Final state - app.js:', window.state ? window.state.jobs.length : '?', 'jobs, modular:', this.state ? this.state.jobs.length : '?');
       
       // Only re-render if there were actual changes
-      if (changesDetected && window.render && typeof window.render === 'function') {
-        console.log('[SyncEngine] Re-rendering after sync changes');
-        window.render(true); // soft update
+      if (changesDetected) {
+        if (window.state) {
+          console.log('[SyncEngine] Re-rendering with app.js state');
+          // Make sure app.js re-renders with the merged data
+          if (window.render && typeof window.render === 'function') {
+            window.render(true); // soft update
+          }
+        }
       }
       
       return changesDetected;
@@ -375,18 +354,23 @@ class SyncEngine {
    * Prepare job for cloud storage
    */
   prepareJobForCloud(job) {
+    // Handle both naming conventions (app.js uses `type`, modular uses `jobType`)
+    const jobType = job.jobType || job.type;
+    const upgraded = job.upgraded !== undefined ? job.upgraded : job.isUpgraded;
+    const jobId = job.jobId || job.jobID;
+    
     return {
       id: job.id,
       user_id: this.supabase.userId,
-      job_type: job.jobType,
+      job_type: jobType,
       date: job.date,
       status: job.status,
       fee: job.fee,
       base_fee: job.baseFee,
       manual_fee: job.manualFee,
-      job_id_external: job.jobId,
+      job_id_external: jobId,
       notes: job.notes,
-      is_upgraded: job.upgraded,
+      is_upgraded: upgraded,
       saturday_premium: job.saturdayPremium,
       elf: job.elf,
       elf_added_by: job.elfAddedBy,
@@ -402,7 +386,7 @@ class SyncEngine {
       chargeback_added_by: job.chargebackAddedBy,
       chargeback_added_date: job.chargebackAddedDate,
       completed_at: job.completedAt,
-      updated_at: new Date().toISOString()
+      updated_at: job.updated_at || new Date().toISOString()
     };
   }
 
@@ -410,14 +394,34 @@ class SyncEngine {
    * Merge remote job into local state
    */
   async mergeJob(remoteJob, source = 'remote') {
-    const localJob = this.state.getJob(remoteJob.id);
+    // Try to find in app.js state first if available
+    let localJob = null;
+    let stateLocation = 'modular';
+    
+    if (window.state && window.state.jobs) {
+      localJob = window.state.jobs.find(j => j.id === remoteJob.id);
+      stateLocation = 'app.js';
+    } 
+    
+    if (!localJob && this.state && this.state.jobs) {
+      localJob = this.state.getJob(remoteJob.id);
+      stateLocation = 'modular';
+    }
 
     if (!localJob) {
-      // New remote job - create locally
+      // New remote job - create locally (prefer app.js location if available)
       const newJob = this.reconstructJobFromCloud(remoteJob);
-      this.state.jobs.push(newJob);
-      await this.db.saveJob(newJob);
-      console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id}`);
+      
+      if (window.state && window.state.jobs) {
+        window.state.jobs.push(newJob);
+        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id} (to app.js)`);
+      } else if (this.state && this.state.jobs) {
+        this.state.jobs.push(newJob);
+        await this.db.saveJob(newJob);
+        console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id} (to modular)`);
+      }
+      
       return true; // change detected
     } else {
       // Update if remote is newer
@@ -426,9 +430,16 @@ class SyncEngine {
 
       if (remoteTime > localTime) {
         console.log(`[SyncEngine] Updating job ${remoteJob.id} - remote is newer (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
-        Object.assign(localJob, this.reconstructJobFromCloud(remoteJob));
-        await this.db.saveJob(localJob);
-        console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id}`);
+        const updatedJob = this.reconstructJobFromCloud(remoteJob);
+        Object.assign(localJob, updatedJob);
+        
+        if (stateLocation === 'app.js' && window.state) {
+          localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        } else if (stateLocation === 'modular') {
+          await this.db.saveJob(localJob);
+        }
+        
+        console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id} (to ${stateLocation})`);
         return true; // change detected
       } else {
         console.log(`[SyncEngine] Skipping job ${remoteJob.id} - local is up to date`);
@@ -439,20 +450,20 @@ class SyncEngine {
   }
 
   /**
-   * Reconstruct job from cloud format to local format
+   * Reconstruct job from cloud format to local format (app.js format)
    */
   reconstructJobFromCloud(remoteJob) {
     return {
       id: remoteJob.id,
-      jobType: remoteJob.job_type,
+      type: remoteJob.job_type,
       date: remoteJob.date,
       status: remoteJob.status,
       fee: remoteJob.fee,
       baseFee: remoteJob.base_fee,
       manualFee: remoteJob.manual_fee,
-      jobId: remoteJob.job_id_external,
+      jobID: remoteJob.job_id_external,
       notes: remoteJob.notes,
-      upgraded: remoteJob.is_upgraded,
+      isUpgraded: remoteJob.is_upgraded,
       saturdayPremium: remoteJob.saturday_premium,
       elf: remoteJob.elf,
       elfAddedBy: remoteJob.elf_added_by,
