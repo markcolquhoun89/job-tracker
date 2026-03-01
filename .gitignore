@@ -1,0 +1,43 @@
+# Environment Variables
+.env
+.env.local
+.env*.local
+config.local.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+jt-backup-*
+*.backup
+*.bak
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies (if using npm/node)
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Testing
+.coverage/
+.nyc_output/
+
+# Cloudflare
+.wrangler/
+wrangler.toml.local
