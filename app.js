@@ -3801,29 +3801,25 @@
     function hideMainUI() {
         const navBar = document.querySelector('.nav-bar');
         const viewContainer = document.getElementById('view-container');
-        const settingsBtn = document.querySelector('.settings-btn');
-        const addPopup = document.getElementById('add-popup');
         const header = document.querySelector('.header');
+        const ptrIndicator = document.querySelector('.ptr-indicator');
         
-        if (navBar) navBar.style.display = 'none';
-        if (viewContainer) viewContainer.style.display = 'none';
-        if (settingsBtn) settingsBtn.style.display = 'none';
-        if (addPopup) addPopup.style.display = 'none';
-        if (header) header.style.display = 'none';
+        if (navBar) navBar.style.visibility = 'hidden';
+        if (viewContainer) viewContainer.style.visibility = 'hidden';
+        if (header) header.style.visibility = 'hidden';
+        if (ptrIndicator) ptrIndicator.style.visibility = 'hidden';
     }
     
     function showMainUI() {
         const navBar = document.querySelector('.nav-bar');
         const viewContainer = document.getElementById('view-container');
-        const settingsBtn = document.querySelector('.settings-btn');
-        const addPopup = document.getElementById('add-popup');
         const header = document.querySelector('.header');
+        const ptrIndicator = document.querySelector('.ptr-indicator');
         
-        if (navBar) navBar.style.display = 'flex';
-        if (viewContainer) viewContainer.style.display = 'block';
-        if (settingsBtn) settingsBtn.style.display = 'flex';
-        if (addPopup) addPopup.style.display = 'flex';
-        if (header) header.style.display = 'flex';
+        if (navBar) navBar.style.visibility = 'visible';
+        if (viewContainer) viewContainer.style.visibility = 'visible';
+        if (header) header.style.visibility = 'visible';
+        if (ptrIndicator) ptrIndicator.style.visibility = 'visible';
     }
     
     function showSignOutModal() {
