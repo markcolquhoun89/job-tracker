@@ -2538,6 +2538,14 @@
         const key = getJobsStorageKey();
         state.jobs = JSON.parse(localStorage.getItem(key) || '[]');
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
+        
+        // Pull remote jobs if authenticated
+        const authStatus = window.supabaseClient?.getStatus?.();
+        if (authStatus?.isAuthenticated && window.syncEngine) {
+            console.log('[App] Pulling remote jobs after account load');
+            window.syncEngine.pullRemoteJobs().catch(err => console.warn('Pull failed:', err));
+        }
+        
         render();
     }
     function save() { 
@@ -2551,6 +2559,13 @@
             window.JobTrackerDB.clear('jobs').then(() => {
                 window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
             }).catch(err => console.warn('IndexedDB clear failed:', err));
+        }
+        
+        // Trigger sync if authenticated and sync engine exists
+        const authStatus = window.supabaseClient?.getStatus?.();
+        if (authStatus?.isAuthenticated && window.syncEngine) {
+            console.log('[App] Triggering sync after save');
+            window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
         }
         
         render(); 
