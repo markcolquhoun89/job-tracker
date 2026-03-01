@@ -223,14 +223,17 @@ class SyncEngine {
       }
 
       // Push deletions to Supabase
-      const deletedJobIds = (window.state && window.state.deletedJobIds) ? window.state.deletedJobIds : [];
+      const deletedJobIds = (window.state && window.state.deletedJobIds) ? [...window.state.deletedJobIds] : [];
       if (deletedJobIds.length > 0) {
         console.log('[SyncEngine] Pushing', deletedJobIds.length, 'deleted jobs to cloud');
+        const successfullyDeleted = [];
+        
         for (const deletedId of deletedJobIds) {
           try {
             const result = await this.supabase.delete('jobs', { id: deletedId });
             if (result.success) {
               console.log(`[SyncEngine] ✓ Deleted job from cloud: ${deletedId}`);
+              successfullyDeleted.push(deletedId);
             } else {
               console.warn(`[SyncEngine] ✗ Failed to delete job ${deletedId}:`, result);
             }
@@ -238,11 +241,14 @@ class SyncEngine {
             console.warn(`[SyncEngine] ✗ Delete error for ${deletedId}:`, error);
           }
         }
-        // Clear deletion tracking after sync
-        if (window.state) {
-          window.state.deletedJobIds = [];
-          localStorage.setItem('nx_deleted_job_ids', JSON.stringify([]));
-          console.log('[SyncEngine] ✓ Cleared deletion tracking');
+        
+        // Only remove successfully deleted IDs from tracking
+        if (window.state && successfullyDeleted.length > 0) {
+          window.state.deletedJobIds = window.state.deletedJobIds.filter(
+            id => !successfullyDeleted.includes(id)
+          );
+          localStorage.setItem('nx_deleted_job_ids', JSON.stringify(window.state.deletedJobIds));
+          console.log(`[SyncEngine] ✓ Cleared ${successfullyDeleted.length} deletion(s) from tracking`);
         }
       }
 
