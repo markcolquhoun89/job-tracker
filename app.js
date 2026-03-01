@@ -2432,7 +2432,7 @@
             }).catch(err => console.warn('IndexedDB clear failed:', err));
         }
         
-        render(true); 
+        render(); 
     }
     // --- Collapsible Panel System ---
     function getPanelStates(tab) {
@@ -3600,7 +3600,7 @@
         
         const status = window.supabaseClient?.getStatus?.();
         if (status?.isAuthenticated) {
-            authBtn.innerHTML = '👤 ' + (status.userId?.substring(0, 8) || 'User');
+            authBtn.innerHTML = '👤 Account';
             authBtn.onclick = () => showSignOutModal();
         } else {
             authBtn.innerHTML = '🔐 Sign In';
