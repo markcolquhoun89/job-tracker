@@ -3767,10 +3767,63 @@
             const displayName = (localStorage.getItem('nx_displayName') || 'Account').substring(0, 12);
             authBtn.innerHTML = '👤 ' + displayName;
             authBtn.onclick = () => showSignOutModal();
+            hideAuthSplash();
+            showMainUI();
         } else {
             authBtn.innerHTML = '🔐 Sign In';
             authBtn.onclick = () => showSignInModal();
+            showAuthSplash();
+            hideMainUI();
         }
+    }
+    
+    function showAuthSplash() {
+        const m = document.getElementById('modal');
+        document.getElementById('modal-body').innerHTML = `
+            <div style="text-align:center; max-width:320px;">
+                <div style="font-size:3rem; margin-bottom:24px;">🔐</div>
+                <h2 style="font-size:1.5rem; font-weight:700; margin-bottom:8px; color:var(--text-main);">Sign In Required</h2>
+                <p style="color:var(--text-muted); margin-bottom:32px; font-size:0.9rem; line-height:1.4;">Create an account or sign in to use Job Tracker.</p>
+                <div style="display:flex; gap:12px; flex-direction:column;">
+                    <button class="btn" style="background:var(--primary); color:#fff; font-weight:600; padding:12px; border-radius:8px; border:none; cursor:pointer; width:100%;" onclick="showSignUpModal()">Create Account</button>
+                    <button class="btn" style="background:var(--surface-elev); color:var(--primary); font-weight:600; padding:12px; border-radius:8px; border:1px solid var(--border-subtle); cursor:pointer; width:100%;" onclick="showSignInModal()">Sign In</button>
+                </div>
+            </div>
+        `;
+        m.style.display = 'flex';
+    }
+    
+    function hideAuthSplash() {
+        const m = document.getElementById('modal');
+        m.style.display = 'none';
+    }
+    
+    function hideMainUI() {
+        const navBar = document.querySelector('.nav-bar');
+        const viewContainer = document.getElementById('view-container');
+        const settingsBtn = document.querySelector('.settings-btn');
+        const addPopup = document.getElementById('add-popup');
+        const header = document.querySelector('.header');
+        
+        if (navBar) navBar.style.display = 'none';
+        if (viewContainer) viewContainer.style.display = 'none';
+        if (settingsBtn) settingsBtn.style.display = 'none';
+        if (addPopup) addPopup.style.display = 'none';
+        if (header) header.style.display = 'none';
+    }
+    
+    function showMainUI() {
+        const navBar = document.querySelector('.nav-bar');
+        const viewContainer = document.getElementById('view-container');
+        const settingsBtn = document.querySelector('.settings-btn');
+        const addPopup = document.getElementById('add-popup');
+        const header = document.querySelector('.header');
+        
+        if (navBar) navBar.style.display = 'flex';
+        if (viewContainer) viewContainer.style.display = 'block';
+        if (settingsBtn) settingsBtn.style.display = 'flex';
+        if (addPopup) addPopup.style.display = 'flex';
+        if (header) header.style.display = 'flex';
     }
     
     function showSignOutModal() {
@@ -3797,13 +3850,32 @@
     }
 
     // Update auth UI on page load
+    const status = window.supabaseClient?.getStatus?.();
+    if (!status?.isAuthenticated) {
+        showAuthSplash();
+        hideMainUI();
+    }
+    
     setTimeout(() => {
-        updateAuthUI();
-        loadJobsForCurrentAccount();
+        const currentStatus = window.supabaseClient?.getStatus?.();
+        if (currentStatus?.isAuthenticated) {
+            updateAuthUI();
+            loadJobsForCurrentAccount();
+            showMainUI();
+        } else if (!document.getElementById('modal').style.display || document.getElementById('modal').style.display === 'none') {
+            // If still not authenticated and modal somehow got hidden, show it again
+            showAuthSplash();
+            hideMainUI();
+        }
     }, 500);
     
     normalizeSaturdayFees();
-    render();
+    
+    // Only render if authenticated to avoid UI flicker
+    const initialStatus = window.supabaseClient?.getStatus?.();
+    if (initialStatus?.isAuthenticated) {
+        render();
+    }
     // Show idle notifications if there's activity since last sync
     // NOTE: Disabled during testing phase - will enable when login system is added
     // setTimeout(() => showIdleNotifications(), 500);
