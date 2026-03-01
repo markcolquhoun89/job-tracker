@@ -11,7 +11,8 @@
         },
         viewDate: new Date(),
         range: 'day',
-        activeTab: 'jobs'
+        activeTab: 'jobs',
+        deletedJobIds: JSON.parse(localStorage.getItem('nx_deleted_job_ids')) || []
     };
     
     // Expose state globally for sync engine and bridge
@@ -2219,6 +2220,10 @@
         if (!j) return;
         _deletedJob = { ...j };
         state.jobs = state.jobs.filter(x => x.id !== id);
+        // Track deletion for sync
+        if (!state.deletedJobIds.includes(id)) {
+            state.deletedJobIds.push(id);
+        }
         save(); closeModal();
         const toast = document.getElementById('toast');
         clearTimeout(_deleteTimer);
@@ -2438,6 +2443,8 @@
     function undoDelete() {
         if (_deletedJob) {
             state.jobs.push(_deletedJob);
+            // Remove from deletion tracking on undo
+            state.deletedJobIds = state.deletedJobIds.filter(id => id !== _deletedJob.id);
             _deletedJob = null;
             save();
         }
@@ -2554,6 +2561,7 @@
     function save() { 
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
         localStorage.setItem('nx_types', JSON.stringify(state.types)); 
+        localStorage.setItem('nx_deleted_job_ids', JSON.stringify(state.deletedJobIds)); 
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         
         // Also save to modular IndexedDB for sync engine

@@ -83,8 +83,16 @@ class SyncEngine {
       let changesDetected = false;
       const beforeCount = window.state && window.state.jobs ? window.state.jobs.length : 0;
 
+      // Get deleted job IDs to filter out
+      const deletedJobIds = (window.state && window.state.deletedJobIds) ? window.state.deletedJobIds : [];
+      
       // Merge with local jobs using conflict resolution
       for (const remoteJob of remoteJobs) {
+        // Skip deleted jobs - don't re-pull them from cloud
+        if (deletedJobIds.includes(remoteJob.id)) {
+          console.log('[SyncEngine] Skipping deleted job:', remoteJob.id);
+          continue;
+        }
         const changed = await this.mergeJob(remoteJob, 'remote');
         if (changed) changesDetected = true;
       }
@@ -211,6 +219,30 @@ class SyncEngine {
               }
             }
           }
+        }
+      }
+
+      // Push deletions to Supabase
+      const deletedJobIds = (window.state && window.state.deletedJobIds) ? window.state.deletedJobIds : [];
+      if (deletedJobIds.length > 0) {
+        console.log('[SyncEngine] Pushing', deletedJobIds.length, 'deleted jobs to cloud');
+        for (const deletedId of deletedJobIds) {
+          try {
+            const result = await this.supabase.delete('jobs', { eq: { id: deletedId } });
+            if (result.success) {
+              console.log(`[SyncEngine] ✓ Deleted job from cloud: ${deletedId}`);
+            } else {
+              console.warn(`[SyncEngine] ✗ Failed to delete job ${deletedId}:`, result);
+            }
+          } catch (error) {
+            console.warn(`[SyncEngine] ✗ Delete error for ${deletedId}:`, error);
+          }
+        }
+        // Clear deletion tracking after sync
+        if (window.state) {
+          window.state.deletedJobIds = [];
+          localStorage.setItem('nx_deleted_job_ids', JSON.stringify([]));
+          console.log('[SyncEngine] ✓ Cleared deletion tracking');
         }
       }
 
