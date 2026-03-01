@@ -59,7 +59,7 @@ class SupabaseClient {
         body: JSON.stringify({
           email,
           password,
-          data: { display_name: displayName },
+          data: { display_name: displayName, role: 'engineer' },
           email_redirect_to: emailRedirectTo
         })
       });

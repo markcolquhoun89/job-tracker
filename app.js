@@ -2617,6 +2617,12 @@
     }
     
     function setUserRoleGlobal(role) {
+        const authStatus = window.supabaseClient?.getStatus?.();
+        if (authStatus?.isAuthenticated) {
+            customAlert('Role Managed in Admin', 'Signed-in account roles are server-managed. New users default to Engineer.');
+            return;
+        }
+
         if (window.JobTrackerState && typeof window.JobTrackerState.setUserRole === 'function') {
             window.JobTrackerState.setUserRole(role);
         }
@@ -3536,6 +3542,30 @@
         m.style.display = 'flex';
     }
     
+    async function applyServerRole(userId) {
+        try {
+            const profileRows = await window.supabaseClient.select('profiles', {
+                select: 'role',
+                eq: { id: userId },
+                limit: 1
+            });
+
+            const serverRole = Array.isArray(profileRows) && profileRows[0]?.role ? profileRows[0].role : 'engineer';
+            state.userRole = serverRole;
+            localStorage.setItem('nx_userRole', serverRole);
+            if (window.JobTrackerState && typeof window.JobTrackerState.setUserRole === 'function') {
+                window.JobTrackerState.setUserRole(serverRole);
+            }
+        } catch (error) {
+            console.warn('Could not load profile role, defaulting to engineer:', error);
+            state.userRole = 'engineer';
+            localStorage.setItem('nx_userRole', 'engineer');
+            if (window.JobTrackerState && typeof window.JobTrackerState.setUserRole === 'function') {
+                window.JobTrackerState.setUserRole('engineer');
+            }
+        }
+    }
+
     async function handleSignUp() {
         const email = document.getElementById('signup-email').value.trim();
         const password = document.getElementById('signup-password').value.trim();
@@ -3552,6 +3582,7 @@
                 if (result.needsVerification) {
                     customAlert('Verify Email', 'Account created. Check your inbox/spam and click the verification link, then sign in.');
                 } else {
+                    await applyServerRole(result.user.id);
                     customAlert('Success', 'Account created! Signed in as ' + name + '.');
                 }
                 closeModal();
@@ -3577,6 +3608,7 @@
         try {
             const result = await window.supabaseClient.signIn(email, password);
             if (result.success) {
+                await applyServerRole(result.user.id);
                 customAlert('Success', 'Signed in successfully!');
                 closeModal();
                 localStorage.setItem('nx_active_user_id', result.user.id);
