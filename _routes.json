@@ -1,11 +1,11 @@
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/js/*", "/api/*"],
+  "exclude": ["/*.js", "/*.css", "/*.html", "/js/*", "/css/*"],
   "rules": [
     {
       "type": "rewrite",
-      "pattern": "^/(?!(?:js|css|\.well-known|.*\\..*)).*$",
+      "pattern": "^.*$",
       "destination": "/index.html"
     }
   ]
