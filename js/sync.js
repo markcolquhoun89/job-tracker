@@ -60,19 +60,25 @@ class SyncEngine {
       return false;
     }
 
-    console.log('[SyncEngine] Pulling remote jobs');
+    console.log('[SyncEngine] Pulling remote jobs for user:', this.supabase.userId);
     try {
       // Get all jobs for current user
       const remoteJobs = await this.supabase.select('jobs', {
         eq: { user_id: this.supabase.userId }
       });
 
+      console.log('[SyncEngine] pullRemoteJobs result:', remoteJobs);
+      
       if (!Array.isArray(remoteJobs)) {
-        console.warn('[SyncEngine] No remote jobs found or fetch failed');
+        console.warn('[SyncEngine] No remote jobs found or fetch failed, result type:', typeof remoteJobs);
         return false;
       }
 
       console.log(`[SyncEngine] Pulled ${remoteJobs.length} remote jobs`);
+      
+      if (remoteJobs.length > 0) {
+        console.log('[SyncEngine] Sample remote job:', remoteJobs[0]);
+      }
       
       let changesDetected = false;
       const mergedJobIds = new Set();
@@ -85,19 +91,32 @@ class SyncEngine {
       }
       
       // Sync merged jobs back to app.js global state
-      if (window.state && this.state && this.state.jobs) {
-        console.log('[SyncEngine] Synchronizing jobs to app.js state:', this.state.jobs.length, 'jobs');
+      if (window.state) {
+        console.log('[SyncEngine] Syncing to app.js - before:', window.state.jobs.length, 'jobs from modular:', this.state.jobs.length);
         
-        // Rebuild state.jobs with merged data
-        const syncedJobs = [];
-        for (const stateJob of this.state.jobs) {
-          syncedJobs.push({...stateJob}); // clone to avoid reference issues
+        // If modular state has more jobs or different jobs, sync them
+        if (this.state.jobs.length > 0) {
+          // Create a merged set of jobs with modular as source of truth
+          const mergedJobs = {};
+          
+          // Add modular jobs
+          for (const job of this.state.jobs) {
+            mergedJobs[job.id] = {...job};
+          }
+          
+          // Convert back to array and update app.js state
+          window.state.jobs = Object.values(mergedJobs);
+          localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+          localStorage.setItem('nx_jobs_anon', JSON.stringify(window.state.jobs)); // Also save to anon key in case
+          
+          const key = window.getJobsStorageKey ? window.getJobsStorageKey() : 'nx_jobs';
+          localStorage.setItem(key, JSON.stringify(window.state.jobs));
+          
+          console.log('[SyncEngine] After sync:', window.state.jobs.length, 'jobs in app.js');
+          changesDetected = true;
         }
-        
-        window.state.jobs = syncedJobs;
-        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
-        console.log('[SyncEngine] Synced to app.js state');
-        changesDetected = true;
+      } else {
+        console.warn('[SyncEngine] window.state not available!');
       }
       
       // Only re-render if there were actual changes
@@ -166,7 +185,9 @@ class SyncEngine {
 
     console.log('[SyncEngine] Pushing local jobs');
     try {
-      const localJobs = this.state.jobs;
+      // Use app.js state if available, otherwise use modular state
+      const localJobs = (window.state && window.state.jobs) ? window.state.jobs : this.state.jobs;
+      console.log('[SyncEngine] Pushing', localJobs.length, 'jobs from', window.state ? 'app.js' : 'modular', 'state');
       
       for (const localJob of localJobs) {
         // Check if job exists remote
@@ -177,13 +198,16 @@ class SyncEngine {
         if (!remoteJob || remoteJob.length === 0) {
           // New job - insert
           const jobData = this.prepareJobForCloud(localJob);
+          console.log('[SyncEngine] Inserting new job:', localJob.id, jobData);
           const result = await this.supabase.insert('jobs', jobData);
           
           if (result.success) {
-            console.log(`[SyncEngine] Pushed new job: ${localJob.id}`);
+            console.log(`[SyncEngine] ✓ Pushed new job: ${localJob.id}`);
             // Update local timestamp
             localJob.synced_at = new Date().toISOString();
             await this.db.saveJob(localJob);
+          } else {
+            console.warn(`[SyncEngine] ✗ Failed to push job ${localJob.id}:`, result);
           }
         } else {
           // Existing job - check for conflicts
@@ -197,7 +221,7 @@ class SyncEngine {
             const result = await this.supabase.update('jobs', jobData, { id: localJob.id });
             
             if (result.success) {
-              console.log(`[SyncEngine] Pushed update to job: ${localJob.id}`);
+              console.log(`[SyncEngine] ✓ Pushed update to job: ${localJob.id}`);
               localJob.synced_at = new Date().toISOString();
               await this.db.saveJob(localJob);
             }
@@ -208,10 +232,10 @@ class SyncEngine {
       // Update last sync time
       this.lastSyncTime = new Date();
       localStorage.setItem('nx_last_sync_time', this.lastSyncTime.toISOString());
-      console.log('[SyncEngine] Push complete');
+      console.log('[SyncEngine] ✓ Push complete');
 
     } catch (error) {
-      console.error('[SyncEngine] Push failed:', error);
+      console.error('[SyncEngine] ✗ Push failed:', error);
     }
   }
 
@@ -219,8 +243,10 @@ class SyncEngine {
    * Full bi-directional sync
    */
   async fullSync() {
+    console.log('[SyncEngine] fullSync called - isSyncing:', this.isSyncing, 'isOnline:', this.supabase.isOnline);
+    
     if (this.isSyncing || !this.supabase.isOnline) {
-      console.log('[SyncEngine] Sync already in progress or offline');
+      console.log('[SyncEngine] Sync skipped - already in progress or offline');
       return;
     }
 
@@ -228,11 +254,16 @@ class SyncEngine {
     console.log('[SyncEngine] Starting full sync');
     
     try {
-      await this.pullRemoteJobs();
+      console.log('[SyncEngine] Step 1: Pull remote jobs');
+      const pullResult = await this.pullRemoteJobs();
+      console.log('[SyncEngine] Pull result:', pullResult);
+      
+      console.log('[SyncEngine] Step 2: Push local jobs');
       await this.pushLocalJobs();
-      console.log('[SyncEngine] Full sync complete');
+      
+      console.log('[SyncEngine] ✓ Full sync complete');
     } catch (error) {
-      console.error('[SyncEngine] Full sync failed:', error);
+      console.error('[SyncEngine] ✗ Full sync failed:', error);
     } finally {
       this.isSyncing = false;
     }
@@ -386,7 +417,7 @@ class SyncEngine {
       const newJob = this.reconstructJobFromCloud(remoteJob);
       this.state.jobs.push(newJob);
       await this.db.saveJob(newJob);
-      console.log(`[SyncEngine] Merged new job from ${source}: ${remoteJob.id}`);
+      console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id}`);
       return true; // change detected
     } else {
       // Update if remote is newer
@@ -394,10 +425,13 @@ class SyncEngine {
       const remoteTime = new Date(remoteJob.updated_at || 0);
 
       if (remoteTime > localTime) {
+        console.log(`[SyncEngine] Updating job ${remoteJob.id} - remote is newer (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
         Object.assign(localJob, this.reconstructJobFromCloud(remoteJob));
         await this.db.saveJob(localJob);
-        console.log(`[SyncEngine] Merged update from ${source}: ${remoteJob.id}`);
+        console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id}`);
         return true; // change detected
+      } else {
+        console.log(`[SyncEngine] Skipping job ${remoteJob.id} - local is up to date`);
       }
     }
     
