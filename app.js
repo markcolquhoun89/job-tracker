@@ -3543,7 +3543,11 @@
         try {
             const result = await window.supabaseClient.signUp(email, password, name);
             if (result.success) {
-                customAlert('Success', 'Account created! Signed in as ' + name + '.');
+                if (result.needsVerification) {
+                    customAlert('Verify Email', 'Account created. Check your inbox/spam and click the verification link, then sign in.');
+                } else {
+                    customAlert('Success', 'Account created! Signed in as ' + name + '.');
+                }
                 closeModal();
                 updateAuthUI();
                 render();

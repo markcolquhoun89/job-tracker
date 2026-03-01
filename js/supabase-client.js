@@ -49,6 +49,7 @@ class SupabaseClient {
   async signUp(email, password, displayName) {
     console.log('[Supabase] Signing up user:', email);
     try {
+      const emailRedirectTo = window.location.origin;
       const response = await fetch(`${this.url}/auth/v1/signup`, {
         method: 'POST',
         headers: {
@@ -58,12 +59,12 @@ class SupabaseClient {
         body: JSON.stringify({
           email,
           password,
-          data: { display_name: displayName }
+          data: { display_name: displayName },
+          email_redirect_to: emailRedirectTo
         })
       });
 
       const data = await response.json();
-      console.log('[Supabase] Signup response:', JSON.stringify(data));
       if (!response.ok) throw new Error(data.message || 'Signup failed');
 
       // Supabase signup returns user object (sometimes at top level, sometimes nested)
@@ -78,11 +79,11 @@ class SupabaseClient {
             user: user
           }));
           console.log('[Supabase] Signup successful - authenticated:', this.userId);
+          return { success: true, user: user, needsVerification: false };
         } else {
           console.log('[Supabase] Signup successful - awaiting email confirmation:', this.userId);
+          return { success: true, user: user, needsVerification: true };
         }
-        
-        return { success: true, user: user };
       } else {
         throw new Error('No user in response');
       }
