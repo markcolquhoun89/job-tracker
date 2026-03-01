@@ -333,3 +333,6 @@ class SupabaseClient {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = SupabaseClient;
 }
+
+// Ensure global availability in browser
+window.SupabaseClient = SupabaseClient;

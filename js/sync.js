@@ -380,3 +380,7 @@ class SyncEngine {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = SyncEngine;
 }
+
+// Ensure global availability in browser
+window.SyncEngine = SyncEngine;
+}
