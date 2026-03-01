@@ -2420,7 +2420,18 @@
         state.jobs.push({ id: generateID(), date: state.viewDate.toISOString().split('T')[0], type, status: 'Pending', fee: 0, notes: '', isUpgraded: false, jobID });
         closeModal(); save();
     }
-    function save() { localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); localStorage.setItem('nx_types', JSON.stringify(state.types)); render(true); }
+    function save() { 
+        localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
+        localStorage.setItem('nx_types', JSON.stringify(state.types)); 
+        
+        // Also save to modular IndexedDB for sync engine
+        if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
+            window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
+            window.JobTrackerDB.bulkPut('types', Object.keys(state.types).map(key => ({ id: key, ...state.types[key] }))).catch(err => console.warn('IndexedDB types save failed:', err));
+        }
+        
+        render(true); 
+    }
     // --- Collapsible Panel System ---
     function getPanelStates(tab) {
         const key = `nx_panels_${tab}`;
