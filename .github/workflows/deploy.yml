@@ -35,5 +35,5 @@ jobs:
           command: pages deploy . --project-name=job-tracker --branch=main
 
       - name: Show deployment URL
-        if: ${{ success() && steps.deploy.outputs.deployment-url != '' }}
-        run: echo "Deployment URL: ${{ steps.deploy.outputs.deployment-url }}"
+        if: success()
+        run: echo "Deployed to Cloudflare Pages"
