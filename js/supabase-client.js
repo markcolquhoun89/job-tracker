@@ -196,14 +196,19 @@ class SupabaseClient {
           'Content-Type': 'application/json',
           'apikey': this.anonKey,
           'Authorization': `Bearer ${this.token}`,
+          'Prefer': 'return=minimal'
         },
         body: JSON.stringify(data)
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      console.log(`[Supabase] Inserted into ${table}:`, result);
-      return { success: true, data: result };
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      // Supabase returns empty response by default for inserts
+      console.log(`[Supabase] Inserted into ${table}`);
+      return { success: true };
     } catch (error) {
       console.error(`[Supabase] INSERT ${table} failed:`, error);
       // Queue for retry
@@ -234,14 +239,18 @@ class SupabaseClient {
           'Content-Type': 'application/json',
           'apikey': this.anonKey,
           'Authorization': `Bearer ${this.token}`,
+          'Prefer': 'return=minimal'
         },
         body: JSON.stringify(data)
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      console.log(`[Supabase] Updated ${table}:`, result);
-      return { success: true, data: result };
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      console.log(`[Supabase] Updated ${table}`);
+      return { success: true };
     } catch (error) {
       console.error(`[Supabase] UPDATE ${table} failed:`, error);
       this.syncQueue.push({ op: 'update', table, data, filters, timestamp: Date.now() });
