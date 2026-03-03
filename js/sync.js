@@ -194,8 +194,20 @@ class SyncEngine {
       // Use app.js state if available, otherwise use modular state
       const localJobs = (window.state && window.state.jobs) ? window.state.jobs : this.state.jobs;
       const activeUserId = this.supabase.userId;
-      const scopedJobs = localJobs.filter(job => !job.user_id || job.user_id === activeUserId);
-      console.log('[SyncEngine] Pushing', scopedJobs.length, 'jobs from', window.state ? 'app.js' : 'modular', 'state');
+      
+      // Get current deletedJobIds to filter them out from regular push
+      const deletedKey = `nx_deleted_job_ids_user_${activeUserId}`;
+      const deletedJobIdsForFilter = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+      
+      // Filter out deleted jobs - they should not be pushed as regular jobs
+      const scopedJobs = localJobs.filter(job => {
+        if (deletedJobIdsForFilter.includes(job.id)) {
+          console.log('[SyncEngine] Skipping deleted job in push:', job.id);
+          return false;
+        }
+        return !job.user_id || job.user_id === activeUserId;
+      });
+      console.log('[SyncEngine] Pushing', scopedJobs.length, 'jobs from', window.state ? 'app.js' : 'modular', 'state', '(deleted:', deletedJobIdsForFilter.length + ')');
       
       for (const localJob of scopedJobs) {
         if (!localJob.user_id) {

@@ -3,7 +3,11 @@
 // ============================================================================
 
     let state = {
-        jobs: JSON.parse(localStorage.getItem('nx_jobs')) || [],
+        jobs: (() => {
+            const allJobs = JSON.parse(localStorage.getItem('nx_jobs')) || [];
+            const deleted = JSON.parse(localStorage.getItem('nx_deleted_job_ids') || '[]');
+            return allJobs.filter(j => !deleted.includes(j.id));
+        })(),
         types: JSON.parse(localStorage.getItem('nx_types')) || {
             OH: { pay: 44, int: 21, ug: null, countTowardsCompletion: true },
             UG: { pay: 42, int: 21, ug: null, countTowardsCompletion: true },
@@ -82,6 +86,7 @@
     // Soft-delete state
     let _deletedJob = null;
     let _deleteTimer = null;
+    let _pendingDeletions = new Map(); // Track multiple pending deletions: id -> { job, timer }
     // Wake lock
     let wakeLock = null;
     // --- Utility: relative time ---
@@ -2475,19 +2480,37 @@
         // Soft-delete with undo using shared toast
         const j = state.jobs.find(x => x.id === id);
         if (!j) return;
+        
+        // Track this deletion independently
         _deletedJob = { ...j };
+        _pendingDeletions.set(id, { job: { ...j }, undoable: true });
+        
         state.jobs = state.jobs.filter(x => x.id !== id);
         // Track deletion for sync
         if (!state.deletedJobIds.includes(id)) {
             state.deletedJobIds.push(id);
         }
-        save(); closeModal();
+        save();
+        closeModal();
+        
         const toast = document.getElementById('toast');
         clearTimeout(_deleteTimer);
-        clearTimeout(_undoTimer);
-        toast.innerHTML = `Job deleted <button class="toast-undo" onclick="undoDelete()">UNDO</button>`;
+        
+        const pendingCount = _pendingDeletions.size;
+        const undoLabel = pendingCount > 1 ? `${pendingCount} jobs deleted <button class="toast-undo" onclick="undoLastDelete()">UNDO</button>` : `Job deleted <button class="toast-undo" onclick="undoDelete()">UNDO</button>`;
+        toast.innerHTML = undoLabel;
         toast.classList.add('show');
-        _deleteTimer = setTimeout(() => { toast.classList.remove('show'); _deletedJob = null; }, 5000);
+        
+        // Set timer for this deletion: after 5 seconds, mark as non-undoable
+        _deleteTimer = setTimeout(() => {
+            // Mark all pending as non-undoable and hide toast
+            for (const [key, val] of _pendingDeletions.entries()) {
+                val.undoable = false;
+            }
+            _pendingDeletions.clear();
+            _deletedJob = null;
+            toast.classList.remove('show');
+        }, 5000);
     }
     
     // --- Management Controls (Manager/Admin only) ---
@@ -2697,6 +2720,12 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
+    function undoLastDelete() {
+        // Undo the most recent deletion
+        if (_deletedJob && _pendingDeletions.has(_deletedJob.id)) {
+            undoDelete();
+        }
+    }
     function undoDelete() {
         if (_deletedJob) {
             _deletedJob.user_id = getActiveUserId() || _deletedJob.user_id || null;
@@ -2704,6 +2733,7 @@
             state.jobs.push(_deletedJob);
             // Remove from deletion tracking on undo
             state.deletedJobIds = state.deletedJobIds.filter(id => id !== _deletedJob.id);
+            _pendingDeletions.delete(_deletedJob.id);
             _deletedJob = null;
             save();
         }
@@ -2831,12 +2861,16 @@
         const deletedKey = getDeletedJobsStorageKey();
         const loadedJobs = JSON.parse(localStorage.getItem(key) || '[]');
         const activeUserId = getActiveUserId();
+        const deletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+        
+        // Load jobs, filter by user AND exclude deleted jobs  
         state.jobs = activeUserId
             ? loadedJobs
-                .filter(j => !j.user_id || j.user_id === activeUserId)
+                .filter(j => (!j.user_id || j.user_id === activeUserId) && !deletedJobIds.includes(j.id))
                 .map(j => ({ ...j, user_id: activeUserId }))
-            : loadedJobs;
-        state.deletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+            : loadedJobs.filter(j => !deletedJobIds.includes(j.id));
+        
+        state.deletedJobIds = deletedJobIds;
         // Only write to scoped key - never to unscoped
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
