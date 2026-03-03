@@ -2926,12 +2926,15 @@
         const activeUserId = getActiveUserId();
         const previousAccountKey = localStorage.getItem('nx_last_loaded_user_id');
         
-        // If account has changed (login on new device or account switch), clear local cache
+        // If account has changed (login on new device or account switch), clear ALL local cache
         // This prevents old stale data from showing up before cloud sync completes
         if (previousAccountKey !== activeUserId) {
-            console.log(`[App] Account changed from ${previousAccountKey} to ${activeUserId}, clearing local cache`);
+            console.log(`[App] Account changed from ${previousAccountKey} to ${activeUserId}, clearing all local caches`);
+            // Clear scoped keys
             localStorage.removeItem(key);
             localStorage.removeItem(deletedKey);
+            // Clear unscoped keys (legacy/compatibility)
+            localStorage.removeItem('nx_jobs');
             localStorage.removeItem('nx_deleted_job_ids');
             localStorage.setItem('nx_last_loaded_user_id', activeUserId || '');
         }
@@ -2959,7 +2962,8 @@
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated && window.syncEngine) {
             console.log('[App] Pulling remote jobs after account load');
-            window.syncEngine.pullRemoteJobs().catch(err => console.warn('Pull failed:', err));
+            // Force a full sync (push + pull) to ensure complete cloud sync
+            window.syncEngine.fullSync().catch(err => console.warn('Full sync failed:', err));
         }
     }
     function save() { 
