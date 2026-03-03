@@ -67,18 +67,36 @@
         if (!state.types || !typeName) return null;
 
         const requestedType = String(typeName).trim();
-        let matchedKey = requestedType;
-
-        if (!state.types[matchedKey]) {
-            const requestedLower = requestedType.toLowerCase();
-            matchedKey = Object.keys(state.types).find(k => String(k).trim().toLowerCase() === requestedLower);
+        
+        // Handle object format (legacy)
+        if (typeof state.types === 'object' && !Array.isArray(state.types)) {
+            let matchedKey = requestedType;
+            if (!state.types[matchedKey]) {
+                const requestedLower = requestedType.toLowerCase();
+                matchedKey = Object.keys(state.types).find(k => String(k).trim().toLowerCase() === requestedLower);
+            }
+            const cfg = matchedKey ? state.types[matchedKey] : null;
+            if (cfg) return normalizeTypeConfig(cfg);
         }
-
-        const cfg = matchedKey ? state.types[matchedKey] : null;
-        if (!cfg) return null;
-
-        const normalized = normalizeTypeConfig(cfg);
-        return normalized;
+        
+        // Handle array format (modular)
+        if (Array.isArray(state.types)) {
+            const found = state.types.find(t => String(t.code).trim().toLowerCase() === requestedType.toLowerCase());
+            if (found) return normalizeTypeConfig(found);
+        }
+        
+        // Fallback: try object.entries if state.types looks mixed
+        try {
+            for (const [key, val] of Object.entries(state.types)) {
+                if (String(key).trim().toLowerCase() === requestedType.toLowerCase() && val) {
+                    return normalizeTypeConfig(val);
+                }
+            }
+        } catch (e) {
+            console.warn('[getTypeConfig] Error iterating types:', e);
+        }
+        
+        return null;
     }
 
     function getActiveUserId() {
@@ -1937,11 +1955,14 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                if (cfg?.upgradePay != null) {
-                    const label = j.isUpgraded ? '↻ REAPPLY UPGRADE' : '💰 UPGRADE';
-                    return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">${label} (£${cfg.upgradePay})</button>`;
+                if (cfg) {
+                    if (cfg?.upgradePay != null) {
+                        const label = j.isUpgraded ? '↻ REAPPLY UPGRADE' : '💰 UPGRADE';
+                        return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">${label} (£${cfg.upgradePay})</button>`;
+                    }
+                    return `<div style="background:#ffebee; color:#c62828; padding:8px; margin:8px 0; border-radius:4px; font-size:0.75rem;">⚠ Type ${j.type} has no upgrade rate set</div>`;
                 }
-                return '';
+                return `<div style="background:#ffcdd2; color:#b71c1c; padding:8px; margin:8px 0; border-radius:4px; font-size:0.75rem;">❌ Type config not found: ${j.type}</div>`;
             })()}
             ${j.status !== 'Pending' ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="if(confirm('Revert this job to Pending status?')) { const job = state.jobs.find(x => x.id === '${id}'); if(job) { job.status = 'Pending'; job.fee = 0; job.completedAt = null; job.isUpgraded = false; delete job.saturdayPremium; delete job.baseFee; save(); closeModal(); } }">↻ REVERT TO PENDING</button>` : ''}
             ${(['OH', 'UG', 'HyOH', 'HyUG'].includes(j.type) || j.isUpgraded) ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="openNotesWizard('${id}')">NOTES ASSISTANT</button>` : ''}
@@ -3210,10 +3231,18 @@
         
         // Also save to modular IndexedDB for sync engine
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
-            // Clear the store first to remove deleted jobs
+            // Clear the stores and save both jobs and types
             window.JobTrackerDB.clear('jobs').then(() => {
                 window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
             }).catch(err => console.warn('IndexedDB clear failed:', err));
+            
+            // Also save types to IndexedDB to prevent stale data on sync
+            const typesToSave = Array.isArray(state.types) 
+                ? state.types 
+                : Object.entries(state.types).map(([code, data]) => ({ code, ...data }));
+            window.JobTrackerDB.clear('types').then(() => {
+                window.JobTrackerDB.bulkPut('types', typesToSave).catch(err => console.warn('IndexedDB types save failed:', err));
+            }).catch(err => console.warn('IndexedDB types clear failed:', err));
         }
         
         // Save job types to cloud if authenticated
@@ -3259,10 +3288,18 @@
         
         // Also save to modular IndexedDB for sync engine
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
-            // Clear the store first to remove deleted jobs
+            // Clear the stores and save both jobs and types
             window.JobTrackerDB.clear('jobs').then(() => {
                 window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
             }).catch(err => console.warn('IndexedDB clear failed:', err));
+            
+            // Also save types to IndexedDB to prevent stale data on sync
+            const typesToSave = Array.isArray(state.types) 
+                ? state.types 
+                : Object.entries(state.types).map(([code, data]) => ({ code, ...data }));
+            window.JobTrackerDB.clear('types').then(() => {
+                window.JobTrackerDB.bulkPut('types', typesToSave).catch(err => console.warn('IndexedDB types save failed:', err));
+            }).catch(err => console.warn('IndexedDB types clear failed:', err));
         }
         
         // Save job types to cloud if authenticated
