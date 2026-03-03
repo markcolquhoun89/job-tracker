@@ -5,9 +5,12 @@
     let state = {
         jobs: JSON.parse(localStorage.getItem('nx_jobs')) || [],
         types: JSON.parse(localStorage.getItem('nx_types')) || {
-            OH: { pay: 44, int: 21 }, UG: { pay: 42, int: 21 },
-            HyOH: { pay: 55, int: 21 }, HyUG: { pay: 55, int: 21 },
-            RC: { pay: 20, int: null }, BTTW: { pay: 20, int: null }
+            OH: { pay: 44, int: 21, ug: null, countTowardsCompletion: true },
+            UG: { pay: 42, int: 21, ug: null, countTowardsCompletion: true },
+            HyOH: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
+            HyUG: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
+            RC: { pay: 20, int: null, ug: null, countTowardsCompletion: true },
+            BTTW: { pay: 20, int: null, ug: null, countTowardsCompletion: true }
         },
         viewDate: new Date(),
         range: 'day',
@@ -17,6 +20,52 @@
     
     // Expose state globally for sync engine and bridge
     window.state = state;
+
+    function normalizeTypeConfig(typeData) {
+        const pay = parseFloat(typeData?.pay);
+        const int = (typeData?.int === '' || typeData?.int == null || isNaN(parseFloat(typeData.int)))
+            ? null
+            : parseFloat(typeData.int);
+        const ug = (typeData?.ug === '' || typeData?.ug == null || isNaN(parseFloat(typeData.ug)))
+            ? null
+            : parseFloat(typeData.ug);
+        const countTowardsCompletion = typeData?.countTowardsCompletion !== false;
+
+        return {
+            pay: isNaN(pay) ? 0 : pay,
+            int,
+            ug,
+            countTowardsCompletion
+        };
+    }
+
+    function normalizeAllTypes() {
+        Object.keys(state.types || {}).forEach(typeName => {
+            state.types[typeName] = normalizeTypeConfig(state.types[typeName]);
+        });
+    }
+
+    function getTypeConfig(typeName) {
+        const cfg = state.types && state.types[typeName] ? state.types[typeName] : null;
+        return cfg ? normalizeTypeConfig(cfg) : null;
+    }
+
+    function getActiveUserId() {
+        const authStatus = window.supabaseClient?.getStatus?.();
+        return authStatus?.isAuthenticated && authStatus?.userId ? authStatus.userId : null;
+    }
+
+    function getDeletedJobsStorageKey() {
+        const userId = getActiveUserId();
+        return userId ? `nx_deleted_job_ids_user_${userId}` : 'nx_deleted_job_ids_anon';
+    }
+
+    function getLeaderboardParticipationKey() {
+        const userId = getActiveUserId();
+        return userId ? `nx_leaderboard_enabled_user_${userId}` : 'nx_leaderboard_enabled_anon';
+    }
+
+    normalizeAllTypes();
     const noteTemplates = {
         'Cable Fault': 'Issue: [Describe the cable fault]\nLocation: [Cable location/route]\nResolution: [How the issue was resolved]\nTime: [Duration of repair]',
         'New Install': 'Type: [Type of installation]\nLocation: [Installation site]\nEquipment: [Equipment used]\nCompletion: [Installation status]',
@@ -163,12 +212,13 @@
         }
     }
     function toggleLeaderboardParticipation() {
-        const isEnabled = localStorage.getItem('nx_leaderboard_enabled') === '1';
+        const key = getLeaderboardParticipationKey();
+        const isEnabled = localStorage.getItem(key) === '1';
         if (isEnabled) {
-            localStorage.setItem('nx_leaderboard_enabled', '0');
+            localStorage.setItem(key, '0');
             showRoleChangeNotification('Leaderboard disabled');
         } else {
-            localStorage.setItem('nx_leaderboard_enabled', '1');
+            localStorage.setItem(key, '1');
             showRoleChangeNotification('Leaderboard enabled');
         }
         render();
@@ -334,7 +384,12 @@
         });
     }
     function calculate(list) {
-        const res = list.filter(j => ['Completed', 'Failed', 'Internals'].includes(j.status));
+        const completionEligible = list.filter(j => {
+            const cfg = getTypeConfig(j.type);
+            return cfg ? cfg.countTowardsCompletion !== false : true;
+        });
+
+        const res = completionEligible.filter(j => ['Completed', 'Failed', 'Internals'].includes(j.status));
         const noHy = res.filter(j => !j.type.toUpperCase().startsWith('HY'));
         const rate = (arr) => {
             if (!arr.length) return 0;
@@ -358,6 +413,21 @@
         for (const j of sorted) {
             if (j.status === 'Completed') streak++;
             else break;
+        }
+
+        // Longest streak within current period
+        const oldestFirstResolved = [...list]
+            .filter(j => j.status !== 'Pending')
+            .sort((a, b) => (a.completedAt || 0) - (b.completedAt || 0));
+        let runningStreak = 0;
+        let longestStreakInRange = 0;
+        for (const j of oldestFirstResolved) {
+            if (j.status === 'Completed') {
+                runningStreak++;
+                longestStreakInRange = Math.max(longestStreakInRange, runningStreak);
+            } else {
+                runningStreak = 0;
+            }
         }
         // Status breakdown per job type
         const typeBreakdown = {};
@@ -383,7 +453,29 @@
         const failedRev = list.filter(j => j.status === 'Failed').reduce((a, b) => a + parseFloat(b.fee || 0), 0);
         const internalRev = list.filter(j => j.status === 'Internals').reduce((a, b) => a + parseFloat(b.fee || 0), 0);
         const pendingRev = list.filter(j => j.status === 'Pending').reduce((a, b) => a + parseFloat(b.fee || 0), 0);
-        return { compRate: rate(res), exclHy: rate(noHy), totalCash, vol: list.length, done, ints, fails, pend, avgJobPay, avgDailyPay, avgJobsPerDay, daysWorked, streak, typeBreakdown, byWeekday, completedRev, failedRev, internalRev, pendingRev };
+        return {
+            compRate: rate(res),
+            exclHy: rate(noHy),
+            totalCash,
+            vol: list.length,
+            done,
+            ints,
+            fails,
+            pend,
+            avgJobPay,
+            avgDailyPay,
+            avgJobsPerDay,
+            daysWorked,
+            streak,
+            longestStreakInRange,
+            eligibleForCompletion: completionEligible.length,
+            typeBreakdown,
+            byWeekday,
+            completedRev,
+            failedRev,
+            internalRev,
+            pendingRev
+        };
     }
     function render(softUpdate) {
         const container = document.getElementById('view-container');
@@ -527,7 +619,7 @@
                         if (j.status === 'Pending' && !actions) {
                             const div = document.createElement('div');
                             div.className = 'job-actions';
-                            const hasInt = state.types[j.type] && state.types[j.type].int !== null;
+                            const hasInt = getTypeConfig(j.type)?.int != null;
                             div.innerHTML = `
                                 <button class="action-btn done" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Completed')"><span>\u2713</span> FINISH</button>
                                 ${hasInt ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INT</button>` : ''}
@@ -583,7 +675,7 @@
                         <div class="comp-meter-row">
                             <div class="comp-meter-pct" data-meter="all" style="color:${rateColor1}">${s.compRate}%</div>
                             <div class="comp-meter-info">
-                                <div class="comp-meter-label">Completion Rate (INT=FAIL)</div>
+                                <div class="comp-meter-label">Completion Rate (eligible job types)</div>
                                 <div class="comp-meter-track"><div class="comp-meter-fill" data-fill="all" style="width:${Math.min(s.compRate,100)}%; background:${rateColor1};"></div><div class="comp-meter-target" style="left:${target}%;"></div></div>
                             </div>
                         </div>
@@ -642,7 +734,7 @@
         const storedFee = parseFloat(j.fee || 0);
         if (!isSat || (j.status !== 'Completed' && j.status !== 'Internals') || storedFee <= 0 || j.manualFee === true) return null;
 
-        const typeCfg = state.types && state.types[j.type] ? state.types[j.type] : null;
+        const typeCfg = getTypeConfig(j.type);
         
         // Use Internal rate for Internals, completed rate for Completed
         const configuredBase = j.status === 'Internals' 
@@ -739,7 +831,7 @@
                     ${j.status === 'Pending' ? `
                     <div class="job-actions">
                         <button class="action-btn done" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Completed')"><span>\u2713</span> FINISH</button>
-                        ${(state.types[j.type] && state.types[j.type].int !== null) ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INT</button>` : ''}
+                        ${(getTypeConfig(j.type)?.int != null) ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INT</button>` : ''}
                         <button class="action-btn fail" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Failed')"><span>\u2715</span> FAIL</button>
                     </div>` : ''}
                 </div>
@@ -1288,88 +1380,200 @@
             </div>` + orderedPanels.map(p => wrapPanel(p.id, p.title, p.content, 'funds', p.icon || '')).join('');
     }
     function renderLeaderboard(container, list, s) {
-        const isEnabled = localStorage.getItem('nx_leaderboard_enabled') === '1';
-        const displayName = localStorage.getItem('nx_displayName') || 'Anonymous';
-        
+        const participationKey = getLeaderboardParticipationKey();
+        const isEnabled = localStorage.getItem(participationKey) === '1';
+
         if (!isEnabled) {
             container.innerHTML = `<div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
                 <div style="margin-bottom:16px; opacity:0.4;"><svg viewBox="0 0 24 24" width="56" height="56" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6-6 6 6"/><polyline points="3 6 3 20 21 20"/><path d="M7 11v9"/><path d="M12 8v12"/><path d="M17 10v11"/></svg></div>
                 <h3 style="color:var(--text-main); margin-bottom:8px;">Leaderboards Disabled</h3>
-                <p style="font-size:0.8rem;">Enable leaderboard participation in settings to join the global leaderboards and compete with other users.</p>
+                <p style="font-size:0.8rem;">Enable leaderboard participation in settings to join leaderboard rankings.</p>
                 <button class="btn" style="background:var(--primary); color:#fff; margin-top:16px;" onclick="navSettings()">Enable in Settings</button>
             </div>`;
             return;
         }
-        
-        // Calculate your stats
-        const userCompleted = list.filter(j => j.status === 'Completed').length;
-        const userEarnings = s.totalCash || 0;
-        const userAvgPay = s.avgJobPay || 0;
-        const userStreak = s.streak || 0;
-        
-        // Mock leaderboard data - in production, this would come from Supabase
-        const leaderboardData = [
-            { rank: 1, name: 'Alex Pro', completed: 248, earnings: 12400, avgPay: 50, streak: 23, you: false },
-            { rank: 2, name: 'Jordan', completed: 186, earnings: 9300, avgPay: 50, streak: 18, you: false },
-            { rank: 3, name: displayName, completed: userCompleted, earnings: userEarnings, avgPay: userAvgPay, streak: userStreak, you: true },
-            { rank: 4, name: 'Casey Tech', completed: 142, earnings: 7100, avgPay: 50, streak: 12, you: false },
-            { rank: 5, name: 'Morgan Swift', completed: 128, earnings: 6400, avgPay: 50, streak: 9, you: false },
-        ].sort((a, b) => b.completed - a.completed).map((user, idx) => ({...user, rank: idx + 1}));
-        
-        const you = leaderboardData.find(u => u.you) || {};
-        const yourRank = you.rank || '–';
-        
-        container.innerHTML = `
-            <div class="panel" style="background:linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--primary) 5%, transparent)); border:2px solid var(--primary); margin-bottom:16px;">
-                <div style="text-align:center; padding:8px 0;">
-                    <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Your Rank</div>
-                    <b style="font-size:2.4rem; color:var(--primary);">#${yourRank}</b>
-                </div>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
-                <div class="panel" style="margin-bottom:0; padding:14px;">
-                    <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Jobs Completed</div>
-                    <b style="font-size:1.6rem;">${userCompleted}</b>
-                </div>
-                <div class="panel" style="margin-bottom:0; padding:14px;">
-                    <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Total Earned</div>
-                    <b style="font-size:1.6rem; color:var(--success);">£${userEarnings.toFixed(0)}</b>
-                </div>
-            </div>
-            <div class="panel" style="padding:0; border:none; background:transparent; margin-bottom:0;">
+
+        container.innerHTML = `<div style="text-align:center; padding:40px 20px; color:var(--text-muted);">Loading leaderboard data...</div>`;
+
+        const activeUserId = getActiveUserId();
+        const refDate = new Date(state.viewDate);
+        let startDate = new Date(refDate);
+        let endDate = new Date(refDate);
+
+        if (state.range === 'day') {
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+        } else if (state.range === 'week') {
+            const daysToSat = (refDate.getDay() + 1) % 7;
+            startDate.setDate(refDate.getDate() - daysToSat);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6);
+            endDate.setHours(23, 59, 59, 999);
+        } else if (state.range === 'month') {
+            startDate = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+            endDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59, 999);
+        } else {
+            startDate = new Date(refDate.getFullYear(), 0, 1);
+            endDate = new Date(refDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+        }
+
+        const inRange = (jobDateStr) => {
+            const jobDate = new Date(jobDateStr + 'T00:00:00');
+            return jobDate >= startDate && jobDate <= endDate;
+        };
+
+        const computeCurrentStreak = (jobs) => {
+            const toTime = (value) => {
+                if (!value) return 0;
+                if (typeof value === 'number') return value;
+                const parsed = new Date(value).getTime();
+                return isNaN(parsed) ? 0 : parsed;
+            };
+            const resolved = [...jobs]
+                .filter(j => j.status !== 'Pending')
+                .sort((a, b) => toTime(b.completed_at || b.completedAt) - toTime(a.completed_at || a.completedAt));
+            let streak = 0;
+            for (const j of resolved) {
+                if (j.status === 'Completed') streak++;
+                else break;
+            }
+            return streak;
+        };
+
+        const computeLongestStreak = (jobs) => {
+            const toTime = (value) => {
+                if (!value) return 0;
+                if (typeof value === 'number') return value;
+                const parsed = new Date(value).getTime();
+                return isNaN(parsed) ? 0 : parsed;
+            };
+            const resolved = [...jobs]
+                .filter(j => j.status !== 'Pending')
+                .sort((a, b) => toTime(a.completed_at || a.completedAt) - toTime(b.completed_at || b.completedAt));
+            let run = 0;
+            let maxRun = 0;
+            for (const j of resolved) {
+                if (j.status === 'Completed') {
+                    run++;
+                    maxRun = Math.max(maxRun, run);
+                } else {
+                    run = 0;
+                }
+            }
+            return maxRun;
+        };
+
+        const completionRate = (jobs) => {
+            const resolved = jobs.filter(j => {
+                if (!['Completed', 'Failed', 'Internals'].includes(j.status)) return false;
+                const cfg = getTypeConfig(j.job_type || j.type);
+                return cfg ? cfg.countTowardsCompletion !== false : true;
+            });
+            if (resolved.length === 0) return 0;
+            const completed = resolved.filter(j => j.status === 'Completed').length;
+            return parseFloat(((completed / resolved.length) * 100).toFixed(1));
+        };
+
+        const renderMetricBoard = (title, key, rows, formatValue) => {
+            if (!rows.length) {
+                return `<div class="panel"><h4 style="margin:0 0 10px 0;">${title}</h4><div style="color:var(--text-muted); font-size:0.8rem;">No data for this period.</div></div>`;
+            }
+
+            return `<div class="panel" style="padding:0; overflow:hidden;">
+                <div style="padding:12px 12px 8px; font-weight:700;">${title}</div>
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead>
-                        <tr style="border-bottom:2px solid var(--border-t); text-align:left;">
-                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700;">Rank</th>
-                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700;">Name</th>
-                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700; text-align:right;">Completed</th>
-                            <th style="padding:12px 8px; color:var(--text-muted); font-weight:700; text-align:right;">Earnings</th>
+                        <tr style="border-bottom:1px solid var(--border-t); text-align:left;">
+                            <th style="padding:8px; color:var(--text-muted);">Rank</th>
+                            <th style="padding:8px; color:var(--text-muted);">Name</th>
+                            <th style="padding:8px; color:var(--text-muted); text-align:right;">Value</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${leaderboardData.map(user => `
-                            <tr style="border-bottom:1px solid var(--border-t); background:${user.you ? 'var(--primary-dim)' : 'transparent'};">
-                                <td style="padding:12px 8px; font-weight:700; color:${user.rank <= 3 ? (user.rank === 1 ? '#FFD700' : user.rank === 2 ? '#C0C0C0' : '#CD7F32') : 'var(--text-muted)'};">
-                                    ${user.rank <= 3 ? (user.rank === 1 ? '🥇' : user.rank === 2 ? '🥈' : '🥉') : user.rank}
-                                </td>
-                                <td style="padding:12px 8px; font-weight:700; color:${user.you ? 'var(--primary)' : 'var(--text-main)'};">${user.name}${user.you ? ' (You)' : ''}</td>
-                                <td style="padding:12px 8px; text-align:right; color:var(--text-muted);">${user.completed}</td>
-                                <td style="padding:12px 8px; text-align:right; font-weight:600; color:var(--success);">£${user.earnings}</td>
-                            </tr>
-                        `).join('')}
+                        ${rows.map((row, index) => {
+                            const rank = index + 1;
+                            return `<tr style="border-bottom:1px solid var(--border-t); background:${row.user_id === activeUserId ? 'var(--primary-dim)' : 'transparent'};">
+                                <td style="padding:8px; font-weight:700; color:var(--text-muted);">${rank}</td>
+                                <td style="padding:8px; font-weight:700; color:${row.user_id === activeUserId ? 'var(--primary)' : 'var(--text-main)'};">${row.display_name}${row.user_id === activeUserId ? ' (You)' : ''}</td>
+                                <td style="padding:8px; text-align:right; font-weight:700;">${formatValue(row[key])}</td>
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
-            </div>
-            <div style="margin-top:20px; padding:12px; background:var(--surface-elev); border-radius:8px; border:1px solid var(--border-t); font-size:0.75rem; color:var(--text-muted);">
-                <div style="margin-bottom:8px;"><strong>💡 How Leaderboards Work:</strong></div>
-                <ul style="margin:0; padding-left:16px;">
-                    <li>Rankings are based on jobs completed in the current week</li>
-                    <li>Automatically calculated and updated every hour</li>
-                    <li>Only shows participants who have enabled leaderboards</li>
-                    <li>Disable anytime from settings without losing data</li>
-                </ul>
-            </div>
-        `;
+            </div>`;
+        };
+
+        (async () => {
+            try {
+                const [profiles, jobs] = await Promise.all([
+                    window.supabaseClient.select('profiles', { select: 'id,display_name' }),
+                    window.supabaseClient.select('jobs', {
+                        select: 'id,user_id,job_type,date,status,completed_at,updated_at'
+                    })
+                ]);
+
+                const profileMap = new Map((Array.isArray(profiles) ? profiles : []).map(p => [p.id, p.display_name || 'Anonymous']));
+                const allJobs = Array.isArray(jobs) ? jobs : [];
+
+                if (!allJobs.length) {
+                    container.innerHTML = `<div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
+                        <h3 style="color:var(--text-main); margin-bottom:8px;">No leaderboard data yet</h3>
+                        <p style="font-size:0.8rem;">Once jobs are logged, leaderboard metrics will appear here.</p>
+                    </div>`;
+                    return;
+                }
+
+                const byUser = new Map();
+                allJobs.forEach(job => {
+                    if (!job.user_id) return;
+                    if (!byUser.has(job.user_id)) byUser.set(job.user_id, []);
+                    byUser.get(job.user_id).push(job);
+                });
+
+                const metrics = [];
+                byUser.forEach((userJobs, userId) => {
+                    const periodJobs = userJobs.filter(j => inRange(j.date));
+                    const completedPeriod = periodJobs.filter(j => j.status === 'Completed').length;
+
+                    metrics.push({
+                        user_id: userId,
+                        display_name: profileMap.get(userId) || (userId === activeUserId ? (localStorage.getItem('nx_displayName') || 'You') : 'Anonymous'),
+                        completion_rate: completionRate(periodJobs),
+                        current_streak: computeCurrentStreak(periodJobs),
+                        longest_streak_all_time: computeLongestStreak(userJobs),
+                        completed_jobs: completedPeriod
+                    });
+                });
+
+                const withPeriodData = metrics.filter(m => m.completed_jobs > 0 || m.completion_rate > 0 || m.current_streak > 0);
+                const completionRows = [...withPeriodData].sort((a, b) => b.completion_rate - a.completion_rate || b.completed_jobs - a.completed_jobs);
+                const currentStreakRows = [...withPeriodData].sort((a, b) => b.current_streak - a.current_streak || b.completion_rate - a.completion_rate);
+                const longestRows = [...metrics].sort((a, b) => b.longest_streak_all_time - a.longest_streak_all_time || b.completion_rate - a.completion_rate);
+                const completedRows = [...withPeriodData].sort((a, b) => b.completed_jobs - a.completed_jobs || b.completion_rate - a.completion_rate);
+
+                const currentUser = completionRows.find(r => r.user_id === activeUserId) || metrics.find(r => r.user_id === activeUserId);
+
+                container.innerHTML = `
+                    <div class="panel" style="margin-bottom:12px; background:linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--primary) 5%, transparent)); border:1px solid var(--border-t);">
+                        <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Your Completion Rate (${state.range.toUpperCase()})</div>
+                        <div style="margin-top:4px; font-size:1.8rem; font-weight:800; color:var(--primary);">${currentUser ? currentUser.completion_rate.toFixed(1) + '%' : '—'}</div>
+                    </div>
+                    <div style="display:grid; gap:12px;">
+                        ${renderMetricBoard('Completion Rate', 'completion_rate', completionRows, value => `${value.toFixed(1)}%`)}
+                        ${renderMetricBoard('Current Streak', 'current_streak', currentStreakRows, value => `${value}`)}
+                        ${renderMetricBoard('Longest Streak (All Time)', 'longest_streak_all_time', longestRows, value => `${value}`)}
+                        ${renderMetricBoard('Completed Jobs', 'completed_jobs', completedRows, value => `${value}`)}
+                    </div>
+                `;
+            } catch (error) {
+                console.warn('Leaderboard load failed:', error);
+                container.innerHTML = `<div style="text-align:center; padding:50px 20px; color:var(--text-muted);">
+                    <h3 style="color:var(--text-main); margin-bottom:8px;">Leaderboard unavailable</h3>
+                    <p style="font-size:0.8rem;">Could not load leaderboard data right now.</p>
+                </div>`;
+            }
+        })();
     }
     function buildBgAnimOptions() {
         var anims = [
@@ -1470,7 +1674,7 @@
                 content: `<div style=\"max-height:250px; overflow-y:auto; margin-bottom:12px; padding-right:10px;\">
                     ${Object.entries(state.types).map(([name, data]) => `
                         <div style=\"display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border-t); gap:12px;\">
-                            <div style=\"min-width:0;\"><b>${name}</b><br><span style=\"font-size:0.7rem; color:var(--text-muted)\">&pound;${data.pay} / Int: &pound;${data.int || 0}</span></div>
+                            <div style="min-width:0;"><b>${name}</b><br><span style="font-size:0.7rem; color:var(--text-muted)">&pound;${data.pay} · Int: ${data.int == null ? 'N/A' : '&pound;' + data.int} · UG: ${data.ug == null ? 'N/A' : '&pound;' + data.ug} · Completion: ${data.countTowardsCompletion === false ? 'Off' : 'On'}</span></div>
                             <button class=\"btn\" style=\"width:auto; min-width:54px; flex-shrink:0; padding:6px 12px; margin:0; font-size:0.6rem; background:var(--border)\" onclick=\"editTypeModal('${name}')\">EDIT</button>
                         </div>
                     `).join('')}
@@ -1514,16 +1718,16 @@
                 title: 'Leaderboards',
                 icon: '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6-6 6 6"/><polyline points="3 6 3 20 21 20"/><path d="M7 11v9"/><path d="M12 8v12"/><path d="M17 10v11"/></svg>',
                 content: `<div class=\"theme-toggle-row\">
-                    <div><span>Participate in Leaderboards</span><br><small>Join weekly rankings (disabled by default)</small></div>
+                    <div><span>Participate in Leaderboards</span><br><small>Join period-based rankings (disabled by default)</small></div>
                     <label class=\"toggle-switch\">
-                        <input type=\"checkbox\" ${localStorage.getItem('nx_leaderboard_enabled') === '1' ? 'checked' : ''} onchange=\"toggleLeaderboardParticipation()\">
+                        <input type=\"checkbox\" ${localStorage.getItem(getLeaderboardParticipationKey()) === '1' ? 'checked' : ''} onchange=\"toggleLeaderboardParticipation()\">
                         <span class=\"toggle-track\"></span>
                     </label>
                 </div>
                 <div style=\"margin-top:16px; padding:12px; background:var(--surface-elev); border-radius:8px; border:1px solid var(--border-t); font-size:0.75rem; color:var(--text-muted);\">
                     <strong style=\"color:var(--text-main);\">📊 What are Leaderboards?</strong><br>
                     <div style=\"margin-top:8px; line-height:1.6;\">
-                        Opt-in global rankings based on jobs completed each week. Your display name and stats appear only if you enable participation. You can toggle this anytime.
+                        Opt-in leaderboard rankings for completion rate, streaks, and completed jobs. Boards follow the current day/week/month/year period. You can toggle this anytime.
                     </div>
                 </div>`
             },
@@ -1636,9 +1840,9 @@
             </div>
             ${(j.type === 'BTTW' && !j.isUpgraded) ? `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px;" onclick="updateJob('${id}', 'Completed', true)">UPGRADE TO UG RATE</button>` : ''}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
-            <div style="display:grid; grid-template-columns:${(state.types[j.type] && state.types[j.type].int !== null) ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-bottom:10px;">
+            <div style="display:grid; grid-template-columns:${(getTypeConfig(j.type)?.int != null) ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-bottom:10px;">
                 <button class="btn" style="background:var(--success); margin:0; ${j.status === 'Completed' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Completed')">DONE</button>
-                ${(state.types[j.type] && state.types[j.type].int !== null) ? `<button class="btn" style="background:var(--warning); margin:0; ${j.status === 'Internals' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Internals')">INT</button>` : ''}
+                ${(getTypeConfig(j.type)?.int != null) ? `<button class="btn" style="background:var(--warning); margin:0; ${j.status === 'Internals' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Internals')">INT</button>` : ''}
                 <button class="btn" style="background:var(--danger); margin:0; ${j.status === 'Failed' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Failed')">FAIL</button>
             </div>
             ${j.status !== 'Pending' ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="if(confirm('Revert this job to Pending status?')) { const job = state.jobs.find(x => x.id === '${id}'); if(job) { job.status = 'Pending'; job.fee = 0; job.completedAt = null; job.isUpgraded = false; delete job.saturdayPremium; delete job.baseFee; save(); closeModal(); } }">↻ REVERT TO PENDING</button>` : ''}
@@ -2119,7 +2323,15 @@
             <h3 style="margin-bottom:16px;">NEW JOB TYPE</h3>
             <input type="text" id="nt-name" class="input-box" placeholder="Type Name (e.g. MDU)">
             <input type="number" id="nt-pay" class="input-box" placeholder="Standard Pay (&pound;)">
-            <input type="number" id="nt-int" class="input-box" placeholder="Internal Pay (&pound;) (Optional)">
+            <input type="number" id="nt-int" class="input-box" placeholder="Internal Pay (&pound;) (Optional, blank = no Internals)">
+            <input type="number" id="nt-ug" class="input-box" placeholder="Upgrade Pay (&pound;) (Optional, blank = no Upgrades)">
+            <div class="theme-toggle-row" style="margin-top:6px;">
+                <div><span>Count toward completion rate</span><br><small>Disable for job types that should not affect completion metrics</small></div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="nt-count" checked>
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
             <button class="btn" style="background:var(--primary); margin-top:16px;" onclick="saveNewType()">CREATE TYPE</button>
         `;
         m.style.display = 'flex';
@@ -2128,14 +2340,17 @@
         const name = document.getElementById('nt-name').value.trim();
         const pay = parseFloat(document.getElementById('nt-pay').value);
         const intVal = document.getElementById('nt-int').value.trim();
+        const ugVal = document.getElementById('nt-ug').value.trim();
+        const countTowardsCompletion = document.getElementById('nt-count').checked;
         const int = intVal === '' ? null : (parseFloat(intVal) || null);
+        const ug = ugVal === '' ? null : (parseFloat(ugVal) || null);
         if(!name || isNaN(pay)) return customAlert("Error", "Name and Standard Pay are required.", true);
         if(state.types[name]) return customAlert("Error", "A job type with this name already exists.", true);
-        state.types[name] = { pay, int };
+        state.types[name] = normalizeTypeConfig({ pay, int, ug, countTowardsCompletion });
         save(); closeModal(); customAlert("Success", `${name} has been created.`);
     }
     function editTypeModal(name) {
-        const t = state.types[name];
+        const t = getTypeConfig(name);
         const m = document.getElementById('modal');
         document.getElementById('modal-body').innerHTML = `
             <button class="close-btn" onclick="closeModal()">×</button>
@@ -2143,7 +2358,16 @@
             <label style="font-size:0.7rem; color:var(--text-muted)">Standard Pay (&pound;)</label>
             <input type="number" id="et-pay" class="input-box" value="${t.pay}">
             <label style="font-size:0.7rem; color:var(--text-muted)">Internal Pay (&pound;)</label>
-            <input type="number" id="et-int" class="input-box" value="${t.int || 0}">
+            <input type="number" id="et-int" class="input-box" value="${t.int == null ? '' : t.int}" placeholder="Leave blank to disable Internals">
+            <label style="font-size:0.7rem; color:var(--text-muted)">Upgrade Pay (&pound;)</label>
+            <input type="number" id="et-ug" class="input-box" value="${t.ug == null ? '' : t.ug}" placeholder="Leave blank to disable Upgrades">
+            <div class="theme-toggle-row" style="margin-top:6px;">
+                <div><span>Count toward completion rate</span><br><small>Disable for jobs that should not affect completion metrics</small></div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="et-count" ${t.countTowardsCompletion === false ? '' : 'checked'}>
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
             <button class="btn" style="background:var(--primary); margin-top:16px;" onclick="saveEditType('${name}')">SAVE CHANGES</button>
             <button class="btn" style="background:transparent; border:1px solid var(--danger); color:var(--danger); margin-top:8px;" onclick="confirmDeleteType('${name}')">DELETE TYPE</button>
         `;
@@ -2152,9 +2376,12 @@
     function saveEditType(name) {
         const pay = parseFloat(document.getElementById('et-pay').value);
         const intVal = document.getElementById('et-int').value.trim();
-        const int = intVal === '' || intVal === '0' ? null : (parseFloat(intVal) || null);
+        const ugVal = document.getElementById('et-ug').value.trim();
+        const countTowardsCompletion = document.getElementById('et-count').checked;
+        const int = intVal === '' ? null : (parseFloat(intVal) || null);
+        const ug = ugVal === '' ? null : (parseFloat(ugVal) || null);
         if(isNaN(pay)) return customAlert("Error", "Standard Pay is required.", true);
-        state.types[name] = { pay, int };
+        state.types[name] = normalizeTypeConfig({ pay, int, ug, countTowardsCompletion });
         save(); closeModal(); customAlert("Success", `${name} configuration updated.`);
     }
     function confirmDeleteType(name) {
@@ -2164,6 +2391,18 @@
     function updateJob(id, status, upgrade = false) {
         const j = state.jobs.find(x => x.id === id);
         if (!j) return;
+        const typeCfg = getTypeConfig(j.type);
+
+        if (status === 'Internals' && (!typeCfg || typeCfg.int == null)) {
+            customAlert("Error", `${j.type} does not support Internals.`, true);
+            return;
+        }
+
+        if (upgrade && (!typeCfg || typeCfg.ug == null)) {
+            customAlert("Error", `${j.type} does not support Upgrades.`, true);
+            return;
+        }
+
         j.status = status;
         // Track when the job was resolved for ordering
         if (status !== 'Pending') j.completedAt = Date.now();
@@ -2176,21 +2415,25 @@
         }
        
         if (upgrade) j.isUpgraded = true;
-        const typeRef = (j.type === 'BTTW' && j.isUpgraded) ? 'UG' : j.type;
-        if (!state.types[typeRef] && !state.types[j.type]) {
+        if (!typeCfg) {
             customAlert("Warning", "The pay configuration for this job type no longer exists. Value set to &pound;0.");
             j.fee = 0;
         } else {
             if (status === 'Completed') {
-                const basePay = parseFloat(state.types[typeRef].pay);
+                const basePay = j.isUpgraded && typeCfg.ug != null
+                    ? parseFloat(typeCfg.ug)
+                    : parseFloat(typeCfg.pay);
                 const jobDay = new Date(j.date + 'T00:00:00').getDay();
                 const isSaturday = jobDay === 6;
                 j.fee = isSaturday ? Math.round(basePay * 1.5 * 100) / 100 : basePay;
                 if (isSaturday) { j.saturdayPremium = true; j.baseFee = basePay; }
                 else { delete j.saturdayPremium; delete j.baseFee; }
-            } else if (status === 'Internals') j.fee = parseFloat(state.types[j.type].int || 0);
+            } else if (status === 'Internals') j.fee = parseFloat(typeCfg.int || 0);
             else j.fee = 0;
         }
+
+        j.user_id = getActiveUserId() || j.user_id || null;
+        j.updated_at = new Date().toISOString();
        
         // Reactive background pulse
         if (window.pulseBackground) window.pulseBackground(status);
@@ -2204,12 +2447,26 @@
         const j = state.jobs.find(x => x.id === id);
         j.notes = document.getElementById(`enotes-${id}`).value;
         j.jobID = document.getElementById(`edit-jobid-${id}`).value.trim() || null;
+        j.user_id = getActiveUserId() || j.user_id || null;
+        j.updated_at = new Date().toISOString();
         save(); closeModal();
     }
     function duplicateJob(id) {
         const j = state.jobs.find(x => x.id === id);
         if (!j) return;
-        const clone = { ...j, id: generateID(), status: 'Pending', fee: state.types[j.type]?.pay || j.fee, completedAt: null, isUpgraded: false, notes: '', jobID: null, date: state.viewDate.toISOString().split('T')[0] };
+        const clone = {
+            ...j,
+            id: generateID(),
+            status: 'Pending',
+            fee: getTypeConfig(j.type)?.pay || j.fee,
+            completedAt: null,
+            isUpgraded: false,
+            notes: '',
+            jobID: null,
+            date: state.viewDate.toISOString().split('T')[0],
+            user_id: getActiveUserId() || j.user_id || null,
+            updated_at: new Date().toISOString()
+        };
         state.jobs.push(clone);
         save(); closeModal();
         customAlert('Duplicated', `Cloned ${j.type} job to today as Pending.`);
@@ -2442,6 +2699,8 @@
 
     function undoDelete() {
         if (_deletedJob) {
+            _deletedJob.user_id = getActiveUserId() || _deletedJob.user_id || null;
+            _deletedJob.updated_at = new Date().toISOString();
             state.jobs.push(_deletedJob);
             // Remove from deletion tracking on undo
             state.deletedJobIds = state.deletedJobIds.filter(id => id !== _deletedJob.id);
@@ -2519,10 +2778,22 @@
     }
     function saveMultiJobs() {
         const counts = window.tempMultiCounts;
+        const activeUserId = getActiveUserId();
         let added = 0;
         Object.entries(counts).forEach(([type, count]) => {
             for(let i=0; i<count; i++) {
-                state.jobs.push({ id: generateID(), date: state.viewDate.toISOString().split('T')[0], type, status: 'Pending', fee: 0, notes: '', isUpgraded: false, jobID: null });
+                state.jobs.push({
+                    id: generateID(),
+                    date: state.viewDate.toISOString().split('T')[0],
+                    type,
+                    status: 'Pending',
+                    fee: 0,
+                    notes: '',
+                    isUpgraded: false,
+                    jobID: null,
+                    user_id: activeUserId,
+                    updated_at: new Date().toISOString()
+                });
                 added++;
             }
         });
@@ -2534,7 +2805,18 @@
     }
     function addJob(type) {
         const jobID = document.getElementById('new-jobid').value.trim() || null;
-        state.jobs.push({ id: generateID(), date: state.viewDate.toISOString().split('T')[0], type, status: 'Pending', fee: 0, notes: '', isUpgraded: false, jobID });
+        state.jobs.push({
+            id: generateID(),
+            date: state.viewDate.toISOString().split('T')[0],
+            type,
+            status: 'Pending',
+            fee: 0,
+            notes: '',
+            isUpgraded: false,
+            jobID,
+            user_id: getActiveUserId(),
+            updated_at: new Date().toISOString()
+        });
         closeModal(); save();
     }
     function getJobsStorageKey() {
@@ -2546,8 +2828,17 @@
     }
     function loadJobsForCurrentAccount() {
         const key = getJobsStorageKey();
-        state.jobs = JSON.parse(localStorage.getItem(key) || '[]');
+        const deletedKey = getDeletedJobsStorageKey();
+        const loadedJobs = JSON.parse(localStorage.getItem(key) || '[]');
+        const activeUserId = getActiveUserId();
+        state.jobs = activeUserId
+            ? loadedJobs
+                .filter(j => !j.user_id || j.user_id === activeUserId)
+                .map(j => ({ ...j, user_id: activeUserId }))
+            : loadedJobs;
+        state.deletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
+        localStorage.setItem('nx_deleted_job_ids', JSON.stringify(state.deletedJobIds));
         
         render();
         
@@ -2559,10 +2850,20 @@
         }
     }
     function save() { 
+        normalizeAllTypes();
+        const activeUserId = getActiveUserId();
+        if (activeUserId) {
+            state.jobs = state.jobs.map(job => ({
+                ...job,
+                user_id: activeUserId,
+                updated_at: job.updated_at || new Date().toISOString()
+            }));
+        }
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
         localStorage.setItem('nx_types', JSON.stringify(state.types)); 
         localStorage.setItem('nx_deleted_job_ids', JSON.stringify(state.deletedJobIds)); 
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
+        localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
         
         // Also save to modular IndexedDB for sync engine
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
@@ -2658,7 +2959,7 @@
         const j = state.jobs.find(x => x.id === id);
         if (!j) return;
         // Block Internals for types that don't support it
-        if (status === 'Internals' && state.types[j.type] && state.types[j.type].int === null) return;
+        if (status === 'Internals' && getTypeConfig(j.type)?.int == null) return;
         const prev = { status: j.status, fee: j.fee };
         // Status colour map for flash
         const flashMap = { 'Completed': 'var(--success)', 'Internals': 'var(--warning)', 'Failed': 'var(--danger)' };
@@ -2704,6 +3005,7 @@
         if (!j) return;
         j.status = prev.status;
         j.fee = prev.fee;
+        j.updated_at = new Date().toISOString();
         save();
         // Reactive background pulse with the reverted status colour
         if (window.pulseBackground) window.pulseBackground(prev.status);
@@ -2959,6 +3261,7 @@
                 const lines = text.split('\n').slice(1).filter(l => l.trim());
                 if (lines.length === 0) { customAlert("Import Failed", "CSV file is empty or has no data rows.", true); e.target.value = ''; return; }
                 let count = 0, skipped = 0;
+                const activeUserId = getActiveUserId();
                 const validStatuses = ['Pending', 'Completed', 'Internals', 'Failed'];
                 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
                 lines.forEach(line => {
@@ -2973,10 +3276,13 @@
                     if (isNaN(fee) || fee < 0) { skipped++; return; }
                     const notes = (parts[5] || '').trim();
                     const jobID = (parts[6] || '').trim() || null;
+                    const csvUserId = (parts[7] || '').trim() || null;
                     state.jobs.push({
                         id: generateID(), date, type, status, fee,
                         isUpgraded: parts.length >= 5 ? parts[4].trim() === 'true' : false,
-                        notes, jobID
+                        notes, jobID,
+                        user_id: csvUserId || activeUserId,
+                        updated_at: new Date().toISOString()
                     });
                     count++;
                 });
@@ -3711,6 +4017,20 @@
         }
     }
 
+    async function ensureSyncEngineReady() {
+        if (!window.supabaseClient || !window.SyncEngine) return;
+
+        if (!window.syncEngine) {
+            window.syncEngine = new SyncEngine(
+                window.supabaseClient,
+                window.JobTrackerDB,
+                window.JobTrackerState
+            );
+        }
+
+        await window.syncEngine.init();
+    }
+
     async function handleSignUp() {
         const email = document.getElementById('signup-email').value.trim();
         const password = document.getElementById('signup-password').value.trim();
@@ -3730,6 +4050,7 @@
                     customAlert('Verify Email', 'Account created. Check your inbox/spam and click the verification link, then sign in.');
                 } else {
                     await applyServerRole(result.user.id);
+                    await ensureSyncEngineReady();
                     customAlert('Success', 'Account created! Signed in as ' + name + '.');
                     loadJobsForCurrentAccount();
                 }
@@ -3764,6 +4085,7 @@
                 customAlert('Success', 'Signed in successfully!');
                 closeModal();
                 localStorage.setItem('nx_active_user_id', result.user.id);
+                await ensureSyncEngineReady();
                 updateAuthUI();
                 loadJobsForCurrentAccount();
             } else {

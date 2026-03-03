@@ -14,6 +14,8 @@ class SyncEngine {
     this.syncInterval = 30000; // 30 seconds
     this.lastRemoteCheckTime = null;
     this.lastRemoteCount = 0;
+    this.periodicSyncId = null;
+    this.eventsBound = false;
 
     console.log('[SyncEngine] Initialized');
   }
@@ -40,13 +42,16 @@ class SyncEngine {
     });
     this.lastRemoteCount = Array.isArray(remoteJobs) ? remoteJobs.length : 0;
     
-    // Start periodic sync (faster interval for real-time-ish feel)
+    // Start periodic sync
     this.startPeriodicSync();
     
-    // Set up event listeners for when jobs are added locally
-    window.addEventListener('nx-job-added', () => this.fullSync());
-    window.addEventListener('nx-job-updated', () => this.fullSync());
-    window.addEventListener('nx-job-deleted', () => this.fullSync());
+    // Set up event listeners once
+    if (!this.eventsBound) {
+      window.addEventListener('nx-job-added', () => this.fullSync());
+      window.addEventListener('nx-job-updated', () => this.fullSync());
+      window.addEventListener('nx-job-deleted', () => this.fullSync());
+      this.eventsBound = true;
+    }
     
     return true;
   }
@@ -55,7 +60,8 @@ class SyncEngine {
    * Pull jobs from Supabase
    */
   async pullRemoteJobs() {
-    if (!this.supabase.isOnline) {
+    const status = this.supabase.getStatus();
+    if (!this.supabase.isOnline || !status.isAuthenticated || !this.supabase.userId) {
       console.log('[SyncEngine] Offline, skipping pull');
       return false;
     }
@@ -126,7 +132,8 @@ class SyncEngine {
    * Check for remote updates since last sync
    */
   async hasRemoteUpdates() {
-    if (!this.supabase.isOnline) {
+    const status = this.supabase.getStatus();
+    if (!this.supabase.isOnline || !status.isAuthenticated || !this.supabase.userId) {
       return false;
     }
 
@@ -167,7 +174,8 @@ class SyncEngine {
    * Push local jobs to Supabase
    */
   async pushLocalJobs() {
-    if (!this.supabase.isOnline) {
+    const status = this.supabase.getStatus();
+    if (!this.supabase.isOnline || !status.isAuthenticated || !this.supabase.userId) {
       console.log('[SyncEngine] Offline, skipping push');
       return;
     }
@@ -176,12 +184,18 @@ class SyncEngine {
     try {
       // Use app.js state if available, otherwise use modular state
       const localJobs = (window.state && window.state.jobs) ? window.state.jobs : this.state.jobs;
-      console.log('[SyncEngine] Pushing', localJobs.length, 'jobs from', window.state ? 'app.js' : 'modular', 'state');
+      const activeUserId = this.supabase.userId;
+      const scopedJobs = localJobs.filter(job => !job.user_id || job.user_id === activeUserId);
+      console.log('[SyncEngine] Pushing', scopedJobs.length, 'jobs from', window.state ? 'app.js' : 'modular', 'state');
       
-      for (const localJob of localJobs) {
+      for (const localJob of scopedJobs) {
+        if (!localJob.user_id) {
+          localJob.user_id = activeUserId;
+        }
+
         // Check if job exists remote
         const remoteJob = await this.supabase.select('jobs', {
-          eq: { id: localJob.id }
+          eq: { id: localJob.id, user_id: activeUserId }
         });
 
         if (!remoteJob || remoteJob.length === 0) {
@@ -230,7 +244,7 @@ class SyncEngine {
         
         for (const deletedId of deletedJobIds) {
           try {
-            const result = await this.supabase.delete('jobs', { id: deletedId });
+            const result = await this.supabase.delete('jobs', { id: deletedId, user_id: activeUserId });
             if (result.success) {
               console.log(`[SyncEngine] ✓ Deleted job from cloud: ${deletedId}`);
               successfullyDeleted.push(deletedId);
@@ -267,8 +281,9 @@ class SyncEngine {
    */
   async fullSync() {
     console.log('[SyncEngine] fullSync called - isSyncing:', this.isSyncing, 'isOnline:', this.supabase.isOnline);
+    const status = this.supabase.getStatus();
     
-    if (this.isSyncing || !this.supabase.isOnline) {
+    if (this.isSyncing || !this.supabase.isOnline || !status.isAuthenticated || !this.supabase.userId) {
       console.log('[SyncEngine] Sync skipped - already in progress or offline');
       return;
     }
@@ -296,7 +311,8 @@ class SyncEngine {
    * Sync specific job
    */
   async syncJob(jobId) {
-    if (!this.supabase.isOnline) {
+    const status = this.supabase.getStatus();
+    if (!this.supabase.isOnline || !status.isAuthenticated || !this.supabase.userId) {
       console.log(`[SyncEngine] Offline, queuing sync for job ${jobId}`);
       return;
     }
@@ -310,7 +326,7 @@ class SyncEngine {
       }
 
       const remoteJobs = await this.supabase.select('jobs', {
-        eq: { id: jobId }
+        eq: { id: jobId, user_id: this.supabase.userId }
       });
 
       if (!Array.isArray(remoteJobs) || remoteJobs.length === 0) {
@@ -397,7 +413,24 @@ class SyncEngine {
   shouldUpdate(localJob, remoteJob) {
     const localTime = new Date(localJob.updated_at || 0);
     const remoteTime = new Date(remoteJob.updated_at || 0);
-    return localTime > remoteTime;
+    if (localTime > remoteTime) return true;
+
+    // Fallback: push if timestamps are stale/missing but payload differs
+    const localComparable = this.prepareJobForCloud(localJob);
+    const comparableKeys = [
+      'job_type', 'date', 'status', 'fee', 'base_fee', 'manual_fee', 'job_id_external',
+      'notes', 'is_upgraded', 'saturday_premium',
+      'elf', 'elf_added_by', 'elf_added_date',
+      'candids', 'candids_reason', 'candids_added_by', 'candids_added_date',
+      'chargeback', 'chargeback_reason', 'chargeback_amount', 'chargeback_week', 'chargeback_added_by', 'chargeback_added_date',
+      'completed_at'
+    ];
+
+    return comparableKeys.some(key => {
+      const localVal = localComparable[key] ?? null;
+      const remoteVal = remoteJob[key] ?? null;
+      return localVal !== remoteVal;
+    });
   }
 
   /**
@@ -507,6 +540,7 @@ class SyncEngine {
   reconstructJobFromCloud(remoteJob) {
     return {
       id: remoteJob.id,
+      user_id: remoteJob.user_id,
       type: remoteJob.job_type,
       date: remoteJob.date,
       status: remoteJob.status,
@@ -540,8 +574,12 @@ class SyncEngine {
    * Start periodic sync timer with smart change detection
    */
   startPeriodicSync() {
+    if (this.periodicSyncId) {
+      clearInterval(this.periodicSyncId);
+    }
+
     console.log(`[SyncEngine] Starting periodic sync every ${this.syncInterval}ms`);
-    setInterval(async () => {
+    this.periodicSyncId = setInterval(async () => {
       if (this.supabase.isOnline && !this.isSyncing) {
         // Quick check for remote updates first
         if (await this.hasRemoteUpdates()) {
