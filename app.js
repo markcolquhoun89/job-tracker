@@ -9,7 +9,7 @@
             HyOH: { pay: 55, int: 21, upgradePay: null, countTowardsCompletion: true },
             HyUG: { pay: 55, int: 21, upgradePay: null, countTowardsCompletion: true },
             RC: { pay: 20, int: null, upgradePay: null, countTowardsCompletion: true },
-            BTTW: { pay: 20, int: null, upgradePay: null, countTowardsCompletion: true }
+            BTTW: { pay: 20, int: null, upgradePay: 44, countTowardsCompletion: true }
         };
     }
 
