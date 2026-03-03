@@ -68,6 +68,15 @@ class SyncEngine {
 
     console.log('[SyncEngine] Pulling remote jobs for user:', this.supabase.userId);
     try {
+      // Refresh deletedJobIds from localStorage before pull - ensure we have the latest
+      // Always use user-scoped key to prevent cross-user pollution
+      const deletedKey = `nx_deleted_job_ids_user_${this.supabase.userId}`;
+      const freshDeletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+      if (window.state) {
+        window.state.deletedJobIds = freshDeletedJobIds;
+      }
+      console.log('[SyncEngine] Refreshed deletedJobIds from storage, count:', freshDeletedJobIds.length, 'key:', deletedKey);
+
       // Get all jobs for current user
       const remoteJobs = await this.supabase.select('jobs', {
         eq: { user_id: this.supabase.userId }
@@ -89,8 +98,8 @@ class SyncEngine {
       let changesDetected = false;
       const beforeCount = window.state && window.state.jobs ? window.state.jobs.length : 0;
 
-      // Get deleted job IDs to filter out
-      const deletedJobIds = (window.state && window.state.deletedJobIds) ? window.state.deletedJobIds : [];
+      // Use the freshly-loaded deleted job IDs from storage
+      const deletedJobIds = freshDeletedJobIds;
       
       // Merge with local jobs using conflict resolution
       for (const remoteJob of remoteJobs) {
@@ -277,7 +286,7 @@ class SyncEngine {
   }
 
   /**
-   * Full bi-directional sync
+   * Full bi-directional sync - PUSH deletions FIRST to prevent pull-back race condition
    */
   async fullSync() {
     console.log('[SyncEngine] fullSync called - isSyncing:', this.isSyncing, 'isOnline:', this.supabase.isOnline);
@@ -292,12 +301,12 @@ class SyncEngine {
     console.log('[SyncEngine] Starting full sync');
     
     try {
-      console.log('[SyncEngine] Step 1: Pull remote jobs');
+      console.log('[SyncEngine] Step 1: Push local jobs (including deletions) FIRST');
+      await this.pushLocalJobs();
+      
+      console.log('[SyncEngine] Step 2: Pull remote jobs after push completes');
       const pullResult = await this.pullRemoteJobs();
       console.log('[SyncEngine] Pull result:', pullResult);
-      
-      console.log('[SyncEngine] Step 2: Push local jobs');
-      await this.pushLocalJobs();
       
       console.log('[SyncEngine] ✓ Full sync complete');
     } catch (error) {

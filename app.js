@@ -2861,8 +2861,7 @@
         }
         localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
         localStorage.setItem('nx_types', JSON.stringify(state.types)); 
-        localStorage.setItem('nx_deleted_job_ids', JSON.stringify(state.deletedJobIds)); 
-        localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
+        // Save deletions ONLY to scoped key - consistent per-user tracking
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
         
         // Also save to modular IndexedDB for sync engine
