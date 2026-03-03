@@ -1928,19 +1928,19 @@
                 </div>
                 ${j.isUpgraded ? '<span style="background:var(--primary); color:#fff; font-size:0.65rem; padding:2px 8px; border-radius:6px; font-weight:700;">UPGRADED</span>' : ''}
             </div>
-            ${(() => {
-                const cfg = getTypeConfig(j.type);
-                if (cfg?.ug != null && !j.isUpgraded) {
-                    return `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
-                }
-                return '';
-            })()}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
             <div style="display:grid; grid-template-columns:${(getTypeConfig(j.type)?.int != null) ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-bottom:10px;">
                 <button class="btn" style="background:var(--success); margin:0; ${j.status === 'Completed' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Completed')">DONE</button>
                 ${(getTypeConfig(j.type)?.int != null) ? `<button class="btn" style="background:var(--warning); margin:0; ${j.status === 'Internals' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Internals')">INT</button>` : ''}
                 <button class="btn" style="background:var(--danger); margin:0; ${j.status === 'Failed' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Failed')">FAIL</button>
             </div>
+            ${(() => {
+                const cfg = getTypeConfig(j.type);
+                if (cfg?.ug != null && !j.isUpgraded) {
+                    return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
+                }
+                return '';
+            })()}
             ${j.status !== 'Pending' ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="if(confirm('Revert this job to Pending status?')) { const job = state.jobs.find(x => x.id === '${id}'); if(job) { job.status = 'Pending'; job.fee = 0; job.completedAt = null; job.isUpgraded = false; delete job.saturdayPremium; delete job.baseFee; save(); closeModal(); } }">↻ REVERT TO PENDING</button>` : ''}
             ${(['OH', 'UG', 'HyOH', 'HyUG'].includes(j.type) || j.isUpgraded) ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="openNotesWizard('${id}')">NOTES ASSISTANT</button>` : ''}
             <textarea id="enotes-${id}" class="input-box" placeholder="Optional notes...">${j.notes || ''}</textarea>
