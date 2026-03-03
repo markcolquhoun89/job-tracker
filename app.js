@@ -1675,7 +1675,7 @@
         const panels = [
             {
                 id: 'appearance',
-                title: 'Appearance',
+                title: 'Appearance & Display',
                 icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"/><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"/><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"/><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"/><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"/><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"/><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"/><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"/></svg>',
                 content: `<div class=\"theme-toggle-row\">
                     <div><span>Light Mode</span><br><small>Switch between dark and light themes</small></div>
@@ -1684,7 +1684,14 @@
                         <span class=\"toggle-track\"></span>
                     </label>
                 </div>
-                <div style=\"padding-top:12px;\">
+                
+                <div style=\"margin-top:16px; padding-top:16px; border-top:1px solid var(--border-subtle);\">
+                    <span style=\"font-size:0.85rem; font-weight:600; color:var(--text-main);\">Display Name</span><br>
+                    <small style=\"font-size:0.7rem; color:var(--text-muted);\">Your name on leaderboards</small>
+                    <input type="text" value="${(window.JobTrackerState && window.JobTrackerState.displayName) || state.displayName}" style="width:100%; padding:8px; margin-top:6px; border:1px solid var(--border-t); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.85rem;" placeholder="Your name" oninput="setDisplayNameGlobal(this.value);">
+                </div>
+                
+                <div style=\"padding-top:16px; margin-top:16px; border-top:1px solid var(--border-subtle);\">
                     <span style=\"font-size:0.85rem; font-weight:600; color:var(--text-main);\">Accent Colour</span><br>
                     <small style=\"font-size:0.7rem; color:var(--text-muted);\">Choose the base colour across the app</small>
                     <div class=\"picker-card\" onclick=\"this.classList.toggle('open')\">
@@ -1709,17 +1716,17 @@
                             </div>
                         </div>
                     </div>
-                </div>`
-            },
-            {
-                id: 'animation',
-                title: 'Background Animation',
-                icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><path d=\"M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/><path d=\"M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/><path d=\"M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/></svg>',
-                content: `<div class=\"picker-card\" onclick=\"this.classList.toggle('open')\">
-                    <div class=\"picker-card-header\"><span>Style</span><span class=\"picker-card-chevron\">▼</span></div>
-                    <div class=\"picker-card-body\" onclick=\"event.stopPropagation()\">
-                        <div class=\"bg-anim-grid\">
-                            ${buildBgAnimOptions()}
+                </div>
+                
+                <div style=\"padding-top:16px; margin-top:16px; border-top:1px solid var(--border-subtle);\">
+                    <span style=\"font-size:0.85rem; font-weight:600; color:var(--text-main);\">Background Animation</span><br>
+                    <small style=\"font-size:0.7rem; color:var(--text-muted);\">Choose an animated background style</small>
+                    <div class=\"picker-card\" onclick=\"this.classList.toggle('open')\">
+                        <div class=\"picker-card-header\"><span>Style</span><span class=\"picker-card-chevron\">▼</span></div>
+                        <div class=\"picker-card-body\" onclick=\"event.stopPropagation()\">
+                            <div class=\"bg-anim-grid\">
+                                ${buildBgAnimOptions()}
+                            </div>
                         </div>
                     </div>
                 </div>`
@@ -1739,60 +1746,17 @@
                 <button class=\"btn\" style=\"background:var(--primary); color:#fff\" onclick=\"addTypeModal()\">+ CREATE NEW JOB TYPE</button>`
             },
             {
-                id: 'team-access',
-                title: 'Team & Access',
-                icon: '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-                content: `<div style="margin-bottom:16px;">
-                    <span style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Display Name</span><br>
-                    <small style="font-size:0.7rem; color:var(--text-muted);">Used on leaderboards</small>
-                    <input type="text" value="${(window.JobTrackerState && window.JobTrackerState.displayName) || state.displayName}" style="width:100%; padding:8px; margin-top:6px; border:1px solid var(--border-t); border-radius:6px; background:var(--surface-elev); color:var(--text-main);" placeholder="Your name" oninput="setDisplayNameGlobal(this.value);">
-                </div>
-                <div>
-                    <span style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Role</span><br>
-                    <small style="font-size:0.7rem; color:var(--text-muted);">Test different team roles</small>
-                    <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn" data-role-btn="engineer" onclick="setUserRoleGlobal('engineer');" style="background:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'engineer' ? 'var(--primary)' : 'var(--border)'}; color:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'engineer' ? '#fff' : 'var(--text-main)'}; font-weight:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'engineer' ? '700' : '400'}; flex:1; min-width:90px; padding:8px; margin:0; font-size:0.75rem; transition:all 0.2s;">Engineer</button>
-                        <button class="btn" data-role-btn="manager" onclick="setUserRoleGlobal('manager');" style="background:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'manager' ? 'var(--primary)' : 'var(--border)'}; color:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'manager' ? '#fff' : 'var(--text-main)'}; font-weight:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'manager' ? '700' : '400'}; flex:1; min-width:90px; padding:8px; margin:0; font-size:0.75rem; transition:all 0.2s;">Manager</button>
-                        <button class="btn" data-role-btn="admin" onclick="setUserRoleGlobal('admin');" style="background:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'admin' ? 'var(--primary)' : 'var(--border)'}; color:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'admin' ? '#fff' : 'var(--text-main)'}; font-weight:${(window.JobTrackerState && window.JobTrackerState.userRole) === 'admin' ? '700' : '400'}; flex:1; min-width:90px; padding:8px; margin:0; font-size:0.75rem; transition:all 0.2s;">Admin</button>
-                    </div>
-                </div>`
-            },
-            {
-                title: 'Data Management',
-                icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\"/><path d=\"M21 12c0 1.66-4 3-9 3s-9-1.34-9-3\"/><path d=\"M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5\"/></svg>',
-                content: `<button class=\"btn\" style=\"background:var(--border); color:var(--text-main)\" onclick=\"exportCSV()\">EXPORT DATABASE (CSV)</button>
-                <div class=\"btn\" style=\"background:var(--border); color:var(--text-main); position:relative; overflow:hidden; text-align:center;\">
-                    IMPORT CSV
-                    <input type=\"file\" onchange=\"importCSV(event)\" style=\"position:absolute; top:0; right:0; bottom:0; left:0; opacity:0; cursor:pointer;\">
-                </div>
-                <button class=\"btn\" style=\"background:var(--primary); color:#fff; margin-top:10px;\" onclick=\"window.JobTrackerModals.showDataManagement()\">
-                    <span style=\"margin-right:6px;\">💾</span> ADVANCED DATA TOOLS
-                </button>
-                <button class=\"btn\" style=\"background:var(--danger); margin-top:24px;\" onclick=\"confirmWipe()\">WIPE DATA</button>`
-            },
-            {
-                id: 'leaderboards',
-                title: 'Leaderboards',
-                icon: '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6-6 6 6"/><polyline points="3 6 3 20 21 20"/><path d="M7 11v9"/><path d="M12 8v12"/><path d="M17 10v11"/></svg>',
+                id: 'features',
+                title: 'Features & Tools',
+                icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/></svg>',
                 content: `<div class=\"theme-toggle-row\">
-                    <div><span>Participate in Leaderboards</span><br><small>Join period-based rankings (disabled by default)</small></div>
+                    <div><span>Leaderboards</span><br><small>Participate in period-based rankings</small></div>
                     <label class=\"toggle-switch\">
                         <input type=\"checkbox\" ${localStorage.getItem(getLeaderboardParticipationKey()) === '1' ? 'checked' : ''} onchange=\"toggleLeaderboardParticipation()\">
                         <span class=\"toggle-track\"></span>
                     </label>
                 </div>
-                <div style=\"margin-top:16px; padding:12px; background:var(--surface-elev); border-radius:8px; border:1px solid var(--border-t); font-size:0.75rem; color:var(--text-muted);\">
-                    <strong style=\"color:var(--text-main);\">📊 What are Leaderboards?</strong><br>
-                    <div style=\"margin-top:8px; line-height:1.6;\">
-                        Opt-in leaderboard rankings for completion rate, streaks, and completed jobs. Boards follow the current day/week/month/year period. You can toggle this anytime.
-                    </div>
-                </div>`
-            },
-            {
-                id: 'tools',
-                title: 'Tools & Utilities',
-                icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/></svg>',
-                content: `<div class=\"theme-toggle-row\">
+                <div class=\"theme-toggle-row\">
                     <div><span>Wake Lock</span><br><small>Keep screen on while using app</small></div>
                     <label class=\"toggle-switch\">
                         <input type=\"checkbox\" ${localStorage.getItem('nx_wakelock') === '1' ? 'checked' : ''} onchange=\"toggleWakeLock()\">
@@ -1807,6 +1771,20 @@
                     </label>
                 </div>
                 <button class=\"btn\" style=\"background:var(--border); color:var(--text-main); margin-top:12px; display:flex; align-items:center; justify-content:center; gap:6px;\" onclick=\"showNotesSearch()\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg> SEARCH NOTES</button>`
+            },
+            {
+                id: 'data',
+                title: 'Data Management',
+                icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\"/><path d=\"M21 12c0 1.66-4 3-9 3s-9-1.34-9-3\"/><path d=\"M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5\"/></svg>',
+                content: `<button class=\"btn\" style=\"background:var(--border); color:var(--text-main)\" onclick=\"exportCSV()\">EXPORT DATABASE (CSV)</button>
+                <div class=\"btn\" style=\"background:var(--border); color:var(--text-main); position:relative; overflow:hidden; text-align:center;\">
+                    IMPORT CSV
+                    <input type=\"file\" onchange=\"importCSV(event)\" style=\"position:absolute; top:0; right:0; bottom:0; left:0; opacity:0; cursor:pointer;\">
+                </div>
+                <button class=\"btn\" style=\"background:var(--primary); color:#fff; margin-top:10px;\" onclick=\"window.JobTrackerModals.showDataManagement()\">
+                    <span style=\"margin-right:6px;\">💾</span> ADVANCED DATA TOOLS
+                </button>
+                <button class=\"btn\" style=\"background:var(--danger); margin-top:24px;\" onclick=\"confirmWipe()\">WIPE DATA</button>`
             }
         ];
        
