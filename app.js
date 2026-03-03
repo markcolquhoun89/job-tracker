@@ -1926,12 +1926,9 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                console.log('Upgrade button check for job', j.id, 'type:', j.type, 'cfg:', cfg, 'isUpgraded:', j.isUpgraded);
                 if (cfg?.ug != null && !j.isUpgraded) {
-                    console.log('Showing upgrade button for', j.type, 'ug:', cfg.ug);
                     return `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
                 }
-                console.log('Not showing upgrade button for', j.type);
                 return '';
             })()}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
@@ -3098,10 +3095,16 @@
                 };
             });
             
-            // Merge: cloud types override local for code matching, then add any local custom types
+            // Merge: cloud types override local for code matching, but preserve local values if cloud has null
             for (const code of localKeys) {
                 if (cloudTypeMap[code]) {
-                    state.types[code] = cloudTypeMap[code];
+                    const merged = { ...state.types[code] };
+                    // Override with cloud values, but keep local if cloud is null
+                    if (cloudTypeMap[code].pay != null) merged.pay = cloudTypeMap[code].pay;
+                    if (cloudTypeMap[code].int != null) merged.int = cloudTypeMap[code].int;
+                    if (cloudTypeMap[code].ug != null) merged.ug = cloudTypeMap[code].ug;
+                    merged.countTowardsCompletion = cloudTypeMap[code].countTowardsCompletion;
+                    state.types[code] = merged;
                 }
             }
             
