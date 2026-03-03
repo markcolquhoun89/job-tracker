@@ -1926,10 +1926,8 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                if (cfg?.ug != null && !j.isUpgraded) {
-                    return `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
-                }
-                return '';
+                const shouldShow = cfg?.ug != null && !j.isUpgraded;
+                return shouldShow ? `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>` : `<div style="background:red; color:white; padding:10px; margin-bottom:10px;">NO UPGRADE BUTTON: cfg=${!!cfg}, ug=${cfg?.ug}, upgraded=${j.isUpgraded}</div>`;
             })()}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
             <div style="display:grid; grid-template-columns:${(getTypeConfig(j.type)?.int != null) ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-bottom:10px;">
