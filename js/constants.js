@@ -36,7 +36,7 @@ window.JobTrackerConstants = {
         HyOH: { pay: 55, int: 21 },
         HyUG: { pay: 55, int: 21 },
         RC: { pay: 20, int: null },
-        BTTW: { pay: 20, int: null }
+        BTTW: { pay: 20, int: null, upgradePay: 44 }
     },
 
     // Note templates

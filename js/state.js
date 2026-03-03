@@ -81,6 +81,38 @@ class AppState {
                     ...data
                 }));
                 await db.bulkPut(STORES.TYPES, this.types);
+            } else {
+                let typesChanged = false;
+
+                const byCode = new Map(this.types.map(t => [t.code, t]));
+
+                // Ensure default types exist and carry current default fields
+                Object.entries(DEFAULT_TYPES).forEach(([code, defaults]) => {
+                    const existing = byCode.get(code);
+                    if (existing) {
+                        const merged = { ...defaults, ...existing };
+                        if (code === 'BTTW' && (merged.upgradePay == null)) {
+                            merged.upgradePay = 44;
+                        }
+                        if (JSON.stringify(existing) !== JSON.stringify(merged)) {
+                            byCode.set(code, merged);
+                            typesChanged = true;
+                        }
+                    } else {
+                        const created = { code, ...defaults };
+                        if (code === 'BTTW' && (created.upgradePay == null)) {
+                            created.upgradePay = 44;
+                        }
+                        byCode.set(code, created);
+                        typesChanged = true;
+                    }
+                });
+
+                this.types = Array.from(byCode.values());
+
+                if (typesChanged) {
+                    await db.bulkPut(STORES.TYPES, this.types);
+                }
             }
 
             // Load expenses

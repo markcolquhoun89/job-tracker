@@ -118,15 +118,23 @@ window.JobTrackerCompat = {
         window.state.jobs = window.JobTrackerState.jobs;
         
         // Convert types to legacy format
+        const existingTypes = window.state.types || {};
         const typesObj = {};
         window.JobTrackerState.types.forEach(t => {
+            const modularUpgrade = t.upgradePay ?? t.upgrade ?? t.ug ?? null;
+            const existingUpgrade = existingTypes[t.code]?.upgradePay
+                ?? existingTypes[t.code]?.upgrade
+                ?? existingTypes[t.code]?.ug
+                ?? null;
+            const resolvedUpgrade = modularUpgrade != null ? modularUpgrade : existingUpgrade;
+
             typesObj[t.code] = {
                 pay: t.pay,
                 int: t.int,
-                upgradePay: t.upgradePay ?? t.upgrade ?? t.ug ?? null
+                upgradePay: t.code === 'BTTW' ? (resolvedUpgrade ?? 44) : resolvedUpgrade
             };
         });
-        window.state.types = typesObj;
+        window.state.types = { ...existingTypes, ...typesObj };
     }
 };
 
