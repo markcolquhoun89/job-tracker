@@ -2904,7 +2904,7 @@
     }
     function addJob(type) {
         const jobID = document.getElementById('new-jobid').value.trim() || null;
-        state.jobs.push({
+        const newJob = {
             id: generateID(),
             date: state.viewDate.toISOString().split('T')[0],
             type,
@@ -2915,8 +2915,20 @@
             jobID,
             user_id: getActiveUserId(),
             updated_at: new Date().toISOString()
-        });
-        closeModal(); save();
+        };
+        state.jobs.push(newJob);
+        closeModal(); 
+        
+        // Save immediately with NO DEBOUNCE for new jobs - prevents race where pull happens before push
+        saveImmediate(); 
+        
+        // Then trigger immediate sync (0ms delay) to push the new job to cloud ASAP
+        if (window.syncEngine && window.supabaseClient?.getStatus?.().isAuthenticated) {
+            setTimeout(() => {
+                console.log('[App] Triggering immediate sync for newly created job');
+                window.syncEngine.fullSync().catch(err => console.warn('Immediate sync failed:', err));
+            }, 0);
+        }
     }
     function getJobsStorageKey() {
         const authStatus = window.supabaseClient?.getStatus?.();
@@ -3168,6 +3180,39 @@
         }
         
         render(); 
+    }
+
+    function saveImmediate() {
+        normalizeAllTypes();
+        const activeUserId = getActiveUserId();
+        if (activeUserId) {
+            state.jobs = state.jobs.map(job => ({
+                ...job,
+                user_id: activeUserId,
+                updated_at: job.updated_at || new Date().toISOString()
+            }));
+        }
+        // Write ONLY to scoped key - never to unscoped 'nx_jobs'
+        localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
+        localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types)); 
+        // Save deletions ONLY to scoped key - consistent per-user tracking
+        localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
+        
+        // Also save to modular IndexedDB for sync engine
+        if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
+            // Clear the store first to remove deleted jobs
+            window.JobTrackerDB.clear('jobs').then(() => {
+                window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
+            }).catch(err => console.warn('IndexedDB clear failed:', err));
+        }
+        
+        // Save job types to cloud if authenticated
+        const authStatus = window.supabaseClient?.getStatus?.();
+        if (authStatus?.isAuthenticated) {
+            saveJobTypesToCloud().catch(err => console.warn('[App] Job type cloud save failed:', err));
+        }
+        
+        render();
     }
     // --- Collapsible Panel System ---
     function getPanelStates(tab) {
