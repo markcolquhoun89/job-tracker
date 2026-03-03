@@ -1936,8 +1936,9 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                if (cfg?.ug != null && !j.isUpgraded) {
-                    return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
+                if (cfg?.ug != null) {
+                    const label = j.isUpgraded ? '↻ REAPPLY UPGRADE' : '💰 UPGRADE';
+                    return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">${label} (£${cfg.ug})</button>`;
                 }
                 return '';
             })()}
