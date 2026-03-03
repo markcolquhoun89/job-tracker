@@ -121,13 +121,8 @@ class SyncEngine {
         console.log('[SyncEngine] Detected changes by job count increase');
       }
       
-      // Always re-render if we pulled any jobs (even if count didn't change, they might need to display)
-      if (remoteJobs.length > 0) {
-        console.log('[SyncEngine] Re-rendering after pulling jobs');
-        if (window.render && typeof window.render === 'function') {
-          window.render(true); // soft update
-        }
-      }
+      // Don't re-render during sync (prevents visual flicker)
+      // Data is already in state; let the user continue working without interruption
       
       return changesDetected;
 
