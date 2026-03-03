@@ -2837,8 +2837,11 @@
                 .map(j => ({ ...j, user_id: activeUserId }))
             : loadedJobs;
         state.deletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
-        localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
-        localStorage.setItem('nx_deleted_job_ids', JSON.stringify(state.deletedJobIds));
+        // Only write to scoped key - never to unscoped
+        localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
+        localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
+        // Clean up old unscoped deletion key to prevent confusion
+        localStorage.removeItem('nx_deleted_job_ids');
         
         render();
         

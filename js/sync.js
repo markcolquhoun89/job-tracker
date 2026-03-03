@@ -486,6 +486,14 @@ class SyncEngine {
    * Merge remote job into local state
    */
   async mergeJob(remoteJob, source = 'remote') {
+    // CRITICAL: Double-check deletedJobIds before merging - never restore a deleted job
+    const deletedKey = `nx_deleted_job_ids_user_${this.supabase.userId}`;
+    const freshDeletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    if (freshDeletedJobIds.includes(remoteJob.id)) {
+      console.log('[SyncEngine] Job is marked deleted, skipping merge:', remoteJob.id);
+      return false;
+    }
+    
     // Only work with app.js state - simplified approach
     let stateRef = window.state;
     
