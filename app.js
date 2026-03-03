@@ -9,7 +9,7 @@
             HyOH: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
             HyUG: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
             RC: { pay: 20, int: null, ug: null, countTowardsCompletion: true },
-            BTTW: { pay: 20, int: null, ug: 30, countTowardsCompletion: true }
+            BTTW: { pay: 20, int: null, ug: 44, countTowardsCompletion: true }
         };
     }
 
@@ -1915,7 +1915,13 @@
                 </div>
                 ${j.isUpgraded ? '<span style="background:var(--primary); color:#fff; font-size:0.65rem; padding:2px 8px; border-radius:6px; font-weight:700;">UG</span>' : ''}
             </div>
-            ${(getTypeConfig(j.type)?.ug != null && !j.isUpgraded) ? `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px;" onclick="updateJob('${id}', 'Completed', true)">UPGRADE (£${getTypeConfig(j.type).ug})</button>` : ''}
+            ${(() => {
+                const cfg = getTypeConfig(j.type);
+                if (cfg?.ug != null && !j.isUpgraded) {
+                    return `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
+                }
+                return '';
+            })()}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
             <div style="display:grid; grid-template-columns:${(getTypeConfig(j.type)?.int != null) ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-bottom:10px;">
                 <button class="btn" style="background:var(--success); margin:0; ${j.status === 'Completed' ? 'outline:2px solid #fff; outline-offset:-3px;' : ''}" onclick="updateJob('${id}', 'Completed')">DONE</button>
