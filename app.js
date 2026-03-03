@@ -1955,15 +1955,14 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                console.log(`[Render] Job ${j.id} type=${j.type}, cfg=`, cfg);
                 if (cfg) {
                     if (cfg?.upgradePay != null) {
                         const label = j.isUpgraded ? '↻ REAPPLY UPGRADE' : '💰 UPGRADE';
                         return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">${label} (£${cfg.upgradePay})</button>`;
                     }
-                    return `<div style="background:#ffebee; color:#c62828; padding:8px; margin:8px 0; border-radius:4px; font-size:0.75rem;">⚠ Type ${j.type} has no upgrade rate set</div>`;
+                    return '';
                 }
-                return `<div style="background:#ffcdd2; color:#b71c1c; padding:8px; margin:8px 0; border-radius:4px; font-size:0.75rem;">❌ Type config not found: ${j.type}</div>`;
+                return '';
             })()}
             ${j.status !== 'Pending' ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="if(confirm('Revert this job to Pending status?')) { const job = state.jobs.find(x => x.id === '${id}'); if(job) { job.status = 'Pending'; job.fee = 0; job.completedAt = null; job.isUpgraded = false; delete job.saturdayPremium; delete job.baseFee; save(); closeModal(); } }">↻ REVERT TO PENDING</button>` : ''}
             ${(['OH', 'UG', 'HyOH', 'HyUG'].includes(j.type) || j.isUpgraded) ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:10px;" onclick="openNotesWizard('${id}')">NOTES ASSISTANT</button>` : ''}
@@ -2468,7 +2467,6 @@
         if(state.types[name]) return customAlert("Error", "A job type with this name already exists.", true);
         
         const config = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
-        console.log(`[App] Creating type: ${name}`, config);
         state.types[name] = config;
         
         await save(); 
@@ -2514,7 +2512,6 @@
         if(isNaN(pay)) return customAlert("Error", "Standard Pay is required.", true);
         
         const config = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
-        console.log(`[App] Updating type: ${name}`, config);
         state.types[name] = config;
         
         await save(); 
@@ -2530,7 +2527,6 @@
         confirmModal("Delete Job Type", `Are you sure you want to delete ${name}? This will not affect past jobs, but you won't be able to log new ones.`, "DELETE", `deleteType('${name}')`, true);
     }
     async function deleteType(name) { 
-        console.log(`[App] Deleting type: ${name}`);
         delete state.types[name]; 
         await save();
         try {
@@ -2544,9 +2540,7 @@
         try {
             if (window.JobTrackerDB && window.JobTrackerDB.put) {
                 const typeRecord = { code, ...config };
-                console.log(`[App] Syncing type to modular DB: ${code}`, typeRecord);
                 await window.JobTrackerDB.put('types', typeRecord);
-                console.log(`[App] ✓ Type synced to modular DB: ${code}`);
             } else {
                 console.warn('[App] JobTrackerDB not available for type sync');
             }
@@ -2559,9 +2553,7 @@
     async function deleteTypeFromModular(code) {
         try {
             if (window.JobTrackerDB && window.JobTrackerDB.delete) {
-                console.log(`[App] Deleting type from modular DB: ${code}`);
                 await window.JobTrackerDB.delete('types', code);
-                console.log(`[App] ✓ Type deleted from modular DB: ${code}`);
             } else {
                 console.warn('[App] JobTrackerDB not available for type delete');
             }
@@ -3128,21 +3120,17 @@
         // Merge default types: ensure all default types have current default values
         // This ensures hardcoded defaults (like BTTW upgradePay: 44) are always applied
         const defaults = getDefaultTypes();
-        console.log('[App] Defaults from getDefaultTypes():', JSON.stringify(defaults));
         for (const [typeName, defaultConfig] of Object.entries(defaults)) {
             if (!state.types[typeName]) {
                 // Add missing type
-                console.log(`[App] Adding missing default type: ${typeName}`, defaultConfig);
                 state.types[typeName] = defaultConfig;
             } else {
                 // For existing default types, merge in new default values
                 // This ensures hardcoded defaults are always applied
-                console.log(`[App] Merging defaults for ${typeName}:`, 'before=', state.types[typeName], 'default=', defaultConfig);
                 state.types[typeName] = {
                     ...state.types[typeName],
                     ...defaultConfig
                 };
-                console.log(`[App] After merge ${typeName}:`, state.types[typeName]);
             }
         }
         
@@ -3150,7 +3138,6 @@
         
         // Save merged types back to localStorage so they persist
         localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types));
-        console.log('[App] Merged types saved to localStorage:', getTypesStorageKey());
         
         // Merge custom types from modular IndexedDB if available
         // This prevents loss of custom types that weren't in localStorage
@@ -3312,7 +3299,6 @@
     }
     async function save() { 
         normalizeAllTypes();
-        console.log('[App] SAVE - Types snapshot:', Object.keys(state.types).join(', '));
         
         const activeUserId = getActiveUserId();
         if (activeUserId) {
@@ -3325,7 +3311,6 @@
         // Write ONLY to scoped key - never to unscoped 'nx_jobs'
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types)); 
-        console.log('[App] SAVE - Types written to localStorage:', getTypesStorageKey());
         // Save deletions ONLY to scoped key - consistent per-user tracking
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
         
@@ -3341,9 +3326,7 @@
             const typesToSave = Array.isArray(state.types) 
                 ? state.types 
                 : Object.entries(state.types).map(([code, data]) => ({ code, ...data }));
-            console.log('[App] SAVE - Preparing to save types to IndexedDB:', typesToSave.length > 0 ? Object.keys(typesToSave.length === 0 ? {} : typesToSave[0]).join(',') : 'none');
             window.JobTrackerDB.clear('types').then(() => {
-                console.log('[App] SAVE - Types store cleared, now bulk-putting', typesToSave.length, 'types');
                 window.JobTrackerDB.bulkPut('types', typesToSave).then(() => {
                     console.log('[App] ✓ Types saved to IndexedDB:', typesToSave.map(t => t.code).join(', '));
                 }).catch(err => console.error('[App] ✗ IndexedDB types save failed:', err));
