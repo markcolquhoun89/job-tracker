@@ -388,31 +388,30 @@ class Database {
     }
 
     putToLocalStorage(storeName, item) {
+        // ⚠️ DISABLED: DO NOT write to unscoped 'nx_jobs' key - causes cross-device data pollution
+        // Fallback operations for jobs must not happen; rely on main app.js instead
         if (storeName === STORES.JOBS) {
-            const jobs = this.safeParseJSON(localStorage.getItem('nx_jobs'), []);
-            const index = jobs.findIndex(j => j.id === item.id);
-            if (index >= 0) jobs[index] = item;
-            else jobs.push(item);
-            localStorage.setItem('nx_jobs', JSON.stringify(jobs));
+            console.warn('[Database] putToLocalStorage for JOBS is disabled - use main app.js save() instead');
+            return Promise.resolve();
         } else if (storeName === STORES.SETTINGS) {
             localStorage.setItem(item.key, item.value);
         }
-        // Add other stores as needed
         return Promise.resolve();
     }
 
     deleteFromLocalStorage(storeName, key) {
+        // ⚠️ DISABLED: DO NOT write to unscoped 'nx_jobs' key
         if (storeName === STORES.JOBS) {
-            const jobs = this.safeParseJSON(localStorage.getItem('nx_jobs'), []);
-            const filtered = jobs.filter(j => j.id !== key);
-            localStorage.setItem('nx_jobs', JSON.stringify(filtered));
+            console.warn('[Database] deleteFromLocalStorage for JOBS is disabled - use main app.js instead');
+            return Promise.resolve();
         }
         return Promise.resolve();
     }
 
     getLSKey(storeName) {
         const map = {
-            [STORES.JOBS]: 'nx_jobs',
+            // ⚠️ DISABLED: STORES.JOBS should NEVER use unscoped 'nx_jobs'
+            // [STORES.JOBS]: 'nx_jobs',  <-- removed to prevent cross-device pollution
             [STORES.TYPES]: 'nx_types',
             [STORES.EXPENSES]: 'nx_expenses'
         };
