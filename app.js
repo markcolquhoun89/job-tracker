@@ -3124,11 +3124,20 @@
             localStorage.setItem(typesKey, JSON.stringify(state.types));
         }
         
-        // Ensure all default types are present
+        // Merge default types: ensure all default types have current default values
+        // This ensures hardcoded defaults (like BTTW upgradePay: 44) are always applied
         const defaults = getDefaultTypes();
         for (const [typeName, defaultConfig] of Object.entries(defaults)) {
             if (!state.types[typeName]) {
+                // Add missing type
                 state.types[typeName] = defaultConfig;
+            } else {
+                // For existing default types, merge in new default values
+                // This ensures hardcoded defaults are always applied
+                state.types[typeName] = {
+                    ...state.types[typeName],
+                    ...defaultConfig
+                };
             }
         }
         
