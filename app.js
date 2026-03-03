@@ -2923,8 +2923,20 @@
     function loadJobsForCurrentAccount() {
         const key = getJobsStorageKey();
         const deletedKey = getDeletedJobsStorageKey();
-        const loadedJobs = JSON.parse(localStorage.getItem(key) || '[]');
         const activeUserId = getActiveUserId();
+        const previousAccountKey = localStorage.getItem('nx_last_loaded_user_id');
+        
+        // If account has changed (login on new device or account switch), clear local cache
+        // This prevents old stale data from showing up before cloud sync completes
+        if (previousAccountKey !== activeUserId) {
+            console.log(`[App] Account changed from ${previousAccountKey} to ${activeUserId}, clearing local cache`);
+            localStorage.removeItem(key);
+            localStorage.removeItem(deletedKey);
+            localStorage.removeItem('nx_deleted_job_ids');
+            localStorage.setItem('nx_last_loaded_user_id', activeUserId || '');
+        }
+        
+        const loadedJobs = JSON.parse(localStorage.getItem(key) || '[]');
         const deletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
         
         // Load jobs, filter by user AND exclude deleted jobs  
