@@ -2455,7 +2455,7 @@
         `;
         m.style.display = 'flex';
     }
-    function saveNewType() {
+    async function saveNewType() {
         const name = document.getElementById('nt-name').value.trim();
         const pay = parseFloat(document.getElementById('nt-pay').value);
         const intVal = document.getElementById('nt-int').value.trim();
@@ -2465,9 +2465,18 @@
         const upgradePay = upgradeVal === '' ? null : (parseFloat(upgradeVal) || null);
         if(!name || isNaN(pay)) return customAlert("Error", "Name and Standard Pay are required.", true);
         if(state.types[name]) return customAlert("Error", "A job type with this name already exists.", true);
-        state.types[name] = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
+        
+        const config = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
+        console.log(`[App] Creating type: ${name}`, config);
+        state.types[name] = config;
+        
         save(); 
-        syncTypeToModular(name, state.types[name]);
+        // Ensure type is in modular DB (save() should handle this via bulkPut, but this guarantees it)
+        try {
+            await syncTypeToModular(name, state.types[name]);
+        } catch (e) {
+            console.error(`[App] Type creation failed to sync: ${name}`, e);
+        }
         closeModal(); customAlert("Success", `${name} has been created.`);
     }
     function editTypeModal(name) {
@@ -2494,7 +2503,7 @@
         `;
         m.style.display = 'flex';
     }
-    function saveEditType(name) {
+    async function saveEditType(name) {
         const pay = parseFloat(document.getElementById('et-pay').value);
         const intVal = document.getElementById('et-int').value.trim();
         const upgradeVal = document.getElementById('et-upgrade').value.trim();
@@ -2502,38 +2511,62 @@
         const int = intVal === '' ? null : (parseFloat(intVal) || null);
         const upgradePay = upgradeVal === '' ? null : (parseFloat(upgradeVal) || null);
         if(isNaN(pay)) return customAlert("Error", "Standard Pay is required.", true);
-        state.types[name] = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
+        
+        const config = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
+        console.log(`[App] Updating type: ${name}`, config);
+        state.types[name] = config;
+        
         save(); 
-        syncTypeToModular(name, state.types[name]);
+        // Ensure type is in modular DB
+        try {
+            await syncTypeToModular(name, state.types[name]);
+        } catch (e) {
+            console.error(`[App] Type update failed to sync: ${name}`, e);
+        }
         closeModal(); customAlert("Success", `${name} configuration updated.`);
     }
     function confirmDeleteType(name) {
         confirmModal("Delete Job Type", `Are you sure you want to delete ${name}? This will not affect past jobs, but you won't be able to log new ones.`, "DELETE", `deleteType('${name}')`, true);
     }
-    function deleteType(name) { 
+    async function deleteType(name) { 
+        console.log(`[App] Deleting type: ${name}`);
         delete state.types[name]; 
         save();
-        deleteTypeFromModular(name);
-    }
-    
-    function syncTypeToModular(code, config) {
         try {
-            if (window.JobTrackerDB && window.JobTrackerDB.put) {
-                const typeRecord = { code, ...config };
-                window.JobTrackerDB.put('types', typeRecord).catch(err => console.warn('[App] Modular type sync failed:', err));
-            }
+            await deleteTypeFromModular(name);
         } catch (e) {
-            console.warn('[App] Could not sync type to modular state:', e);
+            console.error(`[App] Type deletion failed to sync: ${name}`, e);
         }
     }
     
-    function deleteTypeFromModular(code) {
+    async function syncTypeToModular(code, config) {
         try {
-            if (window.JobTrackerDB && window.JobTrackerDB.delete) {
-                window.JobTrackerDB.delete('types', code).catch(err => console.warn('[App] Modular type delete failed:', err));
+            if (window.JobTrackerDB && window.JobTrackerDB.put) {
+                const typeRecord = { code, ...config };
+                console.log(`[App] Syncing type to modular DB: ${code}`, typeRecord);
+                await window.JobTrackerDB.put('types', typeRecord);
+                console.log(`[App] ✓ Type synced to modular DB: ${code}`);
+            } else {
+                console.warn('[App] JobTrackerDB not available for type sync');
             }
         } catch (e) {
-            console.warn('[App] Could not delete type from modular state:', e);
+            console.error('[App] ✗ Could not sync type to modular state:', e);
+            throw e;
+        }
+    }
+    
+    async function deleteTypeFromModular(code) {
+        try {
+            if (window.JobTrackerDB && window.JobTrackerDB.delete) {
+                console.log(`[App] Deleting type from modular DB: ${code}`);
+                await window.JobTrackerDB.delete('types', code);
+                console.log(`[App] ✓ Type deleted from modular DB: ${code}`);
+            } else {
+                console.warn('[App] JobTrackerDB not available for type delete');
+            }
+        } catch (e) {
+            console.error('[App] ✗ Could not delete type from modular state:', e);
+            throw e;
         }
     }
     function updateJob(id, status, upgrade = false) {
@@ -3105,19 +3138,22 @@
         // This prevents loss of custom types that weren't in localStorage
         if (window.JobTrackerDB && window.JobTrackerDB.getAll) {
             try {
-                (async () => {
-                    const modulartypes = await window.JobTrackerDB.getAll('types');
-                    if (Array.isArray(modulartypes) && modulartypes.length > 0) {
-                        modulartypes.forEach(t => {
-                            if (t && t.code && !state.types[t.code]) {
-                                state.types[t.code] = normalizeTypeConfig(t);
-                            }
-                        });
-                        console.log('[App] Merged custom types from modular DB');
-                    }
-                })();
+                console.log('[App] Attempting to merge custom types from modular DB...');
+                const modulartypes = await window.JobTrackerDB.getAll('types');
+                if (Array.isArray(modulartypes) && modulartypes.length > 0) {
+                    let merged = 0;
+                    modulartypes.forEach(t => {
+                        if (t && t.code && !state.types[t.code]) {
+                            state.types[t.code] = normalizeTypeConfig(t);
+                            merged++;
+                        }
+                    });
+                    console.log(`[App] ✓ Merged ${merged} custom types from modular DB`);
+                } else {
+                    console.log('[App] No custom types found in modular DB');
+                }
             } catch (e) {
-                console.warn('[App] Could not merge modular types:', e);
+                console.warn('[App] ✗ Could not merge modular types:', e);
             }
         }
         
@@ -3264,6 +3300,8 @@
     }
     function save() { 
         normalizeAllTypes();
+        console.log('[App] SAVE - Types snapshot:', Object.keys(state.types).join(', '));
+        
         const activeUserId = getActiveUserId();
         if (activeUserId) {
             state.jobs = state.jobs.map(job => ({
@@ -3275,6 +3313,7 @@
         // Write ONLY to scoped key - never to unscoped 'nx_jobs'
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types)); 
+        console.log('[App] SAVE - Types written to localStorage:', getTypesStorageKey());
         // Save deletions ONLY to scoped key - consistent per-user tracking
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
         
@@ -3282,16 +3321,21 @@
         if (window.JobTrackerDB && window.JobTrackerDB.bulkPut) {
             // Clear the stores and save both jobs and types
             window.JobTrackerDB.clear('jobs').then(() => {
-                window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.warn('IndexedDB save failed:', err));
-            }).catch(err => console.warn('IndexedDB clear failed:', err));
+                window.JobTrackerDB.bulkPut('jobs', state.jobs).catch(err => console.error('[App] ✗ IndexedDB jobs save failed:', err));
+                console.log('[App] ✓ Jobs saved to IndexedDB');
+            }).catch(err => console.error('[App] ✗ IndexedDB jobs clear failed:', err));
             
             // Also save types to IndexedDB to prevent stale data on sync
             const typesToSave = Array.isArray(state.types) 
                 ? state.types 
                 : Object.entries(state.types).map(([code, data]) => ({ code, ...data }));
+            console.log('[App] SAVE - Preparing to save types to IndexedDB:', typesToSave.length > 0 ? Object.keys(typesToSave.length === 0 ? {} : typesToSave[0]).join(',') : 'none');
             window.JobTrackerDB.clear('types').then(() => {
-                window.JobTrackerDB.bulkPut('types', typesToSave).catch(err => console.warn('IndexedDB types save failed:', err));
-            }).catch(err => console.warn('IndexedDB types clear failed:', err));
+                console.log('[App] SAVE - Types store cleared, now bulk-putting', typesToSave.length, 'types');
+                window.JobTrackerDB.bulkPut('types', typesToSave).then(() => {
+                    console.log('[App] ✓ Types saved to IndexedDB:', typesToSave.map(t => t.code).join(', '));
+                }).catch(err => console.error('[App] ✗ IndexedDB types save failed:', err));
+            }).catch(err => console.error('[App] ✗ IndexedDB types clear failed:', err));
         }
         
         // Save job types to cloud if authenticated
