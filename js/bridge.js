@@ -82,7 +82,8 @@ window.JobTrackerCompat = {
         if (legacyState.types) {
             const types = Object.entries(legacyState.types).map(([code, data]) => ({
                 code,
-                ...data
+                ...data,
+                upgradePay: data?.upgradePay ?? data?.upgrade ?? data?.ug ?? null
             }));
             await window.JobTrackerDB.bulkPut(window.JobTrackerDB.STORES.TYPES, types);
         }
@@ -96,7 +97,11 @@ window.JobTrackerCompat = {
         // Convert types array back to object for backward compatibility
         const typesObj = {};
         types.forEach(t => {
-            typesObj[t.code] = { pay: t.pay, int: t.int };
+            typesObj[t.code] = {
+                pay: t.pay,
+                int: t.int,
+                upgradePay: t.upgradePay ?? t.upgrade ?? t.ug ?? null
+            };
         });
         
         return {
@@ -115,7 +120,11 @@ window.JobTrackerCompat = {
         // Convert types to legacy format
         const typesObj = {};
         window.JobTrackerState.types.forEach(t => {
-            typesObj[t.code] = { pay: t.pay, int: t.int };
+            typesObj[t.code] = {
+                pay: t.pay,
+                int: t.int,
+                upgradePay: t.upgradePay ?? t.upgrade ?? t.ug ?? null
+            };
         });
         window.state.types = typesObj;
     }
