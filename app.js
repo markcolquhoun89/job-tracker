@@ -63,17 +63,21 @@
     }
 
     function getTypeConfig(typeName) {
-        const cfg = state.types && state.types[typeName] ? state.types[typeName] : null;
-        if (cfg) {
-            const normalized = normalizeTypeConfig(cfg);
-            // For default types, ensure ug is set if missing
-            const defaults = getDefaultTypes();
-            if (defaults[typeName] && normalized.ug == null && defaults[typeName].ug != null) {
-                normalized.ug = defaults[typeName].ug;
-            }
-            return normalized;
+        if (!state.types || !typeName) return null;
+
+        const requestedType = String(typeName).trim();
+        let matchedKey = requestedType;
+
+        if (!state.types[matchedKey]) {
+            const requestedLower = requestedType.toLowerCase();
+            matchedKey = Object.keys(state.types).find(k => String(k).trim().toLowerCase() === requestedLower);
         }
-        return null;
+
+        const cfg = matchedKey ? state.types[matchedKey] : null;
+        if (!cfg) return null;
+
+        const normalized = normalizeTypeConfig(cfg);
+        return normalized;
     }
 
     function getActiveUserId() {
