@@ -573,7 +573,15 @@
         const todayDot = isToday ? '<span class="today-dot"></span>' : '';
        
         if (state.range === 'day') document.getElementById('date-label').innerHTML = d.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}) + todayDot;
-        else if (state.range === 'week') document.getElementById('date-label').innerHTML = "WEEK " + getWeek(d) + todayDot;
+        else if (state.range === 'week') {
+            const ref = new Date(d); ref.setHours(0,0,0,0);
+            const daysToSat = (ref.getDay() + 1) % 7;
+            const sat = new Date(ref); sat.setDate(ref.getDate() - daysToSat);
+            const fri = new Date(sat); fri.setDate(sat.getDate() + 6);
+            const satStr = sat.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+            const friStr = fri.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+            document.getElementById('date-label').innerHTML = "WEEK " + getWeek(d) + " <span style='font-size:0.7rem; color:var(--text-muted); font-weight:400;'>(" + satStr + " – " + friStr + ")</span>" + todayDot;
+        }
         else if (state.range === 'month') document.getElementById('date-label').innerHTML = d.toLocaleDateString('en-GB', {month:'long', year:'numeric'}) + todayDot;
         else document.getElementById('date-label').innerHTML = d.getFullYear().toString() + todayDot;
         const showDate = state.range !== 'day';
@@ -3153,6 +3161,11 @@
         if (navigator.vibrate) navigator.vibrate(8);
         render();
     }
+    /* ── Refresh current view (for pull-to-refresh) ── */
+    function refreshCurrentView() {
+        if (navigator.vibrate) navigator.vibrate(8);
+        render();
+    }
     function showIdleNotifications() {
         const lastSync = state.lastSyncTime;
         const now = new Date();
@@ -4042,7 +4055,7 @@
             pulling = false;
             const h = parseFloat(ptr.style.height) || 0;
             ptr.style.display = 'none'; ptr.style.height = '0';
-            if (h > 30 && !canceled) { goToday(); }
+            if (h > 30 && !canceled) { refreshCurrentView(); }
             canceled = false;
         });
     })();
