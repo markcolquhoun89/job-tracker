@@ -3148,6 +3148,10 @@
         
         normalizeAllTypes();
         
+        // Save merged types back to localStorage so they persist
+        localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types));
+        console.log('[App] Merged types saved to localStorage:', getTypesStorageKey());
+        
         // Merge custom types from modular IndexedDB if available
         // This prevents loss of custom types that weren't in localStorage
         if (window.JobTrackerDB && window.JobTrackerDB.getAll) {
