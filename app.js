@@ -2,16 +2,33 @@
 // ORIGINAL APP.JS CODE
 // ============================================================================
 
-    let state = {
-        jobs: [], // ⚠️ IMPORTANT: Initialize as empty! Jobs are loaded AFTER auth is ready via loadJobsForCurrentAccount()
-        types: JSON.parse(localStorage.getItem('nx_types')) || {
+    function getDefaultTypes() {
+        return {
             OH: { pay: 44, int: 21, ug: null, countTowardsCompletion: true },
             UG: { pay: 42, int: 21, ug: null, countTowardsCompletion: true },
             HyOH: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
             HyUG: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
             RC: { pay: 20, int: null, ug: null, countTowardsCompletion: true },
             BTTW: { pay: 20, int: null, ug: null, countTowardsCompletion: true }
-        },
+        };
+    }
+
+    function readTypesFromStorage() {
+        try {
+            const scopedTypes = localStorage.getItem(getTypesStorageKey());
+            if (scopedTypes) return JSON.parse(scopedTypes);
+
+            const legacyTypes = localStorage.getItem('nx_types');
+            if (legacyTypes) return JSON.parse(legacyTypes);
+        } catch (e) {
+            console.warn('[App] Failed to parse stored job types, using defaults:', e);
+        }
+        return getDefaultTypes();
+    }
+
+    let state = {
+        jobs: [], // ⚠️ IMPORTANT: Initialize as empty! Jobs are loaded AFTER auth is ready via loadJobsForCurrentAccount()
+        types: readTypesFromStorage(),
         viewDate: new Date(),
         range: 'day',
         activeTab: 'jobs',
@@ -58,6 +75,11 @@
     function getDeletedJobsStorageKey() {
         const userId = getActiveUserId();
         return userId ? `nx_deleted_job_ids_user_${userId}` : 'nx_deleted_job_ids_anon';
+    }
+
+    function getTypesStorageKey() {
+        const userId = getActiveUserId();
+        return userId ? `nx_types_user_${userId}` : 'nx_types_anon';
     }
 
     function getLeaderboardParticipationKey() {
@@ -2906,6 +2928,7 @@
     function loadJobsForCurrentAccount() {
         const key = getJobsStorageKey();
         const deletedKey = getDeletedJobsStorageKey();
+        const typesKey = getTypesStorageKey();
         const activeUserId = getActiveUserId();
         const previousAccountKey = localStorage.getItem('nx_last_loaded_user_id');
         
@@ -2947,6 +2970,23 @@
             : loadedJobs.filter(j => !deletedJobIds.includes(j.id));
         
         state.deletedJobIds = deletedJobIds;
+
+        // Load account-scoped job types (with one-time legacy fallback)
+        try {
+            const scopedTypesRaw = localStorage.getItem(typesKey);
+            if (scopedTypesRaw) {
+                state.types = JSON.parse(scopedTypesRaw);
+            } else {
+                const legacyTypesRaw = localStorage.getItem('nx_types');
+                state.types = legacyTypesRaw ? JSON.parse(legacyTypesRaw) : getDefaultTypes();
+                localStorage.setItem(typesKey, JSON.stringify(state.types));
+            }
+        } catch (e) {
+            console.warn('[App] Failed loading scoped job types, using defaults:', e);
+            state.types = getDefaultTypes();
+            localStorage.setItem(typesKey, JSON.stringify(state.types));
+        }
+        normalizeAllTypes();
         
         // Write state to scoped key (never unscoped at this point)
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
@@ -3091,7 +3131,7 @@
         }
         // Write ONLY to scoped key - never to unscoped 'nx_jobs'
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
-        localStorage.setItem('nx_types', JSON.stringify(state.types)); 
+        localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types)); 
         // Save deletions ONLY to scoped key - consistent per-user tracking
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
         
@@ -3582,19 +3622,60 @@
         if(e.target.files[0]) reader.readAsText(e.target.files[0]);
     }
    
-    function confirmWipe() { confirmModal("Wipe Data", "WARNING: This will permanently delete ALL job history and custom pay configurations. You cannot undo this.", "WIPE SYSTEM", "executeWipe()", true); }
-    function executeWipe() { 
-        localStorage.clear(); 
-        // Also clear IndexedDB if available
-        if (window.JobTrackerDB && window.JobTrackerDB.db && window.JobTrackerDB.db.db) {
-            try {
-                window.JobTrackerDB.db.db.close();
-                indexedDB.deleteDatabase('JobTrackerDB');
-            } catch (e) {
-                console.warn('Could not clear IndexedDB:', e);
+    function confirmWipe() {
+        confirmModal(
+            "Wipe Data",
+            "WARNING: This will permanently delete data for the CURRENT account only (job history + custom pay configurations). You cannot undo this.",
+            "WIPE CURRENT ACCOUNT",
+            "executeWipe()",
+            true
+        );
+    }
+    async function executeWipe() {
+        const activeUserId = getActiveUserId();
+
+        const defaultTypes = getDefaultTypes();
+
+        try {
+            // Clear only current account's local keys
+            localStorage.removeItem(getJobsStorageKey());
+            localStorage.removeItem(getDeletedJobsStorageKey());
+            localStorage.removeItem(getTypesStorageKey());
+
+            // Reset in-memory state for current account
+            state.jobs = [];
+            state.deletedJobIds = [];
+            state.types = defaultTypes;
+            normalizeAllTypes();
+            localStorage.setItem(getTypesStorageKey(), JSON.stringify(state.types));
+
+            // Clear only current account's cloud data
+            const authStatus = window.supabaseClient?.getStatus?.();
+            if (authStatus?.isAuthenticated && activeUserId) {
+                await window.supabaseClient.delete('jobs', { user_id: activeUserId });
+                await window.supabaseClient.delete('job_types', { user_id: activeUserId });
             }
+
+            // Clear only current account's rows from IndexedDB jobs store
+            if (window.JobTrackerDB && window.JobTrackerDB.getAll && window.JobTrackerDB.clear && window.JobTrackerDB.bulkPut) {
+                const allJobs = await window.JobTrackerDB.getAll('jobs');
+                const remainingJobs = Array.isArray(allJobs)
+                    ? allJobs.filter(job => {
+                        if (!activeUserId) return !!job.user_id;
+                        return job.user_id && job.user_id !== activeUserId;
+                    })
+                    : [];
+
+                await window.JobTrackerDB.clear('jobs');
+                if (remainingJobs.length > 0) {
+                    await window.JobTrackerDB.bulkPut('jobs', remainingJobs);
+                }
+            }
+        } catch (e) {
+            console.warn('Could not complete scoped wipe:', e);
         }
-        location.reload(); 
+
+        location.reload();
     }
     /* ── Theme toggle ── */
     function toggleTheme(isLight) {
