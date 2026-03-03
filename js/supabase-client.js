@@ -9,6 +9,8 @@ class SupabaseClient {
     this.url = url;
     this.anonKey = anonKey;
     this.token = null;
+    this.refreshToken = null;
+    this.expiresAt = null;
     this.userId = null;
     this.isOnline = navigator.onLine;
     this.syncQueue = [];
@@ -30,9 +32,19 @@ class SupabaseClient {
       
       if (session && session.access_token) {
         this.token = session.access_token;
-        this.userId = session.user.id;
-        console.log('[Supabase] Restored session for user:', this.userId);
-        return true;
+        this.refreshToken = session.refresh_token || null;
+        this.expiresAt = session.expires_at || null;
+        this.userId = session?.user?.id || null;
+
+        const verified = await this.verifySession();
+        if (verified) {
+          console.log('[Supabase] Restored valid session for user:', this.userId);
+          return true;
+        }
+
+        console.warn('[Supabase] Stored session is invalid or expired, clearing session');
+        this.clearSession();
+        return false;
       }
       
       console.log('[Supabase] No existing session found');
@@ -71,13 +83,12 @@ class SupabaseClient {
       const user = data.user || data;
       if (user && user.id) {
         this.token = data.access_token || (data.session && data.session.access_token) || null;
+        this.refreshToken = data.refresh_token || (data.session && data.session.refresh_token) || null;
+        this.expiresAt = data.expires_at || (data.session && data.session.expires_at) || null;
         this.userId = user.id;
         
         if (this.token) {
-          localStorage.setItem('nx_supabase_session', JSON.stringify({
-            access_token: this.token,
-            user: user
-          }));
+          this.persistSession(user);
           console.log('[Supabase] Signup successful - authenticated:', this.userId);
           return { success: true, user: user, needsVerification: false };
         } else {
@@ -114,11 +125,10 @@ class SupabaseClient {
       // Token endpoint returns access_token, user, etc. at top level
       if (data.access_token && data.user) {
         this.token = data.access_token;
+        this.refreshToken = data.refresh_token || null;
+        this.expiresAt = data.expires_at || null;
         this.userId = data.user.id;
-        localStorage.setItem('nx_supabase_session', JSON.stringify({
-          access_token: data.access_token,
-          user: data.user
-        }));
+        this.persistSession(data.user);
         console.log('[Supabase] Sign in successful:', this.userId);
         return { success: true, user: data.user };
       } else {
@@ -135,10 +145,118 @@ class SupabaseClient {
    */
   async signOut() {
     console.log('[Supabase] Signing out');
+    this.clearSession();
+    return { success: true };
+  }
+
+  persistSession(user) {
+    localStorage.setItem('nx_supabase_session', JSON.stringify({
+      access_token: this.token,
+      refresh_token: this.refreshToken,
+      expires_at: this.expiresAt,
+      user
+    }));
+  }
+
+  clearSession() {
     this.token = null;
+    this.refreshToken = null;
+    this.expiresAt = null;
     this.userId = null;
     localStorage.removeItem('nx_supabase_session');
-    return { success: true };
+  }
+
+  async verifySession() {
+    if (!this.token) return false;
+
+    try {
+      const response = await fetch(`${this.url}/auth/v1/user`, {
+        headers: {
+          'apikey': this.anonKey,
+          'Authorization': `Bearer ${this.token}`,
+        }
+      });
+
+      if (response.ok) {
+        const user = await response.json();
+        this.userId = user?.id || this.userId;
+        this.persistSession(user || { id: this.userId });
+        return true;
+      }
+
+      if (response.status === 401 && this.refreshToken) {
+        return await this.refreshSession();
+      }
+
+      return false;
+    } catch (error) {
+      console.warn('[Supabase] Session verification failed:', error);
+      return false;
+    }
+  }
+
+  async refreshSession() {
+    if (!this.refreshToken) return false;
+
+    try {
+      const response = await fetch(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.anonKey,
+        },
+        body: JSON.stringify({ refresh_token: this.refreshToken })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error_description || data.message || `HTTP ${response.status}`);
+      }
+
+      this.token = data.access_token;
+      this.refreshToken = data.refresh_token || this.refreshToken;
+      this.expiresAt = data.expires_at || this.expiresAt;
+      this.userId = data?.user?.id || this.userId;
+      this.persistSession(data.user || { id: this.userId });
+      console.log('[Supabase] Session refreshed for user:', this.userId);
+      return true;
+    } catch (error) {
+      console.warn('[Supabase] Session refresh failed:', error);
+      this.clearSession();
+      return false;
+    }
+  }
+
+  async authorizedFetch(url, options = {}, retryOn401 = true) {
+    if (!this.token) {
+      throw new Error('Not authenticated');
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      'apikey': this.anonKey,
+      'Authorization': `Bearer ${this.token}`,
+    };
+
+    let response = await fetch(url, { ...options, headers });
+
+    if (response.status === 401 && retryOn401) {
+      const refreshed = await this.refreshSession();
+      if (!refreshed) {
+        throw new Error('HTTP 401: Session expired. Please sign in again.');
+      }
+
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          'apikey': this.anonKey,
+          'Authorization': `Bearer ${this.token}`,
+        }
+      });
+    }
+
+    return response;
   }
 
   /**
@@ -163,12 +281,7 @@ class SupabaseClient {
       if (options.limit) url += `limit=${options.limit}&`;
       if (options.order) url += `order=${options.order}&`;
 
-      const response = await fetch(url, {
-        headers: {
-          'apikey': this.anonKey,
-          'Authorization': `Bearer ${this.token}`,
-        }
-      });
+      const response = await this.authorizedFetch(url);
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
@@ -190,12 +303,10 @@ class SupabaseClient {
     }
 
     try {
-      const response = await fetch(`${this.url}/rest/v1/${table}`, {
+      const response = await this.authorizedFetch(`${this.url}/rest/v1/${table}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': this.anonKey,
-          'Authorization': `Bearer ${this.token}`,
           'Prefer': 'return=minimal'
         },
         body: JSON.stringify(data)
@@ -233,12 +344,10 @@ class SupabaseClient {
         url += `${col}=eq.${encodeURIComponent(val)}&`;
       }
 
-      const response = await fetch(url, {
+      const response = await this.authorizedFetch(url, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': this.anonKey,
-          'Authorization': `Bearer ${this.token}`,
           'Prefer': 'return=minimal'
         },
         body: JSON.stringify(data)
@@ -274,12 +383,8 @@ class SupabaseClient {
         url += `${col}=eq.${encodeURIComponent(val)}&`;
       }
 
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'apikey': this.anonKey,
-          'Authorization': `Bearer ${this.token}`,
-        }
+      const response = await this.authorizedFetch(url, {
+        method: 'DELETE'
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -297,6 +402,12 @@ class SupabaseClient {
    */
   async processQueue() {
     if (this.isSyncing || this.syncQueue.length === 0) return;
+
+    const hasSession = await this.verifySession();
+    if (!hasSession) {
+      console.warn('[Supabase] Cannot process queue: no valid session');
+      return;
+    }
 
     this.isSyncing = true;
     console.log(`[Supabase] Processing ${this.syncQueue.length} queued operations`);
@@ -347,9 +458,11 @@ class SupabaseClient {
   getStatus() {
     return {
       isOnline: this.isOnline,
-      isAuthenticated: !!this.token,
+      isAuthenticated: !!this.token && !!this.userId,
       userId: this.userId,
-      queuedOperations: this.syncQueue.length
+      queuedOperations: this.syncQueue.length,
+      hasRefreshToken: !!this.refreshToken,
+      expiresAt: this.expiresAt
     };
   }
 }
