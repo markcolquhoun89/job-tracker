@@ -64,7 +64,16 @@
 
     function getTypeConfig(typeName) {
         const cfg = state.types && state.types[typeName] ? state.types[typeName] : null;
-        return cfg ? normalizeTypeConfig(cfg) : null;
+        if (cfg) {
+            const normalized = normalizeTypeConfig(cfg);
+            // For default types, ensure ug is set if missing
+            const defaults = getDefaultTypes();
+            if (defaults[typeName] && normalized.ug == null && defaults[typeName].ug != null) {
+                normalized.ug = defaults[typeName].ug;
+            }
+            return normalized;
+        }
+        return null;
     }
 
     function getActiveUserId() {
@@ -1917,9 +1926,12 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
+                console.log('Upgrade button check for job', j.id, 'type:', j.type, 'cfg:', cfg, 'isUpgraded:', j.isUpgraded);
                 if (cfg?.ug != null && !j.isUpgraded) {
+                    console.log('Showing upgrade button for', j.type, 'ug:', cfg.ug);
                     return `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
                 }
+                console.log('Not showing upgrade button for', j.type);
                 return '';
             })()}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
