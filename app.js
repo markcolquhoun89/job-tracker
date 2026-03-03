@@ -2470,7 +2470,7 @@
         console.log(`[App] Creating type: ${name}`, config);
         state.types[name] = config;
         
-        save(); 
+        await save(); 
         // Ensure type is in modular DB (save() should handle this via bulkPut, but this guarantees it)
         try {
             await syncTypeToModular(name, state.types[name]);
@@ -2516,7 +2516,7 @@
         console.log(`[App] Updating type: ${name}`, config);
         state.types[name] = config;
         
-        save(); 
+        await save(); 
         // Ensure type is in modular DB
         try {
             await syncTypeToModular(name, state.types[name]);
@@ -2531,7 +2531,7 @@
     async function deleteType(name) { 
         console.log(`[App] Deleting type: ${name}`);
         delete state.types[name]; 
-        save();
+        await save();
         try {
             await deleteTypeFromModular(name);
         } catch (e) {
@@ -3204,7 +3204,6 @@
                 return;
             }
             
-            const localKeys = Object.keys(state.types);
             const cloudTypeMap = {};
             
             cloudTypes.forEach(ct => {
@@ -3216,23 +3215,18 @@
                 };
             });
             
-            // Merge: cloud types override local for code matching, but preserve local values if cloud has null
-            for (const code of localKeys) {
-                if (cloudTypeMap[code]) {
-                    const merged = { ...state.types[code] };
-                    // Override with cloud values, but keep local if cloud is null
-                    if (cloudTypeMap[code].pay != null) merged.pay = cloudTypeMap[code].pay;
-                    if (cloudTypeMap[code].int != null) merged.int = cloudTypeMap[code].int;
-                    if (cloudTypeMap[code].upgradePay != null) merged.upgradePay = cloudTypeMap[code].upgradePay;
-                    merged.countTowardsCompletion = cloudTypeMap[code].countTowardsCompletion;
-                    state.types[code] = merged;
+            // ONLY add NEW types from cloud that don't exist locally
+            // Never override existing local types - local state is source of truth after initial load
+            let addedCount = 0;
+            for (const code in cloudTypeMap) {
+                if (!state.types[code]) {
+                    state.types[code] = cloudTypeMap[code];
+                    addedCount++;
+                    console.log(`[App] Added cloud type: ${code}`);
                 }
             }
             
-            // Add any cloud-only types
-            Object.assign(state.types, cloudTypeMap);
-            
-            console.log('[App] ✓ Loaded job types from cloud:', Object.keys(state.types).join(', '));
+            console.log(`[App] ✓ Loaded job types from cloud: added ${addedCount} new types`);
         } catch (error) {
             console.warn('[App] Failed to load job types from cloud:', error);
         }
@@ -3298,7 +3292,7 @@
             console.warn('[App] Failed to save job types to cloud:', error);
         }
     }
-    function save() { 
+    async function save() { 
         normalizeAllTypes();
         console.log('[App] SAVE - Types snapshot:', Object.keys(state.types).join(', '));
         
@@ -3338,10 +3332,14 @@
             }).catch(err => console.error('[App] ✗ IndexedDB types clear failed:', err));
         }
         
-        // Save job types to cloud if authenticated
+        // Save job types to cloud if authenticated (await this before triggering sync)
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated) {
-            saveJobTypesToCloud().catch(err => console.warn('[App] Job type cloud save failed:', err));
+            try {
+                await saveJobTypesToCloud();
+            } catch (err) {
+                console.error('[App] ✗ Job type cloud save failed:', err);
+            }
         }
         
         // Debounce sync requests - but check if something is already syncing
@@ -3354,7 +3352,7 @@
                 window.syncEngine.hasPendingChanges = true;
             } else {
                 window._syncTimeout = setTimeout(() => {
-                    console.log('[App] Triggering sync after save');
+                    console.log('[App] Triggering sync after save (cloud types now synced)');
                     window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
                 }, 50);
             }
