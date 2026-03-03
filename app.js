@@ -827,7 +827,8 @@
         });
 
         if (changed) {
-            localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
+            // Only write to scoped key to $
+            localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         }
     }
 
@@ -2937,6 +2938,13 @@
             // Mark this account as loaded
             localStorage.setItem('nx_last_loaded_user_id', activeUserId || '');
             console.log(`[App] ✓ Cleared all cache keys. Loading fresh from cloud.`);
+            
+            // ⚠️ CRITICAL: Also clear IndexedDB on account change
+            if (window.JobTrackerDB && window.JobTrackerDB.clear) {
+                window.JobTrackerDB.clear('jobs').then(() => {
+                    console.log('[App] ✓ Cleared IndexedDB jobs store');
+                }).catch(err => console.warn('[App] IndexedDB clear failed:', err));
+            }
         }
         
         // Load ONLY from the properly scoped key
@@ -2979,8 +2987,7 @@
                 updated_at: job.updated_at || new Date().toISOString()
             }));
         }
-        // Always write to BOTH scoped and unscoped keys to maintain compatibility
-        localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
+        // Write ONLY to scoped key - never to unscoped 'nx_jobs'
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         localStorage.setItem('nx_types', JSON.stringify(state.types)); 
         // Save deletions ONLY to scoped key - consistent per-user tracking
