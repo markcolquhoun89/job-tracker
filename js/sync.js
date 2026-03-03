@@ -323,18 +323,9 @@ class SyncEngine {
       const pullResult = await this.pullRemoteJobs();
       console.log('[SyncEngine] Pull result:', pullResult);
       
-      // NOW clear deletion tracking after both push and pull complete
-      if (this.syncCycleDeletions.length > 0) {
-        if (window.state) {
-          window.state.deletedJobIds = window.state.deletedJobIds.filter(
-            id => !this.syncCycleDeletions.includes(id)
-          );
-          const deletedKey = `nx_deleted_job_ids_user_${this.supabase.userId}`;
-          localStorage.setItem(deletedKey, JSON.stringify(window.state.deletedJobIds));
-          localStorage.removeItem('nx_deleted_job_ids');
-          console.log(`[SyncEngine] ✓ Cleared ${this.syncCycleDeletions.length} deletion(s) from tracking after full sync`);
-        }
-      }
+      // Don't clear deletion tracking - keep it persistent so subsequent syncs continue filtering deleted jobs
+      // This prevents restored jobs from reappearing if cloud deletion races with pull
+      console.log(`[SyncEngine] ✓ Deletion tracking persists (${this.syncCycleDeletions.length} deletions confirmed in cloud)`);
       
       // If new changes arrived during sync, reschedule another sync
       if (this.hasPendingChanges) {
