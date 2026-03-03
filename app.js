@@ -3024,8 +3024,8 @@
             console.log('[App] Loading job types from cloud for user:', userId);
             
             const cloudTypes = await window.supabaseClient.select('job_types', {
-                select: 'id,code,pay,int,ug,countTowardsCompletion',
-                filters: [{ column: 'user_id', operator: 'eq', value: userId }]
+                select: 'id,code,pay,int,ug,count_towards_completion',
+                eq: { user_id: userId }
             });
             
             if (!Array.isArray(cloudTypes) || cloudTypes.length === 0) {
@@ -3041,7 +3041,7 @@
                     pay: ct.pay,
                     int: ct.int,
                     ug: ct.ug,
-                    countTowardsCompletion: ct.countTowardsCompletion !== false
+                    countTowardsCompletion: ct.count_towards_completion !== false
                 };
             });
             
@@ -3078,7 +3078,7 @@
             // Get existing cloud types
             const existing = await window.supabaseClient.select('job_types', {
                 select: 'code',
-                filters: [{ column: 'user_id', operator: 'eq', value: userId }]
+                eq: { user_id: userId }
             });
             
             const existingCodes = Array.isArray(existing) ? existing.map(e => e.code) : [];
@@ -3091,13 +3091,14 @@
                     pay: config.pay || 0,
                     int: config.int,
                     ug: config.ug,
-                    countTowardsCompletion: config.countTowardsCompletion !== false ? true : false
+                    count_towards_completion: config.countTowardsCompletion !== false ? true : false
                 };
                 
                 if (existingCodes.includes(code)) {
                     // Update
                     await window.supabaseClient.update('job_types', data, {
-                        filters: [{ column: 'user_id', operator: 'eq', value: userId }, { column: 'code', operator: 'eq', value: code }]
+                        user_id: userId,
+                        code
                     });
                 } else {
                     // Insert
@@ -3109,7 +3110,8 @@
             for (const code of existingCodes) {
                 if (!state.types[code]) {
                     await window.supabaseClient.delete('job_types', {
-                        filters: [{ column: 'user_id', operator: 'eq', value: userId }, { column: 'code', operator: 'eq', value: code }]
+                        user_id: userId,
+                        code
                     });
                 }
             }
