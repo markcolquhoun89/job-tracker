@@ -87,6 +87,7 @@
     let _deletedJob = null;
     let _deleteTimer = null;
     let _pendingDeletions = new Map(); // Track multiple pending deletions: id -> { job, timer }
+    let isDeletingInProgress = false; // Block further deletes until current one syncs
     // Wake lock
     let wakeLock = null;
     // --- Utility: relative time ---
@@ -308,6 +309,7 @@
                 <button style="background:var(--success);" onclick="batchSetStatus('Completed')">✓ DONE</button>
                 <button style="background:var(--warning);" onclick="batchSetStatus('Internals')">⚠ INT</button>
                 <button style="background:var(--danger);" onclick="batchSetStatus('Failed')">✕ FAIL</button>
+                <button style="background:var(--danger); opacity:0.6;" onclick="batchDeleteSelected()" ${ isDeletingInProgress ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>🗑 DELETE</button>
                 <button style="background:var(--border);" onclick="toggleBatchMode()">CANCEL</button>
             </div>`;
     }
@@ -315,6 +317,51 @@
         batchSelected.forEach(id => updateJob(id, status));
         batchMode = false; batchSelected.clear();
         const bar = document.getElementById('batch-bar'); if (bar) bar.remove();
+        render();
+    }
+    function batchDeleteSelected() {
+        if (batchSelected.size === 0) return;
+        if (isDeletingInProgress) {
+            showToast('⏳ Waiting for sync to complete...');
+            return;
+        }
+        // Delete each selected job
+        const ids = Array.from(batchSelected);
+        ids.forEach(id => {
+            // Directly call confirmDeleteJob for each
+            const j = state.jobs.find(x => x.id === id);
+            if (j) {
+                _pendingDeletions.set(id, { job: { ...j }, undoable: true });
+                state.jobs = state.jobs.filter(x => x.id !== id);
+                if (!state.deletedJobIds.includes(id)) {
+                    state.deletedJobIds.push(id);
+                }
+            }
+        });
+        
+        // Mark as deleting and set up timer once for all
+        isDeletingInProgress = true;
+        save();
+        
+        const toast = document.getElementById('toast');
+        clearTimeout(_deleteTimer);
+        toast.innerHTML = `${batchSelected.size} jobs deleted <button class="toast-undo" onclick="undoLastDelete()">UNDO ALL</button>`;
+        toast.classList.add('show');
+        
+        _deleteTimer = setTimeout(() => {
+            for (const [key, val] of _pendingDeletions.entries()) {
+                val.undoable = false;
+            }
+            _pendingDeletions.clear();
+            _deletedJob = null;
+            toast.classList.remove('show');
+        }, 5000);
+        
+        // Exit batch mode
+        batchMode = false;
+        batchSelected.clear();
+        const bar = document.getElementById('batch-bar');
+        if (bar) bar.remove();
         render();
     }
     // --- Pay period history ---
@@ -1899,7 +1946,7 @@
             
             
             <button class="btn" style="background:var(--border); color:var(--text-main); margin-top:8px; display:flex; align-items:center; justify-content:center; gap:6px;" onclick="duplicateJob('${id}')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> DUPLICATE JOB</button>
-            <button class="btn" style="background:transparent; border:1px solid var(--danger); color:var(--danger); margin-top:8px;" onclick="confirmDeleteJob('${id}')">DELETE RECORD</button>
+            <button class="btn" style="background:transparent; border:1px solid var(--danger); color:var(--danger); margin-top:8px; ${ isDeletingInProgress || (window.syncEngine && window.syncEngine.isSyncing) ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${isDeletingInProgress || (window.syncEngine && window.syncEngine.isSyncing) ? 'disabled' : ''} onclick="${isDeletingInProgress || (window.syncEngine && window.syncEngine.isSyncing) ? '' : `confirmDeleteJob('${id}')`}">🗑️ DELETE RECORD</button>
         `;
         m.style.display = 'flex';
     }
@@ -2477,6 +2524,12 @@
         customAlert('Duplicated', `Cloned ${j.type} job to today as Pending.`);
     }
     function confirmDeleteJob(id) {
+        // Block if sync is currently in progress
+        if (window.syncEngine && window.syncEngine.isSyncing) {
+            showToast('⏳ Waiting for sync to complete...');
+            return;
+        }
+        
         // Soft-delete with undo using shared toast
         const j = state.jobs.find(x => x.id === id);
         if (!j) return;
@@ -2490,6 +2543,10 @@
         if (!state.deletedJobIds.includes(id)) {
             state.deletedJobIds.push(id);
         }
+        
+        // Mark deletion as in progress (blocks further deletes until sync completes)
+        isDeletingInProgress = true;
+        
         save();
         closeModal();
         
@@ -2510,7 +2567,14 @@
             _pendingDeletions.clear();
             _deletedJob = null;
             toast.classList.remove('show');
+            // Keep isDeletingInProgress = true until sync completes
         }, 5000);
+    }
+    
+    // Clear deletion-in-progress flag after sync completes
+    window.clearDeletionInProgress = function() {
+        isDeletingInProgress = false;
+        console.log('[App] ✓ Deletion lock cleared, new deletions allowed');
     }
     
     // --- Management Controls (Manager/Admin only) ---

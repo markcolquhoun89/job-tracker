@@ -348,6 +348,11 @@ class SyncEngine {
       console.error('[SyncEngine] ✗ Full sync failed:', error);
     } finally {
       this.isSyncing = false;
+      
+      // Clear deletion-in-progress flag after sync completes
+      if (window.clearDeletionInProgress) {
+        window.clearDeletionInProgress();
+      }
     }
   }
 
