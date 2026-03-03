@@ -3,11 +3,7 @@
 // ============================================================================
 
     let state = {
-        jobs: (() => {
-            const allJobs = JSON.parse(localStorage.getItem('nx_jobs')) || [];
-            const deleted = JSON.parse(localStorage.getItem('nx_deleted_job_ids') || '[]');
-            return allJobs.filter(j => !deleted.includes(j.id));
-        })(),
+        jobs: [], // ⚠️ IMPORTANT: Initialize as empty! Jobs are loaded AFTER auth is ready via loadJobsForCurrentAccount()
         types: JSON.parse(localStorage.getItem('nx_types')) || {
             OH: { pay: 44, int: 21, ug: null, countTowardsCompletion: true },
             UG: { pay: 42, int: 21, ug: null, countTowardsCompletion: true },
@@ -19,7 +15,7 @@
         viewDate: new Date(),
         range: 'day',
         activeTab: 'jobs',
-        deletedJobIds: JSON.parse(localStorage.getItem('nx_deleted_job_ids')) || []
+        deletedJobIds: [] // ⚠️ Also initialize as empty, loaded after auth is ready
     };
     
     // Expose state globally for sync engine and bridge
@@ -2926,21 +2922,28 @@
         const activeUserId = getActiveUserId();
         const previousAccountKey = localStorage.getItem('nx_last_loaded_user_id');
         
-        // If account has changed (login on new device or account switch), clear ALL local cache
-        // This prevents old stale data from showing up before cloud sync completes
+        // If account has changed or this is a fresh login, clear ALL cache
+        // ALL unscoped/legacy keys to prevent cross-contamination
         if (previousAccountKey !== activeUserId) {
-            console.log(`[App] Account changed from ${previousAccountKey} to ${activeUserId}, clearing all local caches`);
-            // Clear scoped keys
+            console.log(`[App] Account changed: ${previousAccountKey} → ${activeUserId}, AGGRESSIVE cache clear`);
+            // Clear all scoped keys for this account
             localStorage.removeItem(key);
             localStorage.removeItem(deletedKey);
-            // Clear unscoped keys (legacy/compatibility)
+            // Clear ALL possible unscoped/legacy keys
             localStorage.removeItem('nx_jobs');
+            localStorage.removeItem('nx_jobs_anon');
             localStorage.removeItem('nx_deleted_job_ids');
+            localStorage.removeItem('nx_deleted_job_ids_anon');
+            // Mark this account as loaded
             localStorage.setItem('nx_last_loaded_user_id', activeUserId || '');
+            console.log(`[App] ✓ Cleared all cache keys. Loading fresh from cloud.`);
         }
         
+        // Load ONLY from the properly scoped key
         const loadedJobs = JSON.parse(localStorage.getItem(key) || '[]');
         const deletedJobIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+        
+        console.log(`[App] Loaded jobs: ${loadedJobs.length}, deleted: ${deletedJobIds.length}`);
         
         // Load jobs, filter by user AND exclude deleted jobs  
         state.jobs = activeUserId
@@ -2950,18 +2953,18 @@
             : loadedJobs.filter(j => !deletedJobIds.includes(j.id));
         
         state.deletedJobIds = deletedJobIds;
-        // Only write to scoped key - never to unscoped
+        
+        // Write state to scoped key (never unscoped at this point)
         localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
-        // Clean up old unscoped deletion key to prevent confusion
-        localStorage.removeItem('nx_deleted_job_ids');
         
+        console.log(`[App] Initial state: ${state.jobs.length} jobs, ready for sync`);
         render();
         
         // Pull remote jobs if authenticated (async, after initial render)
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated && window.syncEngine) {
-            console.log('[App] Pulling remote jobs after account load');
+            console.log('[App] Initiating fullSync after account load');
             // Force a full sync (push + pull) to ensure complete cloud sync
             window.syncEngine.fullSync().catch(err => console.warn('Full sync failed:', err));
         }

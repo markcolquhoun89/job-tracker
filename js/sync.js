@@ -231,7 +231,6 @@ class SyncEngine {
             localJob.synced_at = new Date().toISOString();
             if (window.state) {
               const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
-              localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
               localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
             }
           } else {
@@ -253,7 +252,6 @@ class SyncEngine {
               localJob.synced_at = new Date().toISOString();
               if (window.state) {
                 const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
-                localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
                 localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
               }
             }
@@ -377,7 +375,6 @@ class SyncEngine {
           localJob.synced_at = new Date().toISOString();
           if (window.state) {
             const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
-            localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
             localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
           }
         }
@@ -395,7 +392,6 @@ class SyncEngine {
             localJob.synced_at = new Date().toISOString();
             if (window.state) {
               const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
-              localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
               localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
             }
           }
@@ -447,7 +443,6 @@ class SyncEngine {
       localJob.synced_at = new Date().toISOString();
       if (window.state) {
         const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
-        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
         localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
       }
     }
@@ -560,7 +555,6 @@ class SyncEngine {
       // Update localStorage
       if (window.state) {
         const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
-        localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
         localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
       }
       
@@ -578,7 +572,7 @@ class SyncEngine {
         
         if (window.state) {
           const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
-          localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+
           localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
         }
         
