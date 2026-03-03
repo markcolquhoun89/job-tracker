@@ -2955,12 +2955,128 @@
         console.log(`[App] Initial state: ${state.jobs.length} jobs, ready for sync`);
         render();
         
-        // Pull remote jobs if authenticated (async, after initial render)
+        // Load job types from cloud if authenticated
         const authStatus = window.supabaseClient?.getStatus?.();
-        if (authStatus?.isAuthenticated && window.syncEngine) {
-            console.log('[App] Initiating fullSync after account load');
-            // Force a full sync (push + pull) to ensure complete cloud sync
-            window.syncEngine.fullSync().catch(err => console.warn('Full sync failed:', err));
+        if (authStatus?.isAuthenticated) {
+            loadJobTypesFromCloud();
+            
+            // Pull remote jobs if authenticated (async, after initial render)
+            if (window.syncEngine) {
+                console.log('[App] Initiating fullSync after account load');
+                // Force a full sync (push + pull) to ensure complete cloud sync
+                window.syncEngine.fullSync().catch(err => console.warn('Full sync failed:', err));
+            }
+        }
+    }
+    
+    /**
+     * Load job types from cloud for authenticated user
+     */
+    async function loadJobTypesFromCloud() {
+        try {
+            const authStatus = window.supabaseClient?.getStatus?.();
+            if (!authStatus?.isAuthenticated || !authStatus?.userId) {
+                console.log('[App] Not authenticated, skipping job types cloud load');
+                return;
+            }
+            
+            const userId = authStatus.userId;
+            console.log('[App] Loading job types from cloud for user:', userId);
+            
+            const cloudTypes = await window.supabaseClient.select('job_types', {
+                select: 'id,code,pay,int,ug,countTowardsCompletion',
+                filters: [{ column: 'user_id', operator: 'eq', value: userId }]
+            });
+            
+            if (!Array.isArray(cloudTypes) || cloudTypes.length === 0) {
+                console.log('[App] No cloud job types found, using local');
+                return;
+            }
+            
+            const localKeys = Object.keys(state.types);
+            const cloudTypeMap = {};
+            
+            cloudTypes.forEach(ct => {
+                cloudTypeMap[ct.code] = {
+                    pay: ct.pay,
+                    int: ct.int,
+                    ug: ct.ug,
+                    countTowardsCompletion: ct.countTowardsCompletion !== false
+                };
+            });
+            
+            // Merge: cloud types override local for code matching, then add any local custom types
+            for (const code of localKeys) {
+                if (cloudTypeMap[code]) {
+                    state.types[code] = cloudTypeMap[code];
+                }
+            }
+            
+            // Add any cloud-only types
+            Object.assign(state.types, cloudTypeMap);
+            
+            console.log('[App] ✓ Loaded job types from cloud:', Object.keys(state.types).join(', '));
+        } catch (error) {
+            console.warn('[App] Failed to load job types from cloud:', error);
+        }
+    }
+    
+    /**
+     * Save job types to cloud for authenticated user
+     */
+    async function saveJobTypesToCloud() {
+        try {
+            const authStatus = window.supabaseClient?.getStatus?.();
+            if (!authStatus?.isAuthenticated || !authStatus?.userId) {
+                console.log('[App] Not authenticated, skipping job types cloud save');
+                return;
+            }
+            
+            const userId = authStatus.userId;
+            console.log('[App] Saving job types to cloud');
+            
+            // Get existing cloud types
+            const existing = await window.supabaseClient.select('job_types', {
+                select: 'code',
+                filters: [{ column: 'user_id', operator: 'eq', value: userId }]
+            });
+            
+            const existingCodes = Array.isArray(existing) ? existing.map(e => e.code) : [];
+            
+            // Upsert each type
+            for (const [code, config] of Object.entries(state.types)) {
+                const data = {
+                    user_id: userId,
+                    code,
+                    pay: config.pay || 0,
+                    int: config.int,
+                    ug: config.ug,
+                    countTowardsCompletion: config.countTowardsCompletion !== false ? true : false
+                };
+                
+                if (existingCodes.includes(code)) {
+                    // Update
+                    await window.supabaseClient.update('job_types', data, {
+                        filters: [{ column: 'user_id', operator: 'eq', value: userId }, { column: 'code', operator: 'eq', value: code }]
+                    });
+                } else {
+                    // Insert
+                    await window.supabaseClient.insert('job_types', data);
+                }
+            }
+            
+            // Delete cloud types that don't exist locally
+            for (const code of existingCodes) {
+                if (!state.types[code]) {
+                    await window.supabaseClient.delete('job_types', {
+                        filters: [{ column: 'user_id', operator: 'eq', value: userId }, { column: 'code', operator: 'eq', value: code }]
+                    });
+                }
+            }
+            
+            console.log('[App] ✓ Job types saved to cloud');
+        } catch (error) {
+            console.warn('[App] Failed to save job types to cloud:', error);
         }
     }
     function save() { 
@@ -2987,10 +3103,15 @@
             }).catch(err => console.warn('IndexedDB clear failed:', err));
         }
         
+        // Save job types to cloud if authenticated
+        const authStatus = window.supabaseClient?.getStatus?.();
+        if (authStatus?.isAuthenticated) {
+            saveJobTypesToCloud().catch(err => console.warn('[App] Job type cloud save failed:', err));
+        }
+        
         // Debounce sync requests - but check if something is already syncing
         if (window._syncTimeout) clearTimeout(window._syncTimeout);
         
-        const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated && window.syncEngine) {
             // If sync is already in progress, flag it so a new one runs after
             if (window.syncEngine.isSyncing) {
