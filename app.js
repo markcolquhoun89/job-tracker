@@ -1955,6 +1955,7 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
+                console.log(`[Render] Job ${j.id} type=${j.type}, cfg=`, cfg);
                 if (cfg) {
                     if (cfg?.upgradePay != null) {
                         const label = j.isUpgraded ? '↻ REAPPLY UPGRADE' : '💰 UPGRADE';
@@ -3127,17 +3128,21 @@
         // Merge default types: ensure all default types have current default values
         // This ensures hardcoded defaults (like BTTW upgradePay: 44) are always applied
         const defaults = getDefaultTypes();
+        console.log('[App] Defaults from getDefaultTypes():', JSON.stringify(defaults));
         for (const [typeName, defaultConfig] of Object.entries(defaults)) {
             if (!state.types[typeName]) {
                 // Add missing type
+                console.log(`[App] Adding missing default type: ${typeName}`, defaultConfig);
                 state.types[typeName] = defaultConfig;
             } else {
                 // For existing default types, merge in new default values
                 // This ensures hardcoded defaults are always applied
+                console.log(`[App] Merging defaults for ${typeName}:`, 'before=', state.types[typeName], 'default=', defaultConfig);
                 state.types[typeName] = {
                     ...state.types[typeName],
                     ...defaultConfig
                 };
+                console.log(`[App] After merge ${typeName}:`, state.types[typeName]);
             }
         }
         
