@@ -2964,7 +2964,7 @@
         }
         return 'nx_jobs_anon';
     }
-    function loadJobsForCurrentAccount() {
+    async function loadJobsForCurrentAccount() {
         const key = getJobsStorageKey();
         const deletedKey = getDeletedJobsStorageKey();
         const typesKey = getTypesStorageKey();
@@ -3037,13 +3037,13 @@
         // Load job types from cloud if authenticated
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated) {
-            loadJobTypesFromCloud();
+            await loadJobTypesFromCloud();
             
             // Pull remote jobs if authenticated (async, after initial render)
             if (window.syncEngine) {
                 console.log('[App] Initiating fullSync after account load');
                 // Force a full sync (push + pull) to ensure complete cloud sync
-                window.syncEngine.fullSync().catch(err => console.warn('Full sync failed:', err));
+                await window.syncEngine.fullSync().catch(err => console.warn('Full sync failed:', err));
             }
         }
     }
@@ -3068,7 +3068,9 @@
             });
             
             if (!Array.isArray(cloudTypes) || cloudTypes.length === 0) {
-                console.log('[App] No cloud job types found, using local');
+                console.log('[App] No cloud job types found, uploading defaults');
+                // Upload default types to cloud for new users
+                await saveJobTypesToCloud();
                 return;
             }
             
@@ -4475,6 +4477,9 @@
             return;
         }
         
+        // Show splash during loading
+        document.getElementById('splash').style.display = 'flex';
+        
         try {
             const result = await window.supabaseClient.signIn(email, password);
             if (result.success) {
@@ -4488,11 +4493,15 @@
                 localStorage.setItem('nx_active_user_id', result.user.id);
                 await ensureSyncEngineReady();
                 updateAuthUI();
-                loadJobsForCurrentAccount();
+                await loadJobsForCurrentAccount();
+                // Hide splash after loading
+                document.getElementById('splash').style.display = 'none';
             } else {
+                document.getElementById('splash').style.display = 'none';
                 customAlert('Error', result.error || 'Sign in failed');
             }
         } catch (err) {
+            document.getElementById('splash').style.display = 'none';
             customAlert('Error', 'Sign in failed: ' + err.message);
         }
     }
