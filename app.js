@@ -2454,7 +2454,7 @@
 
         j.status = status;
         // Track when the job was resolved for ordering
-        if (status !== 'Pending') j.completedAt = Date.now();
+        if (status !== 'Pending') j.completedAt = new Date().toISOString();
         else delete j.completedAt;
        
         // Only attempt to read input if it exists (handles update from card vs modal)

@@ -37,7 +37,7 @@ window.JobTrackerJobs = {
             chargebackAddedBy: null,
             chargebackAddedDate: null,
             
-            createdAt: Date.now(),
+            createdAt: new Date().toISOString(),
             completedAt: null,
             ...jobData
         };
