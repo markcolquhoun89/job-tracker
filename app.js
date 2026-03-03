@@ -3175,7 +3175,7 @@
                 window._syncTimeout = setTimeout(() => {
                     console.log('[App] Triggering sync after save');
                     window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
-                }, 300);
+                }, 50);
             }
         }
         

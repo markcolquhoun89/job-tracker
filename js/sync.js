@@ -11,7 +11,7 @@ class SyncEngine {
     this.state = jobTrackerState;
     this.isSyncing = false;
     this.lastSyncTime = localStorage.getItem('nx_last_sync_time') ? new Date(localStorage.getItem('nx_last_sync_time')) : null;
-    this.syncInterval = 10000; // 10 seconds - reduced from 30s for faster fallback sync
+    this.syncInterval = 3000; // 3 seconds - fallback sync for missed changes
     this.lastRemoteCheckTime = null;
     this.lastRemoteCount = 0;
     this.periodicSyncId = null;
