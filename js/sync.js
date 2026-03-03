@@ -218,7 +218,9 @@ class SyncEngine {
             // Mark as synced
             localJob.synced_at = new Date().toISOString();
             if (window.state) {
+              const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
               localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+              localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
             }
           } else {
             console.warn(`[SyncEngine] ✗ Failed to push job ${localJob.id}:`, result);
@@ -238,7 +240,9 @@ class SyncEngine {
               console.log(`[SyncEngine] ✓ Pushed update to job: ${localJob.id}`);
               localJob.synced_at = new Date().toISOString();
               if (window.state) {
+                const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
                 localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+                localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
               }
             }
           }
@@ -270,7 +274,9 @@ class SyncEngine {
           window.state.deletedJobIds = window.state.deletedJobIds.filter(
             id => !successfullyDeleted.includes(id)
           );
-          localStorage.setItem('nx_deleted_job_ids', JSON.stringify(window.state.deletedJobIds));
+          const deletedKey = `nx_deleted_job_ids_user_${this.supabase.userId}`;
+          localStorage.setItem(deletedKey, JSON.stringify(window.state.deletedJobIds));
+          localStorage.removeItem('nx_deleted_job_ids');
           console.log(`[SyncEngine] ✓ Cleared ${successfullyDeleted.length} deletion(s) from tracking`);
         }
       }
@@ -345,7 +351,9 @@ class SyncEngine {
         if (result.success) {
           localJob.synced_at = new Date().toISOString();
           if (window.state) {
+            const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
             localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+            localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
           }
         }
       } else {
@@ -361,7 +369,9 @@ class SyncEngine {
           if (result.success) {
             localJob.synced_at = new Date().toISOString();
             if (window.state) {
+              const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
               localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+              localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
             }
           }
         }
@@ -411,7 +421,9 @@ class SyncEngine {
       localJob.updated_at = remoteJob.updated_at;
       localJob.synced_at = new Date().toISOString();
       if (window.state) {
+        const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : 'nx_jobs_user_' + this.supabase.userId;
         localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
       }
     }
   }
@@ -522,7 +534,9 @@ class SyncEngine {
       
       // Update localStorage
       if (window.state) {
+        const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
         localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+        localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
       }
       
       console.log(`[SyncEngine] ✓ Merged new job from ${source}: ${remoteJob.id}`);
@@ -538,7 +552,9 @@ class SyncEngine {
         Object.assign(localJob, updatedJob);
         
         if (window.state) {
+          const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
           localStorage.setItem('nx_jobs', JSON.stringify(window.state.jobs));
+          localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
         }
         
         console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id}`);

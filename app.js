@@ -2862,7 +2862,9 @@
                 updated_at: job.updated_at || new Date().toISOString()
             }));
         }
-        localStorage.setItem('nx_jobs', JSON.stringify(state.jobs)); 
+        // Always write to BOTH scoped and unscoped keys to maintain compatibility
+        localStorage.setItem('nx_jobs', JSON.stringify(state.jobs));
+        localStorage.setItem(getJobsStorageKey(), JSON.stringify(state.jobs));
         localStorage.setItem('nx_types', JSON.stringify(state.types)); 
         // Save deletions ONLY to scoped key - consistent per-user tracking
         localStorage.setItem(getDeletedJobsStorageKey(), JSON.stringify(state.deletedJobIds));
