@@ -1863,13 +1863,33 @@
         */
         
         // Fallback to original implementation - use app state as single source of truth
-        const stateToUse = state;
+        let stateToUse = state;
         
         console.log('editJob called with ID:', id);
         console.log('Using state with', stateToUse.jobs.length, 'jobs');
         console.log('Job IDs:', stateToUse.jobs.map(j => j.id).slice(0, 3));
         
-        const j = stateToUse.jobs.find(x => x.id === id);
+        let j = stateToUse.jobs.find(x => x.id === id);
+        
+        // If not found in state, try to reload from storage (fallback for sync race conditions)
+        if (!j) {
+            console.warn('[App] Job not found in state, reloading from storage');
+            try {
+                const storedJobs = JSON.parse(localStorage.getItem(getJobsStorageKey()) || '[]');
+                j = storedJobs.find(x => x.id === id);
+                if (j) {
+                    // Reload entire state from storage to ensure consistency
+                    state.jobs = storedJobs;
+                    stateToUse = state;
+                    console.log('[App] ✓ Job found in storage after reload');
+                } else {
+                    console.error('Job not found', id, 'even in stored jobs. Total stored:', storedJobs.length);
+                }
+            } catch (e) {
+                console.error('[App] Could not reload from storage:', e);
+            }
+        }
+        
         if (!j) {
             console.error('Job not found', id, 'in state.jobs. Total jobs:', stateToUse.jobs.length);
             console.error('All job IDs:', stateToUse.jobs.map(j => j.id));
@@ -2917,17 +2937,18 @@
             updated_at: new Date().toISOString()
         };
         state.jobs.push(newJob);
-        closeModal(); 
-        
+        closeModal();
+
         // Save immediately with NO DEBOUNCE for new jobs - prevents race where pull happens before push
-        saveImmediate(); 
-        
-        // Then trigger immediate sync (0ms delay) to push the new job to cloud ASAP
+        saveImmediate();
+
+        // Trigger sync ASAP to push new job to cloud
         if (window.syncEngine && window.supabaseClient?.getStatus?.().isAuthenticated) {
-            setTimeout(() => {
-                console.log('[App] Triggering immediate sync for newly created job');
-                window.syncEngine.fullSync().catch(err => console.warn('Immediate sync failed:', err));
-            }, 0);
+            // Don't wait at all - let network handle it
+            setImmediate(() => {
+                console.log('[App] Triggering sync for newly created job');
+                window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
+            });
         }
     }
     function getJobsStorageKey() {
