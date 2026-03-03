@@ -1926,11 +1926,10 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                const debug = `DEBUG: type=${j.type}, cfg=${!!cfg}, ug=${cfg?.ug}, upgraded=${j.isUpgraded}`;
                 if (cfg?.ug != null && !j.isUpgraded) {
-                    return `<div style="background:yellow; color:black; padding:5px; margin-bottom:10px; font-size:0.8rem;">${debug}</div><button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
+                    return `<button class="btn" style="background:var(--primary); color:#fff; margin-bottom:10px; font-weight:700; padding:10px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">💰 UPGRADE (£${cfg.ug})</button>`;
                 }
-                return `<div style="background:yellow; color:black; padding:5px; margin-bottom:10px; font-size:0.8rem;">${debug} - NO BUTTON</div>`;
+                return '';
             })()}
             <input type="text" id="edit-jobid-${id}" class="input-box" placeholder="Job ID (Optional)" value="${j.jobID || ''}">
             <div style="display:grid; grid-template-columns:${(getTypeConfig(j.type)?.int != null) ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-bottom:10px;">
