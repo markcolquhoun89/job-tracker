@@ -4,12 +4,12 @@
 
     function getDefaultTypes() {
         return {
-            OH: { pay: 44, int: 21, ug: null, countTowardsCompletion: true },
-            UG: { pay: 42, int: 21, ug: null, countTowardsCompletion: true },
-            HyOH: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
-            HyUG: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
-            RC: { pay: 20, int: null, ug: null, countTowardsCompletion: true },
-            BTTW: { pay: 20, int: null, ug: null, countTowardsCompletion: true }
+            OH: { pay: 44, int: 21, upgradePay: null, countTowardsCompletion: true },
+            UG: { pay: 42, int: 21, upgradePay: null, countTowardsCompletion: true },
+            HyOH: { pay: 55, int: 21, upgradePay: null, countTowardsCompletion: true },
+            HyUG: { pay: 55, int: 21, upgradePay: null, countTowardsCompletion: true },
+            RC: { pay: 20, int: null, upgradePay: null, countTowardsCompletion: true },
+            BTTW: { pay: 20, int: null, upgradePay: null, countTowardsCompletion: true }
         };
     }
 
@@ -43,15 +43,16 @@
         const int = (typeData?.int === '' || typeData?.int == null || isNaN(parseFloat(typeData.int)))
             ? null
             : parseFloat(typeData.int);
-        const ug = (typeData?.ug === '' || typeData?.ug == null || isNaN(parseFloat(typeData.ug)))
+        const rawUpgrade = typeData?.upgradePay ?? typeData?.upgrade ?? typeData?.ug;
+        const upgradePay = (rawUpgrade === '' || rawUpgrade == null || isNaN(parseFloat(rawUpgrade)))
             ? null
-            : parseFloat(typeData.ug);
+            : parseFloat(rawUpgrade);
         const countTowardsCompletion = typeData?.countTowardsCompletion !== false;
 
         return {
             pay: isNaN(pay) ? 0 : pay,
             int,
-            ug,
+            upgradePay,
             countTowardsCompletion
         };
     }
@@ -1773,7 +1774,7 @@
                 content: `<div style=\"max-height:250px; overflow-y:auto; margin-bottom:12px; padding-right:10px;\">
                     ${Object.entries(state.types).map(([name, data]) => `
                         <div style=\"display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border-t); gap:12px;\">
-                            <div style="min-width:0;"><b>${name}</b><br><span style="font-size:0.7rem; color:var(--text-muted)">&pound;${data.pay} · Int: ${data.int == null ? 'N/A' : '&pound;' + data.int} · UG: ${data.ug == null ? 'N/A' : '&pound;' + data.ug} · Completion: ${data.countTowardsCompletion === false ? 'Off' : 'On'}</span></div>
+                            <div style="min-width:0;"><b>${name}</b><br><span style="font-size:0.7rem; color:var(--text-muted)">&pound;${data.pay} · Int: ${data.int == null ? 'N/A' : '&pound;' + data.int} · Upgrade: ${data.upgradePay == null ? 'N/A' : '&pound;' + data.upgradePay} · Completion: ${data.countTowardsCompletion === false ? 'Off' : 'On'}</span></div>
                             <button class=\"btn\" style=\"width:auto; min-width:54px; flex-shrink:0; padding:6px 12px; margin:0; font-size:0.6rem; background:var(--border)\" onclick=\"editTypeModal('${name}')\">EDIT</button>
                         </div>
                     `).join('')}
@@ -1936,9 +1937,9 @@
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
-                if (cfg?.ug != null) {
+                if (cfg?.upgradePay != null) {
                     const label = j.isUpgraded ? '↻ REAPPLY UPGRADE' : '💰 UPGRADE';
-                    return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">${label} (£${cfg.ug})</button>`;
+                    return `<button class="btn" style="display:block; width:100%; background:var(--primary); color:#fff; margin:8px 0 10px 0; font-weight:700; padding:12px; font-size:0.9rem;" onclick="updateJob('${id}', 'Completed', true)">${label} (£${cfg.upgradePay})</button>`;
                 }
                 return '';
             })()}
@@ -2421,7 +2422,7 @@
             <input type="text" id="nt-name" class="input-box" placeholder="Type Name (e.g. MDU)">
             <input type="number" id="nt-pay" class="input-box" placeholder="Standard Pay (&pound;)">
             <input type="number" id="nt-int" class="input-box" placeholder="Internal Pay (&pound;) (Optional, blank = no Internals)">
-            <input type="number" id="nt-ug" class="input-box" placeholder="Upgrade Pay (&pound;) (Optional, blank = no Upgrades)">
+            <input type="number" id="nt-upgrade" class="input-box" placeholder="Upgrade Pay (&pound;) (Optional, blank = no Upgrades)">
             <div class="theme-toggle-row" style="margin-top:6px;">
                 <div><span>Count toward completion rate</span><br><small>Disable for job types that should not affect completion metrics</small></div>
                 <label class="toggle-switch">
@@ -2437,13 +2438,13 @@
         const name = document.getElementById('nt-name').value.trim();
         const pay = parseFloat(document.getElementById('nt-pay').value);
         const intVal = document.getElementById('nt-int').value.trim();
-        const ugVal = document.getElementById('nt-ug').value.trim();
+        const upgradeVal = document.getElementById('nt-upgrade').value.trim();
         const countTowardsCompletion = document.getElementById('nt-count').checked;
         const int = intVal === '' ? null : (parseFloat(intVal) || null);
-        const ug = ugVal === '' ? null : (parseFloat(ugVal) || null);
+        const upgradePay = upgradeVal === '' ? null : (parseFloat(upgradeVal) || null);
         if(!name || isNaN(pay)) return customAlert("Error", "Name and Standard Pay are required.", true);
         if(state.types[name]) return customAlert("Error", "A job type with this name already exists.", true);
-        state.types[name] = normalizeTypeConfig({ pay, int, ug, countTowardsCompletion });
+        state.types[name] = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
         save(); closeModal(); customAlert("Success", `${name} has been created.`);
     }
     function editTypeModal(name) {
@@ -2457,7 +2458,7 @@
             <label style="font-size:0.7rem; color:var(--text-muted)">Internal Pay (&pound;)</label>
             <input type="number" id="et-int" class="input-box" value="${t.int == null ? '' : t.int}" placeholder="Leave blank to disable Internals">
             <label style="font-size:0.7rem; color:var(--text-muted)">Upgrade Pay (&pound;)</label>
-            <input type="number" id="et-ug" class="input-box" value="${t.ug == null ? '' : t.ug}" placeholder="Leave blank to disable Upgrades">
+            <input type="number" id="et-upgrade" class="input-box" value="${t.upgradePay == null ? '' : t.upgradePay}" placeholder="Leave blank to disable Upgrades">
             <div class="theme-toggle-row" style="margin-top:6px;">
                 <div><span>Count toward completion rate</span><br><small>Disable for jobs that should not affect completion metrics</small></div>
                 <label class="toggle-switch">
@@ -2473,12 +2474,12 @@
     function saveEditType(name) {
         const pay = parseFloat(document.getElementById('et-pay').value);
         const intVal = document.getElementById('et-int').value.trim();
-        const ugVal = document.getElementById('et-ug').value.trim();
+        const upgradeVal = document.getElementById('et-upgrade').value.trim();
         const countTowardsCompletion = document.getElementById('et-count').checked;
         const int = intVal === '' ? null : (parseFloat(intVal) || null);
-        const ug = ugVal === '' ? null : (parseFloat(ugVal) || null);
+        const upgradePay = upgradeVal === '' ? null : (parseFloat(upgradeVal) || null);
         if(isNaN(pay)) return customAlert("Error", "Standard Pay is required.", true);
-        state.types[name] = normalizeTypeConfig({ pay, int, ug, countTowardsCompletion });
+        state.types[name] = normalizeTypeConfig({ pay, int, upgradePay, countTowardsCompletion });
         save(); closeModal(); customAlert("Success", `${name} configuration updated.`);
     }
     function confirmDeleteType(name) {
@@ -2495,7 +2496,7 @@
             return;
         }
 
-        if (upgrade && (!typeCfg || typeCfg.ug == null)) {
+        if (upgrade && (!typeCfg || typeCfg.upgradePay == null)) {
             customAlert("Error", `${j.type} does not support Upgrades.`, true);
             return;
         }
@@ -2517,8 +2518,8 @@
             j.fee = 0;
         } else {
             if (status === 'Completed') {
-                const basePay = j.isUpgraded && typeCfg.ug != null
-                    ? parseFloat(typeCfg.ug)
+                const basePay = j.isUpgraded && typeCfg.upgradePay != null
+                    ? parseFloat(typeCfg.upgradePay)
                     : parseFloat(typeCfg.pay);
                 const jobDay = new Date(j.date + 'T00:00:00').getDay();
                 const isSaturday = jobDay === 6;
@@ -3104,7 +3105,7 @@
                 cloudTypeMap[ct.code] = {
                     pay: ct.pay,
                     int: ct.int,
-                    ug: ct.ug,
+                    upgradePay: ct.ug,
                     countTowardsCompletion: ct.count_towards_completion !== false
                 };
             });
@@ -3116,7 +3117,7 @@
                     // Override with cloud values, but keep local if cloud is null
                     if (cloudTypeMap[code].pay != null) merged.pay = cloudTypeMap[code].pay;
                     if (cloudTypeMap[code].int != null) merged.int = cloudTypeMap[code].int;
-                    if (cloudTypeMap[code].ug != null) merged.ug = cloudTypeMap[code].ug;
+                    if (cloudTypeMap[code].upgradePay != null) merged.upgradePay = cloudTypeMap[code].upgradePay;
                     merged.countTowardsCompletion = cloudTypeMap[code].countTowardsCompletion;
                     state.types[code] = merged;
                 }
@@ -3160,7 +3161,7 @@
                     code,
                     pay: config.pay || 0,
                     int: config.int,
-                    ug: config.ug,
+                    ug: config.upgradePay,
                     count_towards_completion: config.countTowardsCompletion !== false ? true : false
                 };
                 
