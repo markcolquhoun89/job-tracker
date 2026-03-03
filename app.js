@@ -9,7 +9,7 @@
             HyOH: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
             HyUG: { pay: 55, int: 21, ug: null, countTowardsCompletion: true },
             RC: { pay: 20, int: null, ug: null, countTowardsCompletion: true },
-            BTTW: { pay: 20, int: null, ug: 44, countTowardsCompletion: true }
+            BTTW: { pay: 20, int: null, ug: null, countTowardsCompletion: true }
         };
     }
 
@@ -909,7 +909,7 @@
                             <div class="job-drag-handle" ontouchstart="handleJobTouch(event, '${j.id}')">&#8942;&#8942;</div>
                             <div style="pointer-events:none;">
                                 <b style="font-size:1.1rem; display:block;">${j.type}${j.jobID ? ` <span style="font-size:0.7rem; color:var(--text-muted)">#${j.jobID}</span>` : ''}
-                                ${j.isUpgraded ? '<span style="color:var(--primary); font-size:0.6rem; vertical-align:middle;">[UG]</span>' : ''}${j.notes ? '<span class="notes-indicator" title="Has notes"></span>' : ''}</b>
+                                ${j.isUpgraded ? '<span style="color:var(--primary); font-size:0.6rem; vertical-align:middle;">[UPGRADED]</span>' : ''}${j.notes ? '<span class="notes-indicator" title="Has notes"></span>' : ''}</b>
                                 <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700">${j.status.toUpperCase()}</span>
                                 ${elfIcon || candidsIcon ? `<div style="margin-top:4px; font-size:0.8rem;">${elfIcon} ${candidsIcon}</div>` : ''}
                             </div>
@@ -1922,7 +1922,7 @@
                     <h3 style="margin:0; font-weight:900; color:${statusColor};">${j.type}</h3>
                     <span style="font-size:0.8rem; color:var(--text-muted);">${dateStr} · ${statusLabel} · ${feeStr}</span>
                 </div>
-                ${j.isUpgraded ? '<span style="background:var(--primary); color:#fff; font-size:0.65rem; padding:2px 8px; border-radius:6px; font-weight:700;">UG</span>' : ''}
+                ${j.isUpgraded ? '<span style="background:var(--primary); color:#fff; font-size:0.65rem; padding:2px 8px; border-radius:6px; font-weight:700;">UPGRADED</span>' : ''}
             </div>
             ${(() => {
                 const cfg = getTypeConfig(j.type);
