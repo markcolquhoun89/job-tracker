@@ -16,8 +16,8 @@ class SyncEngine {
     this.lastRemoteCount = 0;
     this.periodicSyncId = null;
     this.eventsBound = false;
-
-    console.log('[SyncEngine] Initialized');
+    this.syncCycleDeletions = []; // Track deletions synced in this cycle
+    this.hasPendingChanges = false; // Flag if new changes arrived during sync
   }
 
   /**
@@ -261,13 +261,13 @@ class SyncEngine {
         }
       }
 
-      // Push deletions to Supabase
-      const deletedJobIds = (window.state && window.state.deletedJobIds) ? [...window.state.deletedJobIds] : [];
-      if (deletedJobIds.length > 0) {
-        console.log('[SyncEngine] Pushing', deletedJobIds.length, 'deleted jobs to cloud');
+      // Push deletions to Supabase - read from localStorage to ensure authoritative source
+      const deletedJobIdsFromStorage = JSON.parse(localStorage.getItem(`nx_deleted_job_ids_user_${activeUserId}`) || '[]');
+      if (deletedJobIdsFromStorage.length > 0) {
+        console.log('[SyncEngine] Pushing', deletedJobIdsFromStorage.length, 'deleted jobs to cloud');
         const successfullyDeleted = [];
         
-        for (const deletedId of deletedJobIds) {
+        for (const deletedId of deletedJobIdsFromStorage) {
           try {
             const result = await this.supabase.delete('jobs', { id: deletedId, user_id: activeUserId });
             if (result.success) {
@@ -283,13 +283,9 @@ class SyncEngine {
         
         // Only remove successfully deleted IDs from tracking
         if (window.state && successfullyDeleted.length > 0) {
-          window.state.deletedJobIds = window.state.deletedJobIds.filter(
-            id => !successfullyDeleted.includes(id)
-          );
-          const deletedKey = `nx_deleted_job_ids_user_${this.supabase.userId}`;
-          localStorage.setItem(deletedKey, JSON.stringify(window.state.deletedJobIds));
-          localStorage.removeItem('nx_deleted_job_ids');
-          console.log(`[SyncEngine] ✓ Cleared ${successfullyDeleted.length} deletion(s) from tracking`);
+          // Store for cleanup AFTER pull completes
+          this.syncCycleDeletions = successfullyDeleted;
+          console.log(`[SyncEngine] Staged ${successfullyDeleted.length} deletion(s) for cleanup after pull`);
         }
       }
 
@@ -316,6 +312,7 @@ class SyncEngine {
     }
 
     this.isSyncing = true;
+    this.syncCycleDeletions = []; // Reset for this cycle
     console.log('[SyncEngine] Starting full sync');
     
     try {
@@ -325,6 +322,26 @@ class SyncEngine {
       console.log('[SyncEngine] Step 2: Pull remote jobs after push completes');
       const pullResult = await this.pullRemoteJobs();
       console.log('[SyncEngine] Pull result:', pullResult);
+      
+      // NOW clear deletion tracking after both push and pull complete
+      if (this.syncCycleDeletions.length > 0) {
+        if (window.state) {
+          window.state.deletedJobIds = window.state.deletedJobIds.filter(
+            id => !this.syncCycleDeletions.includes(id)
+          );
+          const deletedKey = `nx_deleted_job_ids_user_${this.supabase.userId}`;
+          localStorage.setItem(deletedKey, JSON.stringify(window.state.deletedJobIds));
+          localStorage.removeItem('nx_deleted_job_ids');
+          console.log(`[SyncEngine] ✓ Cleared ${this.syncCycleDeletions.length} deletion(s) from tracking after full sync`);
+        }
+      }
+      
+      // If new changes arrived during sync, reschedule another sync
+      if (this.hasPendingChanges) {
+        console.log('[SyncEngine] New changes detected during sync, rescheduling...');
+        this.hasPendingChanges = false;
+        setTimeout(() => this.fullSync(), 100);
+      }
       
       console.log('[SyncEngine] ✓ Full sync complete');
     } catch (error) {

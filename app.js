@@ -2911,15 +2911,21 @@
             }).catch(err => console.warn('IndexedDB clear failed:', err));
         }
         
-        // Debounce sync requests - only sync after 1 second of no changes
+        // Debounce sync requests - but check if something is already syncing
         if (window._syncTimeout) clearTimeout(window._syncTimeout);
         
         const authStatus = window.supabaseClient?.getStatus?.();
         if (authStatus?.isAuthenticated && window.syncEngine) {
-            window._syncTimeout = setTimeout(() => {
-                console.log('[App] Triggering sync after save');
-                window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
-            }, 1000);
+            // If sync is already in progress, flag it so a new one runs after
+            if (window.syncEngine.isSyncing) {
+                console.log('[App] Sync already in progress, will reschedule after it completes');
+                window.syncEngine.hasPendingChanges = true;
+            } else {
+                window._syncTimeout = setTimeout(() => {
+                    console.log('[App] Triggering sync after save');
+                    window.syncEngine.fullSync().catch(err => console.warn('Sync failed:', err));
+                }, 1000);
+            }
         }
         
         render(); 
