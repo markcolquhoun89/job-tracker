@@ -4,49 +4,40 @@
  * NEVER commit API keys - use .env files
  */
 
-// Supabase configuration - environment variables handled by Vite
-// Safely read `import.meta.env` without causing syntax errors in non-module contexts
+// Try to get credentials from window.ENV (set in index.html for local testing)
+// or from import.meta.env with VITE_ prefix (set by Vite/Cloudflare)
+// or from localStorage (runtime override)
+
+const _windowUrl = window.ENV?.SUPABASE_URL || '';
+const _windowKey = window.ENV?.SUPABASE_ANON_KEY || '';
+
 let _viteEnvUrl = '';
 let _viteEnvKey = '';
-let _rawEnvUrl = '';
-let _rawEnvKey = '';
 try {
-  // Vite only exposes env vars prefixed with VITE_.
-  // developers who set SUPABASE_URL / SUPABASE_ANON_KEY directly
-  // will not see them during development unless they are added to
-  // `.env` with the VITE_ prefix or injected via window.ENV.
   _viteEnvUrl = import.meta?.env?.VITE_SUPABASE_URL || '';
   _viteEnvKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || '';
-  _rawEnvUrl = import.meta?.env?.SUPABASE_URL || '';
-  _rawEnvKey = import.meta?.env?.SUPABASE_ANON_KEY || '';
-
-  // debug helper: log entire environment in development so users can
-  // spot missing variables quickly.
-  if (import.meta.env && import.meta.env.MODE === 'development') {
-    console.debug('[Config] import.meta.env dump:', import.meta.env);
-  }
 } catch (e) {
-  // import.meta may not exist; fall back later
+  // import.meta may not exist in some contexts
 }
 
-if ((_rawEnvUrl || _rawEnvKey) && !_viteEnvUrl && !_viteEnvKey) {
-  console.warn(
-    '[Config] Detected SUPABASE_URL/SUPABASE_ANON_KEY without VITE_ prefix. ' +
-    'Rename them to VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY or configure via window.ENV.'
-  );
-}
-
-// Production defaults - we no longer ship any hard‑coded project credentials.
-// The values must come from environment variables (Vite `import.meta.env` or
-// `window.ENV` for Cloudflare Pages).  Leaving these blank will trigger a
-// validation error so the developer is forced to configure them properly.
-// allow manual configuration stored in localStorage for development or
-// when environment variables are not available (e.g. static build).
 const _storageUrl = (typeof localStorage !== 'undefined') ? localStorage.getItem('nx_supabase_url') || '' : '';
 const _storageKey = (typeof localStorage !== 'undefined') ? localStorage.getItem('nx_supabase_key') || '' : '';
 
-const DEFAULT_SUPABASE_URL = _viteEnvUrl || window.ENV?.SUPABASE_URL || _storageUrl || '';
-const DEFAULT_SUPABASE_KEY = _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || _storageKey || '';
+// Priority: Vite env vars → window.ENV → localStorage
+const DEFAULT_SUPABASE_URL = _viteEnvUrl || _windowUrl || _storageUrl || '';
+const DEFAULT_SUPABASE_KEY = _viteEnvKey || _windowKey || _storageKey || '';
+
+// Log what we found for debugging
+console.log('[Config] Sources checked:', {
+  viteUrl: _viteEnvUrl ? '✓ set' : '✗ empty',
+  viteKey: _viteEnvKey ? '✓ set' : '✗ empty',
+  windowUrl: _windowUrl ? '✓ set' : '✗ empty',
+  windowKey: _windowKey ? '✓ set' : '✗ empty',
+  storageUrl: _storageUrl ? '✓ set' : '✗ empty',
+  storageKey: _storageKey ? '✓ set' : '✗ empty',
+  finalUrl: DEFAULT_SUPABASE_URL ? DEFAULT_SUPABASE_URL.substring(0, 30) + '...' : '✗ EMPTY',
+  finalKey: DEFAULT_SUPABASE_KEY ? '✓ set' : '✗ EMPTY'
+});
 
 export const SUPABASE_CONFIG = {
   url: DEFAULT_SUPABASE_URL,
@@ -55,10 +46,8 @@ export const SUPABASE_CONFIG = {
 
 // warn if we ended up with empty values after initialization
 if (!DEFAULT_SUPABASE_URL || !DEFAULT_SUPABASE_KEY) {
-  console.warn('[Config] Supabase config is empty or incomplete:', {
-    DEFAULT_SUPABASE_URL,
-    DEFAULT_SUPABASE_KEY: DEFAULT_SUPABASE_KEY ? '***' : '(empty)'
-  });
+  console.error('[Config] ❌ Supabase config is MISSING - app will not work');
+  console.error('[Config] Make sure window.ENV is set in index.html or VITE_ env vars are configured');
 }
 
 /**
@@ -82,11 +71,6 @@ export function saveSupabaseConfig(url, anonKey) {
     APP_CONFIG.SUPABASE_URL = url;
     APP_CONFIG.SUPABASE_ANON_KEY = anonKey;
   }
-}
-
-// Log configuration when running locally to aid debugging
-if (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'development') {
-  APP_CONFIG.log && APP_CONFIG.log();
 }
 
 const APP_CONFIG = {
