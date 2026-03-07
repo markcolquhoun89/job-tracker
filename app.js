@@ -54,7 +54,16 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         });
         
         // Initial render
+        console.log('[App] Rendering UI...');
         render();
+        console.log('[App] UI rendered');
+        
+        // Dismiss splash screen now that app is ready
+        const splash = document.getElementById('splash');
+        if (splash) {
+            console.log('[App] Dismissing splash screen');
+            splash.style.display = 'none';
+        }
         
         // Initialize background animations
         initBackgroundAnimation();
@@ -79,6 +88,11 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         console.log('[App] Job Tracker initialized successfully');
     } catch (error) {
         console.error('[App] Initialization failed:', error);
+        // Still dismiss splash so user can see the app
+        const splash = document.getElementById('splash');
+        if (splash) {
+            splash.style.display = 'none';
+        }
         // Show minimal UI - user can still interact, just without full features
         showToast('⚠ App initialization error - some features may not work', 5000);
     }

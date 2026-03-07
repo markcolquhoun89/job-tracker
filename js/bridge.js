@@ -57,24 +57,36 @@ export async function initModules() {
             window.supabaseClient = client;
             console.log('✓ Supabase client exposed globally');
             
-            const hasSession = await client.init();
-            if (hasSession) {
-                console.log('✓ Supabase client initialized with existing session');
+            // Wrap init with timeout so it doesn't hang forever
+            try {
+                const initPromise = client.init();
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Supabase auth check timeout')), 5000)
+                );
                 
-                // Initialize sync engine only if we have an active session
-                try {
-                    const syncEngine = new SyncEngine(
-                        client,
-                        JobTrackerDB,
-                        JobTrackerState
-                    );
-                    await syncEngine.init();
-                    console.log('✓ Sync engine initialized');
-                } catch (syncError) {
-                    console.warn('[Bridge] Sync engine init failed (non-critical):', syncError);
+                const hasSession = await Promise.race([initPromise, timeoutPromise]);
+                
+                if (hasSession) {
+                    console.log('✓ Supabase client initialized with existing session');
+                    
+                    // Initialize sync engine only if we have an active session
+                    try {
+                        const syncEngine = new SyncEngine(
+                            client,
+                            JobTrackerDB,
+                            JobTrackerState
+                        );
+                        await syncEngine.init();
+                        console.log('✓ Sync engine initialized');
+                    } catch (syncError) {
+                        console.warn('[Bridge] Sync engine init failed (non-critical):', syncError);
+                    }
+                } else {
+                    console.log('✓ Supabase client initialized (no session yet - user needs to sign in)');
                 }
-            } else {
-                console.log('✓ Supabase client initialized (no session yet - user needs to sign in)');
+            } catch (authError) {
+                console.warn('[Bridge] Supabase auth check failed or timed out:', authError.message);
+                console.log('✓ Supabase client ready (auth check skipped)');
             }
         } else {
             console.warn('[Bridge] Supabase not configured - authentication disabled');
