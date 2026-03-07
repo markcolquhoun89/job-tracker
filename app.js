@@ -36,10 +36,6 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
 // Application Initialization
 // ===========================
 
-// authentication stub
-function showSignInModal() {
-    customAlert('Authentication', 'Sign‑in UI is not implemented yet.', true);
-}
 
 (async function initializeApp() {
     console.log('Initializing Job Tracker...');
