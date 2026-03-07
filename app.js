@@ -9,6 +9,12 @@
 
 import { JobTrackerConstants } from './js/constants.js';
 import { JobTrackerUtils } from './js/utils.js';
+
+// Basic authentication placeholder (real UI lives elsewhere)
+function showSignInModal() {
+    customAlert('Authentication', 'Sign‑in is not implemented in this build.', true);
+}
+
 import { JobTrackerDB } from './js/database.js';
 import { JobTrackerState } from './js/state.js';
 import { JobTrackerCalculations } from './js/calculations.js';
@@ -29,6 +35,11 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
 // ===========================
 // Application Initialization
 // ===========================
+
+// authentication stub
+function showSignInModal() {
+    customAlert('Authentication', 'Sign‑in UI is not implemented yet.', true);
+}
 
 (async function initializeApp() {
     console.log('Initializing Job Tracker...');
@@ -1938,6 +1949,34 @@ function showNotesSearch() { /* TODO */ }
 function importCSV() { /* TODO */ }
 function confirmWipe() { /* TODO */ }
 function closeModal() { /* TODO */ }
+
+// expose globals for inline handlers (compatibility with existing HTML)
+Object.assign(window, {
+    setRange,
+    nav,
+    navSettings,
+    adjDate,
+    goToday,
+    jumpToDate,
+    showSignInModal,
+    toggleAddPopup,
+    showSingleAdd,
+    showMultiAdd,
+    saveNewJob,
+    saveBulkJobs,
+    toggleBatchMode,
+    clearJobOrder,
+    quickStatus,
+    pressEdit,
+    toggleBatchSelect,
+    editTarget,
+    shareReport,
+    jumpToPayWeek,
+    showNotesSearch,
+    importCSV,
+    confirmWipe,
+    closeModal
+});
 
 // ===========================
 // End of Render Functions
