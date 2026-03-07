@@ -527,6 +527,10 @@ export const JobTrackerModals = {
     async handleSupabaseSetup() {
         const url = document.getElementById('config-url')?.value.trim();
         const key = document.getElementById('config-key')?.value.trim();
+        
+        // Get showToast from utils
+        const { showToast } = getUtils();
+        
         if (!url || !key) {
             this.customAlert('Validation', 'Please provide both URL and anon key', true);
             return;
@@ -559,6 +563,9 @@ export const JobTrackerModals = {
     async handleSignIn() {
         const email = document.getElementById('auth-email')?.value?.trim();
         const password = document.getElementById('auth-password')?.value;
+        
+        // Get showToast from utils
+        const { showToast } = getUtils();
 
         if (!email || !password) {
             this.customAlert('Validation', 'Please enter email and password', true);
@@ -611,6 +618,9 @@ export const JobTrackerModals = {
         const displayName = document.getElementById('auth-displayname')?.value?.trim();
         const email = document.getElementById('auth-email')?.value?.trim();
         const password = document.getElementById('auth-password')?.value;
+        
+        // Get showToast from utils
+        const { showToast } = getUtils();
 
         if (!displayName || !email || !password) {
             this.customAlert('Validation', 'Please fill all fields', true);
