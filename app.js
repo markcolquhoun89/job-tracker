@@ -1939,12 +1939,11 @@ function setBgAnimation() { /* TODO */ }
 function editTypeModal() { /* TODO */ }
 function addTypeModal() { /* TODO */ }
 function toggleLeaderboardParticipation() { /* TODO */ }
-function toggleWakeLock() { /* TODO */ }
-function requestNotifications() { /* TODO */ }
+// wake lock and notification handlers are defined earlier; stubs removed to
+// avoid 'already declared' errors
 function showNotesSearch() { /* TODO */ }
 function importCSV() { /* TODO */ }
 function confirmWipe() { /* TODO */ }
-function closeModal() { /* TODO */ }
 
 // expose globals for inline handlers (compatibility with existing HTML)
 Object.assign(window, {
