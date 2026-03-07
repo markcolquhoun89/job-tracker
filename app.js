@@ -9,10 +9,11 @@
 
 import { JobTrackerConstants } from './js/constants.js';
 import { JobTrackerUtils } from './js/utils.js';
+import { supabaseClient } from './js/supabase-client.js';
 
-// Basic authentication placeholder (real UI lives elsewhere)
+// Basic authentication handler
 function showSignInModal() {
-    customAlert('Authentication', 'Sign-in is not implemented in this build.', true);
+    JobTrackerModals.showSignIn();
 }
 
 import { JobTrackerDB } from './js/database.js';

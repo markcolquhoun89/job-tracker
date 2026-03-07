@@ -7,12 +7,15 @@ import { JobTrackerConstants } from './constants.js';
 import { JobTrackerState } from './state.js';
 import { JobTrackerJobs } from './jobs.js';
 import { JobTrackerUtils } from './utils.js';
+import { supabaseClient } from './supabase-client.js';
 
 const { STATUS, NOTE_TEMPLATES } = JobTrackerConstants;
 // accessor helpers
 const getState = () => JobTrackerState;
 const getJobOps = () => JobTrackerJobs;
 const getUtils = () => JobTrackerUtils;
+const getSupabase = () => window.supabaseClient || supabaseClient;
+
 
 export const JobTrackerModals = {
     /**
@@ -463,6 +466,116 @@ export const JobTrackerModals = {
             );
         } catch (error) {
             this.customAlert('Import Error', error.message, true);
+        }
+    },
+
+    /**
+     * Authentication Modal
+     */
+    async showSignIn() {
+        const { sanitizeHTML } = getUtils();
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:20px;">Sign In</h3>
+            <div style="display:grid; gap:12px;">
+                <input type="email" id="auth-email" placeholder="Email" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <input type="password" id="auth-password" placeholder="Password" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSignIn()">Sign In</button>
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.showSignUp()">Create Account</button>
+            </div>
+        `;
+        JobTrackerModals.showModal(content);
+    },
+
+    /**
+     * Sign Up Modal
+     */
+    async showSignUp() {
+        const { sanitizeHTML } = getUtils();
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:20px;">Create Account</h3>
+            <div style="display:grid; gap:12px;">
+                <input type="text" id="auth-displayname" placeholder="Display Name" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <input type="email" id="auth-email" placeholder="Email" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <input type="password" id="auth-password" placeholder="Password" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSignUp()">Create Account</button>
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.showSignIn()">Back to Sign In</button>
+            </div>
+        `;
+        JobTrackerModals.showModal(content);
+    },
+
+    /**
+     * Handle sign-in submission
+     */
+    async handleSignIn() {
+        const email = document.getElementById('auth-email')?.value?.trim();
+        const password = document.getElementById('auth-password')?.value;
+
+        if (!email || !password) {
+            this.customAlert('Validation', 'Please enter email and password', true);
+            return;
+        }
+
+        try {
+            const client = getSupabase();
+            if (!client) {
+                this.customAlert('Error', 'Supabase client not initialized', true);
+                return;
+            }
+            const result = await client.signIn(email, password);
+            if (result.success) {
+                this.customAlert('Success', `Welcome back, ${result.user.email}!`);
+                JobTrackerModals.closeModal();
+                // reload to reflect authenticated state
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                this.customAlert('Sign In Failed', result.error, true);
+            }
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
+    },
+
+    /**
+     * Handle sign-up submission
+     */
+    async handleSignUp() {
+        const displayName = document.getElementById('auth-displayname')?.value?.trim();
+        const email = document.getElementById('auth-email')?.value?.trim();
+        const password = document.getElementById('auth-password')?.value;
+
+        if (!displayName || !email || !password) {
+            this.customAlert('Validation', 'Please fill all fields', true);
+            return;
+        }
+
+        if (password.length < 6) {
+            this.customAlert('Validation', 'Password must be at least 6 characters', true);
+            return;
+        }
+
+        try {
+            const client = getSupabase();
+            if (!client) {
+                this.customAlert('Error', 'Supabase client not initialized', true);
+                return;
+            }
+            const result = await client.signUp(email, password, displayName);
+            if (result.success) {
+                if (result.needsVerification) {
+                    this.customAlert('Account Created', 'Check your email to verify your account before signing in.');
+                } else {
+                    this.customAlert('Success', `Welcome, ${displayName}!`);
+                    JobTrackerModals.closeModal();
+                    setTimeout(() => window.location.reload(), 1500);
+                }
+            } else {
+                this.customAlert('Sign Up Failed', result.error, true);
+            }
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
         }
     }
 };

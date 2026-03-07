@@ -36,6 +36,9 @@ export async function initModules() {
                 SUPABASE_CONFIG.anonKey
             );
             
+            // expose globally for modals.js and other modules
+            window.supabaseClient = client;
+            
             const hasSession = await client.init();
             if (hasSession) {
                 console.log('✓ Supabase client initialized with existing session');
