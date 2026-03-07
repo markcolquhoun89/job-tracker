@@ -48,12 +48,12 @@ export async function initModules() {
         if (!SUPABASE_CONFIG?.url || !SUPABASE_CONFIG?.anonKey) {
             // additional debug output
             console.warn('[Bridge] SUPABASE_CONFIG object:', SUPABASE_CONFIG);
-            // ask the user to configure if possible
+            // ask the user to configure if possible (delayed to ensure modals are loaded)
             setTimeout(() => {
                 if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
                     window.JobTrackerModals.showSupabaseSetup();
                 }
-            }, 0);
+            }, 2000); // delay 2 seconds to let UI load
         }
         
         if (SUPABASE_CONFIG?.url && SUPABASE_CONFIG?.anonKey) {

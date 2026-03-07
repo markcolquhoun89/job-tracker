@@ -482,6 +482,7 @@ export const JobTrackerModals = {
                 <input type="password" id="auth-password" placeholder="Password" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
                 <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSignIn()">Sign In</button>
                 <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.showSignUp()">Create Account</button>
+                <button class="btn" style="background:var(--warning); color:#fff;" onclick="JobTrackerModals.showSupabaseSetup()">⚙ Configure Supabase</button>
             </div>
         `;
         JobTrackerModals.showModal(content);
