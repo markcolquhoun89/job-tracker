@@ -15,20 +15,37 @@ import { SUPABASE_CONFIG } from '../config.js';
 
 export let modulesReady = false;
 
+/**
+ * Core initialization - should only be called once
+ */
 export async function initModules() {
-    console.log('Initializing modular system...');
+    // prevent double-initialization
+    if (modulesReady) {
+        console.log('[Bridge] Modules already initialized, skipping');
+        return;
+    }
+
+    console.log('[Bridge] Initializing modular system...');
     
     try {
         // Initialize database
+        console.log('[Bridge] Initializing database...');
         await JobTrackerDB.db.init();
         console.log('✓ Database initialized');
         
         // Initialize state
+        console.log('[Bridge] Initializing state...');
         await JobTrackerState.init();
         console.log('✓ State loaded');
         
         // Initialize Supabase client if configured
-        if (SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+        console.log('[Bridge] Checking Supabase config...', {
+            hasUrl: !!SUPABASE_CONFIG?.url,
+            hasKey: !!SUPABASE_CONFIG?.anonKey,
+            url: SUPABASE_CONFIG?.url?.substring(0, 30) + '...' || 'MISSING'
+        });
+        
+        if (SUPABASE_CONFIG?.url && SUPABASE_CONFIG?.anonKey) {
             console.log('[Bridge] Initializing Supabase client...');
             // assign singleton via helper
             const client = initSupabase(
@@ -38,43 +55,44 @@ export async function initModules() {
             
             // expose globally for modals.js and other modules
             window.supabaseClient = client;
+            console.log('✓ Supabase client exposed globally');
             
             const hasSession = await client.init();
             if (hasSession) {
                 console.log('✓ Supabase client initialized with existing session');
                 
-                // Initialize sync engine
-                const syncEngine = new SyncEngine(
-                    client,
-                    JobTrackerDB,
-                    JobTrackerState
-                );
-                await syncEngine.init();
-                console.log('✓ Sync engine initialized');
+                // Initialize sync engine only if we have an active session
+                try {
+                    const syncEngine = new SyncEngine(
+                        client,
+                        JobTrackerDB,
+                        JobTrackerState
+                    );
+                    await syncEngine.init();
+                    console.log('✓ Sync engine initialized');
+                } catch (syncError) {
+                    console.warn('[Bridge] Sync engine init failed (non-critical):', syncError);
+                }
             } else {
-                console.log('✓ Supabase client initialized (no session yet)');
+                console.log('✓ Supabase client initialized (no session yet - user needs to sign in)');
             }
+        } else {
+            console.warn('[Bridge] Supabase not configured - authentication disabled');
+            // Still set a dummy client so modals don't crash
+            window.supabaseClient = null;
         }
         
-        // sync legacy state if any (app.js may call this itself later)
-        if (window.state) {
-            JobTrackerCompat.syncState();
-            console.log('✓ State synchronized');
-        }
-
         // dispatch event for compatibility hooks
         const evt = new Event('modulesReady');
         window.dispatchEvent(evt);
         modulesReady = true;
         console.log('✓ Modular system ready');
     } catch (error) {
-        console.error('Module initialization failed:', error);
-        alert('Failed to initialize app. Please refresh the page.');
+        console.error('[Bridge] Module initialization failed:', error);
+        modulesReady = false;
+        // Don't alert - let app continue with degraded functionality
     }
 }
-
-// automatically kick off initialization when imported
-initModules();
 
 // helper export for legacy code
 export function whenModulesReady(callback) {

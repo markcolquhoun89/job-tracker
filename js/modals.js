@@ -521,19 +521,28 @@ export const JobTrackerModals = {
         try {
             const client = getSupabase();
             if (!client) {
-                this.customAlert('Error', 'Supabase client not initialized', true);
+                console.error('[Modals] Supabase client not available');
+                console.log('[Modals] window.supabaseClient:', window.supabaseClient);
+                console.log('[Modals] config might not be set. Check SUPABASE_CONFIG in console');
+                this.customAlert('Configuration Error', 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment.', true);
                 return;
             }
+            
+            console.log('[Modals] Attempting sign in for:', email);
             const result = await client.signIn(email, password);
+            
             if (result.success) {
+                console.log('[Modals] Sign in successful:', result.user.id);
                 this.customAlert('Success', `Welcome back, ${result.user.email}!`);
                 JobTrackerModals.closeModal();
                 // reload to reflect authenticated state
                 setTimeout(() => window.location.reload(), 1500);
             } else {
+                console.warn('[Modals] Sign in failed:', result.error);
                 this.customAlert('Sign In Failed', result.error, true);
             }
         } catch (error) {
+            console.error('[Modals] Sign in exception:', error);
             this.customAlert('Error', error.message, true);
         }
     },
@@ -559,11 +568,16 @@ export const JobTrackerModals = {
         try {
             const client = getSupabase();
             if (!client) {
-                this.customAlert('Error', 'Supabase client not initialized', true);
+                console.error('[Modals] Supabase client not available for signup');
+                this.customAlert('Configuration Error', 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment.', true);
                 return;
             }
+            
+            console.log('[Modals] Attempting sign up for:', email);
             const result = await client.signUp(email, password, displayName);
+            
             if (result.success) {
+                console.log('[Modals] Sign up successful:', result.user.id);
                 if (result.needsVerification) {
                     this.customAlert('Account Created', 'Check your email to verify your account before signing in.');
                 } else {
@@ -572,9 +586,11 @@ export const JobTrackerModals = {
                     setTimeout(() => window.location.reload(), 1500);
                 }
             } else {
+                console.warn('[Modals] Sign up failed:', result.error);
                 this.customAlert('Sign Up Failed', result.error, true);
             }
         } catch (error) {
+            console.error('[Modals] Sign up exception:', error);
             this.customAlert('Error', error.message, true);
         }
     }

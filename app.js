@@ -36,44 +36,52 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
 
 
 (async function initializeApp() {
-    console.log('Initializing Job Tracker...');
-    
-    // Initialize all modules first (includes Supabase client setup)
-    await initModules();
-    
-    // Subscribe to state changes for reactive updates
-    state.subscribe((event, data) => {
-        console.log('State event:', event);
-        // Auto re-render on data changes
-        if (event.startsWith('job:') || event.startsWith('jobs:')) {
-            render(true);
+    try {
+        console.log('[App] Starting initialization...');
+        
+        // Initialize all modular components (DB, state, Supabase, sync)
+        await initModules();
+        
+        console.log('[App] Modules initialized, setting up UI...');
+        
+        // Subscribe to state changes for reactive updates
+        state.subscribe((event, data) => {
+            console.log('[App] State event:', event);
+            // Auto re-render on data changes
+            if (event.startsWith('job:') || event.startsWith('jobs:')) {
+                render(true);
+            }
+        });
+        
+        // Initial render
+        render();
+        
+        // Initialize background animations
+        initBackgroundAnimation();
+        
+        // Setup service worker
+        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
         }
-    });
-    
-    // Initial render
-    render();
-    
-    // Initialize background animations
-    initBackgroundAnimation();
-    
-    // Setup service worker
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        
+        // Restore wake lock if it was active
+        const wakelock = state.getSetting('nx_wakelock');
+        if (wakelock === '1') {
+            toggleWakeLock();
+        }
+        
+        // Setup notifications if enabled
+        const notif = state.getSetting('nx_notif');
+        if (notif === '1' && 'Notification' in window && Notification.permission === 'granted') {
+            scheduleNotification();
+        }
+        
+        console.log('[App] Job Tracker initialized successfully');
+    } catch (error) {
+        console.error('[App] Initialization failed:', error);
+        // Show minimal UI - user can still interact, just without full features
+        showToast('⚠ App initialization error - some features may not work', 5000);
     }
-    
-    // Restore wake lock if it was active
-    const wakelock = state.getSetting('nx_wakelock');
-    if (wakelock === '1') {
-        toggleWakeLock();
-    }
-    
-    // Setup notifications if enabled
-    const notif = state.getSetting('nx_notif');
-    if (notif === '1' && 'Notification' in window && Notification.permission === 'granted') {
-        scheduleNotification();
-    }
-    
-    console.log('Job Tracker initialized successfully');
 })();
 
 // ===========================

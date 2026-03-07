@@ -15,15 +15,19 @@ try {
   // import.meta may not exist; fall back later
 }
 
+// Production defaults - these are safe to keep as they're marked as public anon keys
+const DEFAULT_SUPABASE_URL = _viteEnvUrl || window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co';
+const DEFAULT_SUPABASE_KEY = _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z';
+
 export const SUPABASE_CONFIG = {
-  url: _viteEnvUrl || window.ENV?.SUPABASE_URL || '',
-  anonKey: _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || ''
+  url: DEFAULT_SUPABASE_URL,
+  anonKey: DEFAULT_SUPABASE_KEY
 };
 
 const APP_CONFIG = {
   // Supabase
-  SUPABASE_URL: _viteEnvUrl || window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co',
-  SUPABASE_ANON_KEY: _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
+  SUPABASE_URL: DEFAULT_SUPABASE_URL,
+  SUPABASE_ANON_KEY: DEFAULT_SUPABASE_KEY,
   
   // Feature flags
   CLOUD_SYNC_ENABLED: true,
