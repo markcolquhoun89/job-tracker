@@ -5,15 +5,25 @@
  */
 
 // Supabase configuration - environment variables handled by Vite
+// Safely read `import.meta.env` without causing syntax errors in non-module contexts
+let _viteEnvUrl = '';
+let _viteEnvKey = '';
+try {
+  _viteEnvUrl = import.meta?.env?.VITE_SUPABASE_URL || '';
+  _viteEnvKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || '';
+} catch (e) {
+  // import.meta may not exist; fall back later
+}
+
 export const SUPABASE_CONFIG = {
-  url: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ? import.meta.env.VITE_SUPABASE_URL : window.ENV?.SUPABASE_URL || '',
-  anonKey: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ? import.meta.env.VITE_SUPABASE_ANON_KEY : window.ENV?.SUPABASE_ANON_KEY || ''
+  url: _viteEnvUrl || window.ENV?.SUPABASE_URL || '',
+  anonKey: _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || ''
 };
 
 const APP_CONFIG = {
   // Supabase
-  SUPABASE_URL: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ? import.meta.env.VITE_SUPABASE_URL : window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co',
-  SUPABASE_ANON_KEY: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ? import.meta.env.VITE_SUPABASE_ANON_KEY : window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
+  SUPABASE_URL: _viteEnvUrl || window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co',
+  SUPABASE_ANON_KEY: _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
   
   // Feature flags
   CLOUD_SYNC_ENABLED: true,

@@ -1925,7 +1925,8 @@ function buildBgAnimOptions() {
 function handlePanelTouch() { /* TODO */ }
 function handleJobTouch() { /* TODO */ }
 function pressEdit() { /* TODO */ }
-function toggleBatchSelect() { /* TODO */ }
+// `toggleBatchSelect` is implemented earlier in the file; remove the
+// duplicate empty stub to avoid redeclaration errors.
 function getLeaderboardParticipationKey() { return 'nx_leaderboard_enabled'; }
 function getActiveUserId() { return 'user123'; } // Placeholder
 function editTarget() { /* TODO */ }
