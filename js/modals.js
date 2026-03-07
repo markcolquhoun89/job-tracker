@@ -507,6 +507,52 @@ export const JobTrackerModals = {
     },
 
     /**
+     * Supabase configuration modal (shown when env vars are missing)
+     */
+    async showSupabaseSetup() {
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:20px;">Supabase Configuration</h3>
+            <div style="display:grid; gap:12px;">
+                <input type="url" id="config-url" placeholder="Supabase URL" value="${window.APP_CONFIG?.SUPABASE_URL || ''}" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <input type="text" id="config-key" placeholder="Anon Key" value="${window.APP_CONFIG?.SUPABASE_ANON_KEY || ''}" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
+                <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSupabaseSetup()">Save</button>
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+            </div>
+        `;
+        JobTrackerModals.showModal(content);
+    },
+
+    async handleSupabaseSetup() {
+        const url = document.getElementById('config-url')?.value.trim();
+        const key = document.getElementById('config-key')?.value.trim();
+        if (!url || !key) {
+            this.customAlert('Validation', 'Please provide both URL and anon key', true);
+            return;
+        }
+        try {
+            // save to storage and config
+            import('../config.js').then(cfg => {
+                cfg.saveSupabaseConfig(url, key);
+                // re-init supabase client if bridge already ran
+                if (window.supabaseClient) {
+                    window.supabaseClient = null;
+                }
+                if (window.SyncEngine) {
+                    // nothing to do until user signs in again
+                }
+                // close modal and reload page to reinitialize
+                JobTrackerModals.closeModal();
+                showToast('Configuration saved, reloading...', 1500);
+                setTimeout(() => location.reload(), 1000);
+            });
+        } catch (err) {
+            console.error('[Modals] Failed to save supabase config', err);
+            this.customAlert('Error', 'Failed to save configuration', true);
+        }
+    },
+
+    /**
      * Handle sign-in submission
      */
     async handleSignIn() {
@@ -524,7 +570,7 @@ export const JobTrackerModals = {
                 console.error('[Modals] Supabase client not available');
                 console.log('[Modals] window.supabaseClient:', window.supabaseClient);
                 console.log('[Modals] config might not be set. Check SUPABASE_CONFIG in console');
-                this.customAlert('Configuration Error', 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment.', true);
+                this.customAlert('Configuration Error', 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment (see README.md).', true);
                 return;
             }
             
@@ -579,7 +625,7 @@ export const JobTrackerModals = {
             const client = getSupabase();
             if (!client) {
                 console.error('[Modals] Supabase client not available for signup');
-                this.customAlert('Configuration Error', 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment.', true);
+                this.customAlert('Configuration Error', 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment (see README.md).', true);
                 return;
             }
             

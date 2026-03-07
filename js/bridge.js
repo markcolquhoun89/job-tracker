@@ -48,6 +48,12 @@ export async function initModules() {
         if (!SUPABASE_CONFIG?.url || !SUPABASE_CONFIG?.anonKey) {
             // additional debug output
             console.warn('[Bridge] SUPABASE_CONFIG object:', SUPABASE_CONFIG);
+            // ask the user to configure if possible
+            setTimeout(() => {
+                if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
+                    window.JobTrackerModals.showSupabaseSetup();
+                }
+            }, 0);
         }
         
         if (SUPABASE_CONFIG?.url && SUPABASE_CONFIG?.anonKey) {

@@ -40,8 +40,13 @@ if ((_rawEnvUrl || _rawEnvKey) && !_viteEnvUrl && !_viteEnvKey) {
 // The values must come from environment variables (Vite `import.meta.env` or
 // `window.ENV` for Cloudflare Pages).  Leaving these blank will trigger a
 // validation error so the developer is forced to configure them properly.
-const DEFAULT_SUPABASE_URL = _viteEnvUrl || window.ENV?.SUPABASE_URL || '';
-const DEFAULT_SUPABASE_KEY = _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || '';
+// allow manual configuration stored in localStorage for development or
+// when environment variables are not available (e.g. static build).
+const _storageUrl = (typeof localStorage !== 'undefined') ? localStorage.getItem('nx_supabase_url') || '' : '';
+const _storageKey = (typeof localStorage !== 'undefined') ? localStorage.getItem('nx_supabase_key') || '' : '';
+
+const DEFAULT_SUPABASE_URL = _viteEnvUrl || window.ENV?.SUPABASE_URL || _storageUrl || '';
+const DEFAULT_SUPABASE_KEY = _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || _storageKey || '';
 
 export const SUPABASE_CONFIG = {
   url: DEFAULT_SUPABASE_URL,
@@ -54,6 +59,29 @@ if (!DEFAULT_SUPABASE_URL || !DEFAULT_SUPABASE_KEY) {
     DEFAULT_SUPABASE_URL,
     DEFAULT_SUPABASE_KEY: DEFAULT_SUPABASE_KEY ? '***' : '(empty)'
   });
+}
+
+/**
+ * Save Supabase configuration to localStorage (runtime override).
+ * Also updates global APP_CONFIG and SUPABASE_CONFIG.
+ * @param {string} url
+ * @param {string} anonKey
+ */
+export function saveSupabaseConfig(url, anonKey) {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem('nx_supabase_url', url);
+      localStorage.setItem('nx_supabase_key', anonKey);
+    } catch (e) {
+      console.warn('[Config] Failed to write supabase config to storage', e);
+    }
+  }
+  SUPABASE_CONFIG.url = url;
+  SUPABASE_CONFIG.anonKey = anonKey;
+  if (APP_CONFIG) {
+    APP_CONFIG.SUPABASE_URL = url;
+    APP_CONFIG.SUPABASE_ANON_KEY = anonKey;
+  }
 }
 
 // Log configuration when running locally to aid debugging
