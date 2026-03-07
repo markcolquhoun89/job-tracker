@@ -15,6 +15,7 @@ import { JobTrackerCalculations } from './js/calculations.js';
 import { JobTrackerJobs } from './js/jobs.js';
 import { JobTrackerModals } from './js/modals.js';
 import { initModules, whenModulesReady } from './js/bridge.js';
+import { SUPABASE_CONFIG } from './config.js';
 
 // Basic authentication handler
 function showSignInModal() {
@@ -81,7 +82,7 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         if (!isAuthenticated) {
             console.log('[App] User not authenticated - checking supabase config');
             // If Supabase is not configured, show config modal first
-            if (!window.APP_CONFIG?.SUPABASE_URL || !window.APP_CONFIG?.SUPABASE_ANON_KEY) {
+            if (!SUPABASE_CONFIG?.url || !SUPABASE_CONFIG?.anonKey) {
                 console.log('[App] Supabase not configured - showing config modal');
                 if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
                     window.JobTrackerModals.showSupabaseSetup();
