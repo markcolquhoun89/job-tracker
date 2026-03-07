@@ -9,20 +9,17 @@
 
 import { JobTrackerConstants } from './js/constants.js';
 import { JobTrackerUtils } from './js/utils.js';
-import { supabaseClient } from './js/supabase-client.js';
-
-// Basic authentication handler
-function showSignInModal() {
-    JobTrackerModals.showSignIn();
-}
-
 import { JobTrackerDB } from './js/database.js';
 import { JobTrackerState } from './js/state.js';
 import { JobTrackerCalculations } from './js/calculations.js';
 import { JobTrackerJobs } from './js/jobs.js';
 import { JobTrackerModals } from './js/modals.js';
-import { supabaseClient } from './js/supabase-client.js';
 import { initModules, whenModulesReady } from './js/bridge.js';
+
+// Basic authentication handler
+function showSignInModal() {
+    JobTrackerModals.showSignIn();
+}
 
 // Locals for convenience
 const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = JobTrackerConstants;
@@ -1948,13 +1945,13 @@ function confirmWipe() { /* TODO */ }
 
 // expose globals for inline handlers (compatibility with existing HTML)
 Object.assign(window, {
+    showSignInModal,
     setRange,
     nav,
     navSettings,
     adjDate,
     goToday,
     jumpToDate,
-    showSignInModal,
     toggleAddPopup,
     showSingleAdd,
     showMultiAdd,
