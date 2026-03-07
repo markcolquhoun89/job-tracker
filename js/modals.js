@@ -50,7 +50,8 @@ export const JobTrackerModals = {
             <p style="color:var(--text-muted); line-height:1.6; margin-bottom:20px;">${sanitizeHTML(message)}</p>
             <button class="btn" onclick="JobTrackerModals.closeModal()">OK</button>
         `;
-        this.showModal(content);
+        // don't rely on `this`; callers may extract the function.
+        JobTrackerModals.showModal(content);
     },
 
     /**
@@ -70,8 +71,8 @@ export const JobTrackerModals = {
             </div>
         `;
         
-        this.confirmCallback = confirmActionCb;
-        this.showModal(content);
+        JobTrackerModals.confirmCallback = confirmActionCb;
+        JobTrackerModals.showModal(content);
     },
 
     /**

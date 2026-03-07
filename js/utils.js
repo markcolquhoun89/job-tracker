@@ -184,7 +184,9 @@ export const JobTrackerUtils = {
         const jobDate = new Date(job.date + 'T00:00:00');
         jobDate.setHours(0, 0, 0, 0);
         
-        const { start, end } = this.getDateRange(viewDate, range);
+        // avoid relying on `this` since callers often destructure the
+        // method and lose context; reference the utility object directly.
+        const { start, end } = JobTrackerUtils.getDateRange(viewDate, range);
         
         return jobDate >= start && jobDate <= end;
     },
