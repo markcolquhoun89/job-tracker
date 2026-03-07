@@ -1970,7 +1970,8 @@ Object.assign(window, {
     showNotesSearch,
     importCSV,
     confirmWipe,
-    closeModal
+    // the modal close helper lives in the modals module
+    closeModal: JobTrackerModals.closeModal
 });
 
 // ===========================

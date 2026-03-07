@@ -1,5 +1,6 @@
 import { JobTrackerConstants } from './constants.js';
 import { JobTrackerDB } from './database.js';
+import { JobTrackerUtils } from './utils.js';
 
 /**
  * State Management Module
@@ -334,6 +335,17 @@ class AppState {
         }
 
         return filtered;
+    }
+
+    /**
+     * Return jobs within the currently selected view date/range
+     * This mirrors the old `state.getScope()` helper used by the
+     * render logic.  It uses the shared utility so calculations stay
+     * consistent with other modules.
+     */
+    getScope() {
+        const { isJobInRange } = JobTrackerUtils;
+        return this.jobs.filter(j => isJobInRange(j, this.viewDate, this.range));
     }
 
     /**
