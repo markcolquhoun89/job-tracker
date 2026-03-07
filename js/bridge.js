@@ -45,6 +45,10 @@ export async function initModules() {
             hasKey: !!SUPABASE_CONFIG?.anonKey,
             url: SUPABASE_CONFIG?.url?.substring(0, 30) + '...' || 'MISSING'
         });
+        if (!SUPABASE_CONFIG?.url || !SUPABASE_CONFIG?.anonKey) {
+            // additional debug output
+            console.warn('[Bridge] SUPABASE_CONFIG object:', SUPABASE_CONFIG);
+        }
         
         if (SUPABASE_CONFIG?.url && SUPABASE_CONFIG?.anonKey) {
             console.log('[Bridge] Initializing Supabase client...');
@@ -95,6 +99,16 @@ export async function initModules() {
             }
         } else {
             console.warn('[Bridge] Supabase not configured - authentication disabled');
+            // show configuration alert to user once
+            setTimeout(() => {
+                if (window.JobTrackerModals && typeof window.JobTrackerModals.customAlert === 'function') {
+                    window.JobTrackerModals.customAlert(
+                        'Configuration Error',
+                        'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment (see README.md).',
+                        true
+                    );
+                }
+            }, 1000);
             // Still set a dummy client so modals don't crash
             window.supabaseClient = null;
         }

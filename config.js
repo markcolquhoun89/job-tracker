@@ -48,6 +48,19 @@ export const SUPABASE_CONFIG = {
   anonKey: DEFAULT_SUPABASE_KEY
 };
 
+// warn if we ended up with empty values after initialization
+if (!DEFAULT_SUPABASE_URL || !DEFAULT_SUPABASE_KEY) {
+  console.warn('[Config] Supabase config is empty or incomplete:', {
+    DEFAULT_SUPABASE_URL,
+    DEFAULT_SUPABASE_KEY: DEFAULT_SUPABASE_KEY ? '***' : '(empty)'
+  });
+}
+
+// Log configuration when running locally to aid debugging
+if (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'development') {
+  APP_CONFIG.log && APP_CONFIG.log();
+}
+
 const APP_CONFIG = {
   // Supabase
   SUPABASE_URL: DEFAULT_SUPABASE_URL,
