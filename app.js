@@ -79,7 +79,23 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         
         // If user is not authenticated, show sign-in modal instead of main app
         if (!isAuthenticated) {
-            console.log('[App] User not authenticated - showing sign-in modal');
+            console.log('[App] User not authenticated - checking supabase config');
+            // If Supabase is not configured, show config modal first
+            if (!window.APP_CONFIG?.SUPABASE_URL || !window.APP_CONFIG?.SUPABASE_ANON_KEY) {
+                console.log('[App] Supabase not configured - showing config modal');
+                if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
+                    window.JobTrackerModals.showSupabaseSetup();
+                } else {
+                    // fallback if modals not loaded yet
+                    setTimeout(() => {
+                        if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
+                            window.JobTrackerModals.showSupabaseSetup();
+                        }
+                    }, 500);
+                }
+                return; // Don't show sign-in until configured
+            }
+            console.log('[App] Supabase configured - showing sign-in modal');
             showSignInModal();
             return; // Don't render main app until user signs in
         }
