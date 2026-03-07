@@ -141,12 +141,37 @@ export class SupabaseClient {
   }
 
   /**
-   * Sign out current user
+   * Sign out current user - clears session and triggers data wipe
    */
   async signOut() {
-    console.log('[Supabase] Signing out');
+    console.log('[Supabase] Signing out user:', this.userId);
     this.clearSession();
+    
+    // Signal to app that user is logging out
+    window.dispatchEvent(new Event('supabase:logout'));
+    
     return { success: true };
+  }
+
+  /**
+   * Clear session tokens
+   */
+  clearSession() {
+    this.token = null;
+    this.refreshToken = null;
+    this.expiresAt = null;
+    this.userId = null;
+    localStorage.removeItem('nx_supabase_session');
+  }
+
+  /**
+   * Full logout - clears session and tells state to wipe data
+   */
+  async fullLogout() {
+    console.log('[Supabase] Full logout - clearing all user data');
+    await this.signOut();
+    // Let listeners know to wipe all data
+    window.dispatchEvent(new Event('supabase:wipe-data'));
   }
 
   persistSession(user) {
@@ -156,14 +181,6 @@ export class SupabaseClient {
       expires_at: this.expiresAt,
       user
     }));
-  }
-
-  clearSession() {
-    this.token = null;
-    this.refreshToken = null;
-    this.expiresAt = null;
-    this.userId = null;
-    localStorage.removeItem('nx_supabase_session');
   }
 
   async verifySession() {
@@ -188,9 +205,14 @@ export class SupabaseClient {
         return await this.refreshSession();
       }
 
+      // Session invalid - trigger data wipe
+      console.warn('[Supabase] Session verification failed - wiping data');
+      await this.fullLogout();
       return false;
     } catch (error) {
       console.warn('[Supabase] Session verification failed:', error);
+      // On network error or timeout, assume session is bad and wipe data
+      await this.fullLogout();
       return false;
     }
   }

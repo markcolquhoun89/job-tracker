@@ -474,6 +474,44 @@ class AppState {
         this.lastSyncTime = new Date();
         localStorage.setItem('nx_lastSync', this.lastSyncTime.toISOString());
     }
+
+    /**
+     * Clear all user data - called on logout/session failure
+     * Wipes IndexedDB and resets in-memory state
+     */
+    async clearAllData() {
+        console.log('[State] Clearing all user data (logout)');
+        
+        // Clear in-memory state
+        this.jobs = [];
+        this.types = [];
+        this.expenses = [];
+        this.settings.clear();
+        this.notifications = [];
+        this.batchSelected.clear();
+        this.searchQuery = '';
+        this.statusFilter = 'all';
+        
+        // Clear all IndexedDB stores
+        try {
+            const tx = db.transaction([STORES.JOBS, STORES.TYPES, STORES.EXPENSES, STORES.SETTINGS], 'readwrite');
+            tx.objectStore(STORES.JOBS).clear();
+            tx.objectStore(STORES.TYPES).clear();
+            tx.objectStore(STORES.EXPENSES).clear();
+            tx.objectStore(STORES.SETTINGS).clear();
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = reject;
+            });
+            console.log('[State] All IndexedDB stores cleared');
+        } catch (error) {
+            console.error('[State] Error clearing IndexedDB:', error);
+            throw error;
+        }
+        
+        // Notify subscribers
+        this.notify('state:cleared');
+    }
 }
 
 // Create singleton instance

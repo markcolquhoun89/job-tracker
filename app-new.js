@@ -4,117 +4,74 @@
  * This file integrates all the modular components and provides
  * the glue code for UI interactions.
  * 
- * Uses ES module imports rather than global window variables.
+ * Modules are loaded in index.html in this order:
+ * 1. constants.js
+ * 2. utils.js
+ * 3. database.js
+ * 4. state.js
+ * 5. calculations.js
+ * 6. jobs.js
+ * 7. modals.js
+ * 8. app.js (this file)
  */
 
-import { JobTrackerConstants } from './js/constants.js';
-import { JobTrackerUtils } from './js/utils.js';
-import { JobTrackerDB } from './js/database.js';
-import { JobTrackerState } from './js/state.js';
-import { JobTrackerCalculations } from './js/calculations.js';
-import { JobTrackerJobs } from './js/jobs.js';
-import { JobTrackerModals } from './js/modals.js';
-import { initModules, whenModulesReady } from './js/bridge.js';
-
-// Basic authentication handler
-function showSignInModal() {
-    JobTrackerModals.showSignIn();
-}
-
-// Locals for convenience
-const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = JobTrackerConstants;
-const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = JobTrackerUtils;
-const { db, STORES } = JobTrackerDB;
-const state = JobTrackerState;
-const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats } = JobTrackerCalculations;
-const jobOps = JobTrackerJobs;
-const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculationDialog, showDataManagement } = JobTrackerModals;
+// Import module references
+const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = window.JobTrackerConstants;
+const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = window.JobTrackerUtils;
+const { db, STORES } = window.JobTrackerDB;
+const state = window.JobTrackerState;
+const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats } = window.JobTrackerCalculations;
+const jobOps = window.JobTrackerJobs;
+const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculationDialog, showDataManagement } = window.JobTrackerModals;
 
 // ===========================
 // Application Initialization
 // ===========================
 
-
 (async function initializeApp() {
-    try {
-        console.log('[App] Starting initialization...');
-        
-        // Initialize all modular components (DB, state, Supabase, sync)
-        await initModules();
-        
-        console.log('[App] Modules initialized, setting up UI...');
-        
-        // Subscribe to state changes for reactive updates
-        state.subscribe((event, data) => {
-            console.log('[App] State event:', event);
-            // Auto re-render on data changes
-            if (event.startsWith('job:') || event.startsWith('jobs:')) {
-                render(true);
-            }
-        });
-        
-        // Listen for logout events to wipe sensitive data
-        window.addEventListener('supabase:wipe-data', async () => {
-            console.log('[App] Received wipe-data event - clearing IndexedDB');
-            try {
-                // Clear all data from IndexedDB
-                await state.clearAllData();
-                console.log('[App] IndexedDB cleared successfully');
-                // Show sign-in modal
-                showToast('Session expired - please sign in again', 3000);
-                setTimeout(() => {
-                    showSignInModal();
-                    render();
-                }, 500);
-            } catch (error) {
-                console.error('[App] Failed to clear data:', error);
-                showToast('Error clearing session data', 3000);
-            }
-        });
-        
-        // Initial render
-        console.log('[App] Rendering UI...');
-        render();
-        console.log('[App] UI rendered');
-        
-        // Dismiss splash screen now that app is ready
-        const splash = document.getElementById('splash');
-        if (splash) {
-            console.log('[App] Dismissing splash screen');
-            splash.style.display = 'none';
+    console.log('Initializing Job Tracker...');
+    
+    // Initialize database
+    await db.init();
+    console.log('Database initialized');
+    
+    // Initialize state
+    await state.init();
+    console.log('State initialized');
+    
+    // Subscribe to state changes for reactive updates
+    state.subscribe((event, data) => {
+        console.log('State event:', event);
+        // Auto re-render on data changes
+        if (event.startsWith('job:') || event.startsWith('jobs:')) {
+            render(true);
         }
-        
-        // Initialize background animations
-        initBackgroundAnimation();
-        
-        // Setup service worker
-        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
-        }
-        
-        // Restore wake lock if it was active
-        const wakelock = state.getSetting('nx_wakelock');
-        if (wakelock === '1') {
-            toggleWakeLock();
-        }
-        
-        // Setup notifications if enabled
-        const notif = state.getSetting('nx_notif');
-        if (notif === '1' && 'Notification' in window && Notification.permission === 'granted') {
-            scheduleNotification();
-        }
-        
-        console.log('[App] Job Tracker initialized successfully');
-    } catch (error) {
-        console.error('[App] Initialization failed:', error);
-        // Still dismiss splash so user can see the app
-        const splash = document.getElementById('splash');
-        if (splash) {
-            splash.style.display = 'none';
-        }
-        // Show minimal UI - user can still interact, just without full features
-        showToast('⚠ App initialization error - some features may not work', 5000);
+    });
+    
+    // Initial render
+    render();
+    
+    // Initialize background animations
+    initBackgroundAnimation();
+    
+    // Setup service worker
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+    
+    // Restore wake lock if it was active
+    const wakelock = state.getSetting('nx_wakelock');
+    if (wakelock === '1') {
+        toggleWakeLock();
+    }
+    
+    // Setup notifications if enabled
+    const notif = state.getSetting('nx_notif');
+    if (notif === '1' && 'Notification' in window && Notification.permission === 'granted') {
+        scheduleNotification();
+    }
+    
+    console.log('Job Tracker initialized successfully');
 })();
 
 // ===========================
@@ -636,7 +593,7 @@ function render(softUpdate) {
     const scrollY = container.scrollTop;
    
     // Get custom order if it exists
-    const customOrder = jobOps.getJobOrder();
+    const customOrder = getJobOrder();
    
     let list;
     if (customOrder.length > 0) {
@@ -1541,8 +1498,8 @@ function renderLeaderboard(container, list, s) {
     (async () => {
         try {
             const [profiles, jobs] = await Promise.all([
-                supabaseClient.select('profiles', { select: 'id,display_name' }),
-                supabaseClient.select('jobs', {
+                window.supabaseClient.select('profiles', { select: 'id,display_name' }),
+                window.supabaseClient.select('jobs', {
                     select: 'id,user_id,job_type,date,status,completed_at,updated_at'
                 })
             ]);
@@ -1656,7 +1613,7 @@ function renderSettings(container) {
             <div style=\"margin-top:16px; padding-top:16px; border-top:1px solid var(--border-subtle);\">
                 <span style=\"font-size:0.85rem; font-weight:600; color:var(--text-main);\">Display Name</span><br>
                 <small style=\"font-size:0.7rem; color:var(--text-muted);\">Your name on leaderboards</small>
-                <input type="text" value="${state.displayName}" style="width:100%; padding:8px; margin-top:6px; border:1px solid var(--border-t); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.85rem;" placeholder="Your name" oninput="setDisplayNameGlobal(this.value);">
+                <input type="text" value="${(window.JobTrackerState && window.JobTrackerState.displayName) || state.displayName}" style="width:100%; padding:8px; margin-top:6px; border:1px solid var(--border-t); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.85rem;" placeholder="Your name" oninput="setDisplayNameGlobal(this.value);">
             </div>
             
             <div style=\"padding-top:16px; margin-top:16px; border-top:1px solid var(--border-subtle);\">
@@ -1956,11 +1913,11 @@ function buildBgAnimOptions() {
 // Placeholder for missing functions (to be implemented)
 // ===========================
 
+function toggleBatchMode() { /* TODO */ }
 function handlePanelTouch() { /* TODO */ }
 function handleJobTouch() { /* TODO */ }
 function pressEdit() { /* TODO */ }
-// `toggleBatchSelect` is implemented earlier in the file; remove the
-// duplicate empty stub to avoid redeclaration errors.
+function toggleBatchSelect() { /* TODO */ }
 function getLeaderboardParticipationKey() { return 'nx_leaderboard_enabled'; }
 function getActiveUserId() { return 'user123'; } // Placeholder
 function editTarget() { /* TODO */ }
@@ -1973,40 +1930,12 @@ function setBgAnimation() { /* TODO */ }
 function editTypeModal() { /* TODO */ }
 function addTypeModal() { /* TODO */ }
 function toggleLeaderboardParticipation() { /* TODO */ }
-// wake lock and notification handlers are defined earlier; stubs removed to
-// avoid 'already declared' errors
+function toggleWakeLock() { /* TODO */ }
+function requestNotifications() { /* TODO */ }
 function showNotesSearch() { /* TODO */ }
 function importCSV() { /* TODO */ }
 function confirmWipe() { /* TODO */ }
-
-// expose globals for inline handlers (compatibility with existing HTML)
-Object.assign(window, {
-    showSignInModal,
-    setRange,
-    nav,
-    navSettings,
-    adjDate,
-    goToday,
-    jumpToDate,
-    toggleAddPopup,
-    showSingleAdd,
-    showMultiAdd,
-    saveNewJob,
-    saveBulkJobs,
-    toggleBatchMode,
-    clearJobOrder,
-    quickStatus,
-    pressEdit,
-    toggleBatchSelect,
-    editTarget,
-    shareReport,
-    jumpToPayWeek,
-    showNotesSearch,
-    importCSV,
-    confirmWipe,
-    // the modal close helper lives in the modals module
-    closeModal: JobTrackerModals.closeModal
-});
+function closeModal() { /* TODO */ }
 
 // ===========================
 // End of Render Functions
