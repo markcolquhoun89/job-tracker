@@ -12,7 +12,7 @@ import { JobTrackerUtils } from './js/utils.js';
 
 // Basic authentication placeholder (real UI lives elsewhere)
 function showSignInModal() {
-    customAlert('Authentication', 'Sign‑in is not implemented in this build.', true);
+    customAlert('Authentication', 'Sign-in is not implemented in this build.', true);
 }
 
 import { JobTrackerDB } from './js/database.js';
