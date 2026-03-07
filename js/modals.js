@@ -7,14 +7,14 @@ import { JobTrackerConstants } from './constants.js';
 import { JobTrackerState } from './state.js';
 import { JobTrackerJobs } from './jobs.js';
 import { JobTrackerUtils } from './utils.js';
-import { supabaseClient } from './supabase-client.js';
 
 const { STATUS, NOTE_TEMPLATES } = JobTrackerConstants;
 // accessor helpers
 const getState = () => JobTrackerState;
 const getJobOps = () => JobTrackerJobs;
 const getUtils = () => JobTrackerUtils;
-const getSupabase = () => window.supabaseClient || supabaseClient;
+// supabase client is set globally during bridge initialization
+const getSupabase = () => window.supabaseClient;
 
 
 export const JobTrackerModals = {

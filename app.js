@@ -38,13 +38,8 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
 (async function initializeApp() {
     console.log('Initializing Job Tracker...');
     
-    // Initialize database
-    await db.init();
-    console.log('Database initialized');
-    
-    // Initialize state
-    await state.init();
-    console.log('State initialized');
+    // Initialize all modules first (includes Supabase client setup)
+    await initModules();
     
     // Subscribe to state changes for reactive updates
     state.subscribe((event, data) => {
