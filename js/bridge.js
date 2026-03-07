@@ -22,10 +22,11 @@ export async function initModules() {
     // prevent double-initialization
     if (modulesReady) {
         console.log('[Bridge] Modules already initialized, skipping');
-        return;
+        return window.supabaseClient?.isAuthenticated || false;
     }
 
     console.log('[Bridge] Initializing modular system...');
+    let isUserAuthenticated = false;
     
     try {
         // Initialize database
@@ -65,6 +66,7 @@ export async function initModules() {
                 );
                 
                 const hasSession = await Promise.race([initPromise, timeoutPromise]);
+                isUserAuthenticated = hasSession;
                 
                 if (hasSession) {
                     console.log('✓ Supabase client initialized with existing session');
@@ -77,6 +79,9 @@ export async function initModules() {
                             JobTrackerState
                         );
                         await syncEngine.init();
+                        // Expose sync engine globally for modals to use
+                        window.syncEngine = syncEngine;
+                        client.syncEngine = syncEngine;
                         console.log('✓ Sync engine initialized');
                     } catch (syncError) {
                         console.warn('[Bridge] Sync engine init failed (non-critical):', syncError);
@@ -104,6 +109,8 @@ export async function initModules() {
         modulesReady = false;
         // Don't alert - let app continue with degraded functionality
     }
+    
+    return isUserAuthenticated;
 }
 
 // helper export for legacy code

@@ -44,6 +44,11 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         
         console.log('[App] Modules initialized, setting up UI...');
         
+        // Get Supabase client to check auth state
+        const supabase = window.supabaseClient;
+        const isAuthenticated = supabase?.isAuthenticated || false;
+        console.log('[App] User authenticated:', isAuthenticated);
+        
         // Subscribe to state changes for reactive updates
         state.subscribe((event, data) => {
             console.log('[App] State event:', event);
@@ -71,6 +76,13 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
                 showToast('Error clearing session data', 3000);
             }
         });
+        
+        // If user is not authenticated, show sign-in modal instead of main app
+        if (!isAuthenticated) {
+            console.log('[App] User not authenticated - showing sign-in modal');
+            showSignInModal();
+            return; // Don't render main app until user signs in
+        }
         
         // Initial render
         console.log('[App] Rendering UI...');
@@ -105,6 +117,12 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         }
         
         console.log('[App] Job Tracker initialized successfully');
+        
+        // Export render and sync for use by modals after auth changes
+        window.appRender = () => render();
+        if (window.supabaseClient?.syncEngine) {
+            window.syncEngine = window.supabaseClient.syncEngine;
+        }
     } catch (error) {
         console.error('[App] Initialization failed:', error);
         // Still dismiss splash so user can see the app

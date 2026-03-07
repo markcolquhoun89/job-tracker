@@ -535,8 +535,18 @@ export const JobTrackerModals = {
                 console.log('[Modals] Sign in successful:', result.user.id);
                 this.customAlert('Success', `Welcome back, ${result.user.email}!`);
                 JobTrackerModals.closeModal();
-                // reload to reflect authenticated state
-                setTimeout(() => window.location.reload(), 1500);
+                showToast('Loading your jobs...', 2000);
+                // Don't reload - instead update UI in place
+                setTimeout(() => {
+                    // Trigger sync to pull remote jobs
+                    if (window.syncEngine) {
+                        window.syncEngine.sync().catch(e => console.error('Sync failed:', e));
+                    }
+                    // Re-render with authenticated user
+                    if (window.appRender) {
+                        window.appRender();
+                    }
+                }, 500);
             } else {
                 console.warn('[Modals] Sign in failed:', result.error);
                 this.customAlert('Sign In Failed', result.error, true);
@@ -583,7 +593,18 @@ export const JobTrackerModals = {
                 } else {
                     this.customAlert('Success', `Welcome, ${displayName}!`);
                     JobTrackerModals.closeModal();
-                    setTimeout(() => window.location.reload(), 1500);
+                    showToast('Loading your jobs...', 2000);
+                    // Don't reload - instead update UI in place
+                    setTimeout(() => {
+                        // Trigger sync to pull remote jobs
+                        if (window.syncEngine) {
+                            window.syncEngine.sync().catch(e => console.error('Sync failed:', e));
+                        }
+                        // Re-render with authenticated user
+                        if (window.appRender) {
+                            window.appRender();
+                        }
+                    }, 500);
                 }
             } else {
                 console.warn('[Modals] Sign up failed:', result.error);
