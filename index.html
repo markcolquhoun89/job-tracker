@@ -465,25 +465,25 @@
 <div id="wake-indicator" class="wake-indicator">☀ AWAKE</div>
 
 <!-- Configuration & Cloud Integration -->
-<script src="config.js"></script>
+<script type="module" src="config.js"></script>
 
 <!-- Modular JavaScript - Load in order -->
-<script src="js/constants.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/database.js"></script>
-<script src="js/state.js"></script>
-<script src="js/calculations.js"></script>
-<script src="js/jobs.js"></script>
-<script src="js/modals.js"></script>
+<script type="module" src="js/constants.js"></script>
+<script type="module" src="js/utils.js"></script>
+<script type="module" src="js/database.js"></script>
+<script type="module" src="js/state.js"></script>
+<script type="module" src="js/calculations.js"></script>
+<script type="module" src="js/jobs.js"></script>
+<script type="module" src="js/modals.js"></script>
 
 <!-- Cloud Integration (before bridge) -->
-<script src="js/supabase-client.js"></script>
-<script src="js/sync.js"></script>
+<script type="module" src="js/supabase-client.js"></script>
+<script type="module" src="js/sync.js"></script>
 
 <!-- Bridge (initializes everything) -->
-<script src="js/bridge.js"></script>
+<script type="module" src="js/bridge.js"></script>
 
 <!-- Main App -->
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

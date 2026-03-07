@@ -1,16 +1,20 @@
-(function () {
 /**
  * Modal UI Module
  * Handles all modal dialogs and popups
  */
 
-const { STATUS, NOTE_TEMPLATES } = window.JobTrackerConstants;
-// Don't destructure - access directly to ensure availability
-const getState = () => window.JobTrackerState;
-const getJobOps = () => window.JobTrackerJobs;
-const getUtils = () => window.JobTrackerUtils;
+import { JobTrackerConstants } from './constants.js';
+import { JobTrackerState } from './state.js';
+import { JobTrackerJobs } from './jobs.js';
+import { JobTrackerUtils } from './utils.js';
 
-window.JobTrackerModals = {
+const { STATUS, NOTE_TEMPLATES } = JobTrackerConstants;
+// accessor helpers
+const getState = () => JobTrackerState;
+const getJobOps = () => JobTrackerJobs;
+const getUtils = () => JobTrackerUtils;
+
+export const JobTrackerModals = {
     /**
      * Show modal
      */
@@ -462,9 +466,8 @@ window.JobTrackerModals = {
     }
 };
 
-// Make closeModal available globally for onclick handlers
-window.closeModal = () => window.JobTrackerModals.closeModal();
-window.customAlert = (...args) => window.JobTrackerModals.customAlert(...args);
-window.confirmModal = (...args) => window.JobTrackerModals.confirmModal(...args);
+// maintain global reference for inline handlers
+if (typeof window !== 'undefined') {
+    window.JobTrackerModals = JobTrackerModals;
+}
 
-})();

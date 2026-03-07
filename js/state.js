@@ -1,11 +1,13 @@
-(function () {
+import { JobTrackerConstants } from './constants.js';
+import { JobTrackerDB } from './database.js';
+
 /**
  * State Management Module
  * Centralized application state with reactive updates
  */
 
-const { DEFAULT_TYPES, RANGES } = window.JobTrackerConstants;
-const { db, STORES } = window.JobTrackerDB;
+const { DEFAULT_TYPES, RANGES } = JobTrackerConstants;
+const { db, STORES } = JobTrackerDB;
 
 class AppState {
     constructor() {
@@ -466,6 +468,4 @@ class AppState {
 const appState = new AppState();
 
 // Export for use in other modules
-window.JobTrackerState = appState;
-
-})();
+export const JobTrackerState = appState;

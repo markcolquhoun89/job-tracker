@@ -1,4 +1,3 @@
-(function () {
 /**
  * Database Abstraction Layer
  * Handles IndexedDB with automatic localStorage migration and fallback
@@ -423,7 +422,7 @@ class Database {
 const db = new Database();
 
 // Export for use in other modules
-window.JobTrackerDB = {
+export const JobTrackerDB = {
     db,
     STORES,
     init: () => db.init(),
@@ -437,5 +436,3 @@ window.JobTrackerDB = {
     exportData: () => db.exportData(),
     importData: (data) => db.importData(data)
 };
-
-})();

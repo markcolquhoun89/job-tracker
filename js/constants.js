@@ -3,7 +3,7 @@
  * Centralized constants to avoid magic numbers and strings
  */
 
-window.JobTrackerConstants = {
+export const JobTrackerConstants = {
     // Status constants
     STATUS: {
         COMPLETED: 'Completed',

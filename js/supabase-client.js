@@ -4,7 +4,7 @@
  * Implements offline-first sync with local IndexedDB
  */
 
-class SupabaseClient {
+export class SupabaseClient {
   constructor(url, anonKey) {
     this.url = url;
     this.anonKey = anonKey;
@@ -467,10 +467,20 @@ class SupabaseClient {
   }
 }
 
-// Export for use in modules
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = SupabaseClient;
+// Module exports
+export let supabaseClient = null;
+
+/**
+ * Convenience initializer used by bridge or other modules.
+ * @param {string} url
+ * @param {string} anonKey
+ * @returns {SupabaseClient}
+ */
+export function initSupabase(url, anonKey) {
+  supabaseClient = new SupabaseClient(url, anonKey);
+  return supabaseClient;
 }
 
-// Ensure global availability in browser
-window.SupabaseClient = SupabaseClient;
+
+typeof window !== 'undefined' && (window.SupabaseClient = SupabaseClient); // keep for legacy compatibility
+

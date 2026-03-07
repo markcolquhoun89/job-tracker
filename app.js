@@ -4,25 +4,27 @@
  * This file integrates all the modular components and provides
  * the glue code for UI interactions.
  * 
- * Modules are loaded in index.html in this order:
- * 1. constants.js
- * 2. utils.js
- * 3. database.js
- * 4. state.js
- * 5. calculations.js
- * 6. jobs.js
- * 7. modals.js
- * 8. app.js (this file)
+ * Uses ES module imports rather than global window variables.
  */
 
-// Import module references
-const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = window.JobTrackerConstants;
-const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = window.JobTrackerUtils;
-const { db, STORES } = window.JobTrackerDB;
-const state = window.JobTrackerState;
-const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats } = window.JobTrackerCalculations;
-const jobOps = window.JobTrackerJobs;
-const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculationDialog, showDataManagement } = window.JobTrackerModals;
+import { JobTrackerConstants } from './js/constants.js';
+import { JobTrackerUtils } from './js/utils.js';
+import { JobTrackerDB } from './js/database.js';
+import { JobTrackerState } from './js/state.js';
+import { JobTrackerCalculations } from './js/calculations.js';
+import { JobTrackerJobs } from './js/jobs.js';
+import { JobTrackerModals } from './js/modals.js';
+import { supabaseClient } from './js/supabase-client.js';
+import { initModules, whenModulesReady } from './js/bridge.js';
+
+// Locals for convenience
+const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = JobTrackerConstants;
+const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = JobTrackerUtils;
+const { db, STORES } = JobTrackerDB;
+const state = JobTrackerState;
+const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats } = JobTrackerCalculations;
+const jobOps = JobTrackerJobs;
+const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculationDialog, showDataManagement } = JobTrackerModals;
 
 // ===========================
 // Application Initialization
@@ -1498,8 +1500,8 @@ function renderLeaderboard(container, list, s) {
     (async () => {
         try {
             const [profiles, jobs] = await Promise.all([
-                window.supabaseClient.select('profiles', { select: 'id,display_name' }),
-                window.supabaseClient.select('jobs', {
+                supabaseClient.select('profiles', { select: 'id,display_name' }),
+                supabaseClient.select('jobs', {
                     select: 'id,user_id,job_type,date,status,completed_at,updated_at'
                 })
             ]);
@@ -1613,7 +1615,7 @@ function renderSettings(container) {
             <div style=\"margin-top:16px; padding-top:16px; border-top:1px solid var(--border-subtle);\">
                 <span style=\"font-size:0.85rem; font-weight:600; color:var(--text-main);\">Display Name</span><br>
                 <small style=\"font-size:0.7rem; color:var(--text-muted);\">Your name on leaderboards</small>
-                <input type="text" value="${(window.JobTrackerState && window.JobTrackerState.displayName) || state.displayName}" style="width:100%; padding:8px; margin-top:6px; border:1px solid var(--border-t); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.85rem;" placeholder="Your name" oninput="setDisplayNameGlobal(this.value);">
+                <input type="text" value="${state.displayName}" style="width:100%; padding:8px; margin-top:6px; border:1px solid var(--border-t); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.85rem;" placeholder="Your name" oninput="setDisplayNameGlobal(this.value);">
             </div>
             
             <div style=\"padding-top:16px; margin-top:16px; border-top:1px solid var(--border-subtle);\">

@@ -1,14 +1,17 @@
-(function () {
 /**
  * Job Operations Module
  * CRUD operations and business logic for jobs
  */
 
-const { STATUS, SATURDAY_MULTIPLIER } = window.JobTrackerConstants;
-const { generateID, isSaturday, calculateSaturdayFee, shouldApplySaturdayPremium, validateJob } = window.JobTrackerUtils;
-const state = window.JobTrackerState;
+import { JobTrackerConstants } from './constants.js';
+import { JobTrackerUtils } from './utils.js';
+import { JobTrackerState } from './state.js';
 
-window.JobTrackerJobs = {
+const { STATUS, SATURDAY_MULTIPLIER } = JobTrackerConstants;
+const { generateID, isSaturday, calculateSaturdayFee, shouldApplySaturdayPremium, validateJob } = JobTrackerUtils;
+const state = JobTrackerState;
+
+export const JobTrackerJobs = {
     /**
      * Create a new job
      */
@@ -525,5 +528,3 @@ window.JobTrackerJobs = {
             .reduce((sum, j) => sum + parseFloat(j.chargebackAmount || 0), 0);
     }
 };
-
-})();

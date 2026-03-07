@@ -1,14 +1,17 @@
-(function () {
 /**
  * Calculation Module
  * Business logic for calculating statistics and metrics
  */
 
-const { STATUS } = window.JobTrackerConstants;
-const { isSaturday, calculateSaturdayFee, getBaseFeeFromSaturday } = window.JobTrackerUtils;
-const state = window.JobTrackerState;
+import { JobTrackerConstants } from './constants.js';
+import { JobTrackerUtils } from './utils.js';
+import { JobTrackerState } from './state.js';
 
-window.JobTrackerCalculations = {
+const { STATUS } = JobTrackerConstants;
+const { isSaturday, calculateSaturdayFee, getBaseFeeFromSaturday } = JobTrackerUtils;
+const state = JobTrackerState;
+
+export const JobTrackerCalculations = {
     /**
      * Calculate comprehensive statistics for a list of jobs
      */
@@ -348,5 +351,3 @@ window.JobTrackerCalculations = {
         return periods;
     }
 };
-
-})();

@@ -1,12 +1,13 @@
-(function () {
+import { JobTrackerConstants } from './constants.js';
+
 /**
  * Utility Functions
  * Common helpers used throughout the application
  */
 
-const { STATUS, ANIMATION, DATE_FORMAT, SATURDAY_MULTIPLIER } = window.JobTrackerConstants;
+const { STATUS, ANIMATION, DATE_FORMAT, SATURDAY_MULTIPLIER } = JobTrackerConstants;
 
-window.JobTrackerUtils = {
+export const JobTrackerUtils = {
     /**
      * Generate unique ID
      */
@@ -207,15 +208,11 @@ window.JobTrackerUtils = {
         const toast = document.getElementById('toast');
         if (!toast) return;
 
-        const safeMessage = window.JobTrackerUtils && typeof window.JobTrackerUtils.sanitizeHTML === 'function'
-            ? window.JobTrackerUtils.sanitizeHTML(message)
-            : String(message ?? '');
+        const safeMessage = sanitizeHTML(message);
 
         let html = `<span>${safeMessage}</span>`;
         if (actions) {
-            const safeLabel = window.JobTrackerUtils && typeof window.JobTrackerUtils.sanitizeHTML === 'function'
-                ? window.JobTrackerUtils.sanitizeHTML(actions.label)
-                : String(actions.label ?? '');
+            const safeLabel = sanitizeHTML(actions.label);
             html += `<button class="toast-undo" onclick="${actions.onClick}">${safeLabel}</button>`;
         }
 
@@ -301,5 +298,3 @@ window.JobTrackerUtils = {
         return JSON.parse(JSON.stringify(obj));
     }
 };
-
-})();

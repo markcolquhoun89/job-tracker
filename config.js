@@ -4,10 +4,16 @@
  * NEVER commit API keys - use .env files
  */
 
+// Supabase configuration - environment variables handled by Vite
+export const SUPABASE_CONFIG = {
+  url: import.meta.env.VITE_SUPABASE_URL || '',
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+};
+
 const APP_CONFIG = {
   // Supabase
-  SUPABASE_URL: 'https://stlzahmiovbrlnhzyuqw.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
+  SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co',
+  SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
   
   // Feature flags
   CLOUD_SYNC_ENABLED: true,
