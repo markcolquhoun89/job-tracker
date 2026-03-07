@@ -15,9 +15,12 @@ try {
   // import.meta may not exist; fall back later
 }
 
-// Production defaults - these are safe to keep as they're marked as public anon keys
-const DEFAULT_SUPABASE_URL = _viteEnvUrl || window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co';
-const DEFAULT_SUPABASE_KEY = _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z';
+// Production defaults - we no longer ship any hard‑coded project credentials.
+// The values must come from environment variables (Vite `import.meta.env` or
+// `window.ENV` for Cloudflare Pages).  Leaving these blank will trigger a
+// validation error so the developer is forced to configure them properly.
+const DEFAULT_SUPABASE_URL = _viteEnvUrl || window.ENV?.SUPABASE_URL || '';
+const DEFAULT_SUPABASE_KEY = _viteEnvKey || window.ENV?.SUPABASE_ANON_KEY || '';
 
 export const SUPABASE_CONFIG = {
   url: DEFAULT_SUPABASE_URL,

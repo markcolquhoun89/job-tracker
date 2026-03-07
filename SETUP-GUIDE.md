@@ -72,7 +72,11 @@ SUPABASE_ANON_KEY: eyJhbGc...
    config.local.js
    ```
 
-3. Update `config.js` with your keys (or use .env loader)
+3. **Do not edit `config.js` directly.**
+   The app now reads its credentials from environment variables (see
+   `.env.example` below).  Put your values in a local `.env` or configure them
+   on your host – the file is automatically consumed by Vite/Cloudflare during
+   build.
 
 ### Option B: Environment Variables (Production)
 Set these on your server/hosting:
