@@ -4,7 +4,7 @@
  * Handles conflicts, retries, and background sync
  */
 
-class SyncEngine {
+export class SyncEngine {
   constructor(supabaseClient, jobTrackerDB, jobTrackerState) {
     this.supabase = supabaseClient;
     this.db = jobTrackerDB;
@@ -651,9 +651,9 @@ class SyncEngine {
   }
 }
 
-// Export for use
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = SyncEngine;
+// legacy compatibility
+if (typeof window !== 'undefined') {
+    window.SyncEngine = SyncEngine;
 }
 
 // Ensure global availability in browser

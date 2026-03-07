@@ -132,7 +132,7 @@ export const JobTrackerCompat = {
         // Convert types to legacy format
         const existingTypes = window.state.types || {};
         const typesObj = {};
-        window.JobTrackerState.types.forEach(t => {
+        JobTrackerState.types.forEach(t => {
             const modularUpgrade = t.upgradePay ?? t.upgrade ?? t.ug ?? null;
             const existingUpgrade = existingTypes[t.code]?.upgradePay
                 ?? existingTypes[t.code]?.upgrade
@@ -150,12 +150,4 @@ export const JobTrackerCompat = {
     }
 };
 
-// Helper to ensure modules are ready before executing code
-window.whenModulesReady = function(callback) {
-    if (window.modulesReady) {
-        callback();
-    } else {
-        window.addEventListener('modulesReady', callback, { once: true });
-    }
-};
 
