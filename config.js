@@ -19,6 +19,12 @@ try {
   _viteEnvKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || '';
   _rawEnvUrl = import.meta?.env?.SUPABASE_URL || '';
   _rawEnvKey = import.meta?.env?.SUPABASE_ANON_KEY || '';
+
+  // debug helper: log entire environment in development so users can
+  // spot missing variables quickly.
+  if (import.meta.env && import.meta.env.MODE === 'development') {
+    console.debug('[Config] import.meta.env dump:', import.meta.env);
+  }
 } catch (e) {
   // import.meta may not exist; fall back later
 }
