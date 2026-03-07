@@ -6,14 +6,14 @@
 
 // Supabase configuration - environment variables handled by Vite
 export const SUPABASE_CONFIG = {
-  url: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) || window.ENV?.SUPABASE_URL || '',
-  anonKey: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || window.ENV?.SUPABASE_ANON_KEY || ''
+  url: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ? import.meta.env.VITE_SUPABASE_URL : window.ENV?.SUPABASE_URL || '',
+  anonKey: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ? import.meta.env.VITE_SUPABASE_ANON_KEY : window.ENV?.SUPABASE_ANON_KEY || ''
 };
 
 const APP_CONFIG = {
   // Supabase
-  SUPABASE_URL: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) || window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co',
-  SUPABASE_ANON_KEY: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
+  SUPABASE_URL: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ? import.meta.env.VITE_SUPABASE_URL : window.ENV?.SUPABASE_URL || 'https://stlzahmiovbrlnhzyuqw.supabase.co',
+  SUPABASE_ANON_KEY: (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ? import.meta.env.VITE_SUPABASE_ANON_KEY : window.ENV?.SUPABASE_ANON_KEY || 'sb_publishable_tXVGejkmyvWmX1K0V9btbQ_myc3Uw8Z',
   
   // Feature flags
   CLOUD_SYNC_ENABLED: true,

@@ -1922,7 +1922,6 @@ function buildBgAnimOptions() {
 // Placeholder for missing functions (to be implemented)
 // ===========================
 
-function toggleBatchMode() { /* TODO */ }
 function handlePanelTouch() { /* TODO */ }
 function handleJobTouch() { /* TODO */ }
 function pressEdit() { /* TODO */ }
