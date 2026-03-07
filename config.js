@@ -8,11 +8,26 @@
 // Safely read `import.meta.env` without causing syntax errors in non-module contexts
 let _viteEnvUrl = '';
 let _viteEnvKey = '';
+let _rawEnvUrl = '';
+let _rawEnvKey = '';
 try {
+  // Vite only exposes env vars prefixed with VITE_.
+  // developers who set SUPABASE_URL / SUPABASE_ANON_KEY directly
+  // will not see them during development unless they are added to
+  // `.env` with the VITE_ prefix or injected via window.ENV.
   _viteEnvUrl = import.meta?.env?.VITE_SUPABASE_URL || '';
   _viteEnvKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || '';
+  _rawEnvUrl = import.meta?.env?.SUPABASE_URL || '';
+  _rawEnvKey = import.meta?.env?.SUPABASE_ANON_KEY || '';
 } catch (e) {
   // import.meta may not exist; fall back later
+}
+
+if ((_rawEnvUrl || _rawEnvKey) && !_viteEnvUrl && !_viteEnvKey) {
+  console.warn(
+    '[Config] Detected SUPABASE_URL/SUPABASE_ANON_KEY without VITE_ prefix. ' +
+    'Rename them to VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY or configure via window.ENV.'
+  );
 }
 
 // Production defaults - we no longer ship any hard‑coded project credentials.

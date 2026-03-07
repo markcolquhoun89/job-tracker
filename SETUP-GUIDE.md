@@ -60,10 +60,15 @@ SUPABASE_ANON_KEY: eyJhbGc...
 
 1. In `c:\Users\mark-\Documents\jt`, create file `.env`:
    ```bash
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_ANON_KEY=your-anon-key-here
+   # Vite only exposes vars prefixed with VITE_ to client code
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key-here
    NODE_ENV=development
    ```
+   **Do not** use plain `SUPABASE_URL`/`SUPABASE_ANON_KEY` unless you plan
+   to manually copy them into `window.ENV` on startup; you'll otherwise see
+   configuration errors.  The console will warn if mis‑prefixed variables are
+   detected.
 
 2. Verify `.gitignore` includes `.env`:
    ```bash
