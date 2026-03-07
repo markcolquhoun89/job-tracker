@@ -140,7 +140,7 @@ export const JobTrackerCalculations = {
         else if (range === 'month') prevDate.setMonth(prevDate.getMonth() - 1);
         else prevDate.setFullYear(prevDate.getFullYear() - 1);
 
-        const { isJobInRange } = window.JobTrackerUtils;
+        const { isJobInRange } = JobTrackerUtils;
         const prevList = state.jobs.filter(j => isJobInRange(j, prevDate, range));
         
         return this.calculate(prevList);

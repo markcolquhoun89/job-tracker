@@ -161,7 +161,7 @@ export const JobTrackerModals = {
                 <div id="fee-info" style="font-size:0.7rem; color:var(--text-muted); line-height:1.5;">
                     ${isManual ? 
                         `<span style="color:var(--warning);">⚠ Manual fee set</span>` :
-                        `<span>Auto: £${autoFee.toFixed(2)}${job.date && window.JobTrackerUtils.isSaturday(job.date) && job.status === STATUS.COMPLETED ? ' (Sat 1.5×)' : ''}</span>`
+                        `<span>Auto: £${autoFee.toFixed(2)}${job.date && JobTrackerUtils.isSaturday(job.date) && job.status === STATUS.COMPLETED ? ' (Sat 1.5×)' : ''}</span>`
                     }
                 </div>
             </div>
@@ -226,7 +226,7 @@ export const JobTrackerModals = {
             
             feeInput.value = autoFee.toFixed(2);
             
-            const isSat = window.JobTrackerUtils.isSaturday(date);
+            const isSat = JobTrackerUtils.isSaturday(date);
             feeInfo.innerHTML = `<span>Auto: £${autoFee.toFixed(2)}${isSat && status === STATUS.COMPLETED ? ' (Sat 1.5×)' : ''}</span>`;
         }
     },
@@ -307,7 +307,7 @@ export const JobTrackerModals = {
         
         // Count how many Saturday jobs would be affected
         const saturdayJobs = state.jobs.filter(job => 
-            window.JobTrackerUtils.isSaturday(job.date) && 
+            JobTrackerUtils.isSaturday(job.date) && 
             (job.status === STATUS.COMPLETED || job.status === STATUS.INTERNALS) && 
             !job.manualFee
         );
@@ -426,7 +426,7 @@ export const JobTrackerModals = {
         try {
             const data = await state.exportAll();
             const filename = `job-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
-            await window.JobTrackerUtils.exportDataAsFile(data, filename);
+            await JobTrackerUtils.exportDataAsFile(data, filename);
             
             showToast('✓ Data exported successfully');
             this.closeModal();
@@ -443,7 +443,7 @@ export const JobTrackerModals = {
         const { showToast } = getUtils();
         
         try {
-            const data = await window.JobTrackerUtils.importDataFromFile();
+            const data = await JobTrackerUtils.importDataFromFile();
             
             this.confirmModal(
                 'Import Data',

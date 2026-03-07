@@ -270,7 +270,7 @@ export const JobTrackerJobs = {
      * Get jobs for current view scope
      */
     getJobsInScope(viewDate, range) {
-        const { isJobInRange } = window.JobTrackerUtils;
+        const { isJobInRange } = JobTrackerUtils;
         return state.jobs.filter(job => isJobInRange(job, viewDate, range));
     },
 
