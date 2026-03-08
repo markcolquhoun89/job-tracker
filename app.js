@@ -1003,7 +1003,8 @@ function renderStats(container, list, s) {
     list.forEach(j => { if (!dayMap[j.date]) dayMap[j.date] = { done:0, fail:0, total:0 }; dayMap[j.date].total++; if (j.status==='Completed') dayMap[j.date].done++; if (j.status==='Failed') dayMap[j.date].fail++; });
     const perfectDays = Object.values(dayMap).filter(d => d.total >= 3 && d.done === d.total).length;
     // Productivity score (jobs per day relative to target of 8)
-    const prodScore = Math.min(100, Math.round((parseFloat(s.avgJobsPerDay) / 8) * 100));
+    const avgJobsPerDay = s.avgJobsPerDay != null ? s.avgJobsPerDay : 0;
+    const prodScore = Math.min(100, Math.round((parseFloat(avgJobsPerDay) / 8) * 100));
     // Best streak in current scope
     const scopeSorted = [...list].filter(j => j.status !== 'Pending').sort((a,b) => (a.completedAt||0)-(b.completedAt||0));
     let scopeBestStreak = 0, tempStreak = 0;
@@ -1042,7 +1043,7 @@ function renderStats(container, list, s) {
                 <span class="comp-meter-tag" onclick="editTarget()" style="margin-top:8px;">\u270e TARGET ${target}%</span>
             </div>
             <div class="metric-row"><span>Total Volume</span><b class="count-up" style="font-size:1.3rem;">${s.vol}</b></div>
-            <div class="metric-row"><span>Avg Jobs per Workday</span><b class="count-up" style="font-size:1.3rem;">${s.avgJobsPerDay}</b></div>
+            <div class="metric-row"><span>Avg Jobs per Workday</span><b class="count-up" style="font-size:1.3rem;">${s.avgJobsPerDay != null ? s.avgJobsPerDay : 0}</b></div>
             <div class="metric-row"><span>Total Earnings</span><b class="count-up" style="font-size:1.3rem; color:var(--success);">&pound;${s.totalCash.toFixed(0)}</b></div>`
         },
         {
@@ -2133,6 +2134,7 @@ Object.assign(window, {
     showNotesSearch,
     importCSV,
     confirmWipe,
+    togglePanel,
     // the modal close helper lives in the modals module
     closeModal: JobTrackerModals.closeModal,
     showToast,
