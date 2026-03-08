@@ -982,6 +982,25 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
  * @param {Object} s - Stats object
  */
 function renderStats(container, list, s) {
+    // Ensure all stats have defaults to prevent undefined errors
+    const stats = {
+        vol: s.vol || 0,
+        done: s.done || 0,
+        fails: s.fails || 0,
+        ints: s.ints || 0,
+        pend: s.pend || 0,
+        compRate: s.compRate || 0,
+        exclHy: s.exclHy || 0,
+        totalCash: s.totalCash || 0,
+        avgDailyPay: s.avgDailyPay || 0,
+        avgJobPay: s.avgJobPay || 0,
+        daysWorked: s.daysWorked || 0,
+        completedRev: s.completedRev || 0,
+        internalRev: s.internalRev || 0,
+        streak: s.streak || 0,
+        byWeekday: s.byWeekday || {Mon:{count:0,rev:0},Tue:{count:0,rev:0},Wed:{count:0,rev:0},Thu:{count:0,rev:0},Fri:{count:0,rev:0},Sat:{count:0,rev:0},Sun:{count:0,rev:0}},
+        typeBreakdown: s.typeBreakdown || {}
+    };
     const byType = {}; list.forEach(j => byType[j.type] = (byType[j.type] || 0) + 1);
     const maxType = Math.max(...Object.values(byType), 1);
     const target = parseInt(localStorage.getItem('nx_target')) || 80;
