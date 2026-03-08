@@ -133,9 +133,9 @@ export const JobTrackerModals = {
                 </select>
 
                 <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Status</label>
-                <select id="edit-status" class="input-box" onchange="JobTrackerModals.updateFeePreview('${jobId}')"
+                <select id="edit-status" class="input-box" onchange="JobTrackerModals.updateFeePreview('${jobId}')">
                     ${statusOptions}
-            </select>
+                </select>
 
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Date</label>
             <input type="date" id="edit-date" class="input-box" value="${job.date}" onchange="JobTrackerModals.updateFeePreview('${jobId}')">
@@ -594,7 +594,7 @@ export const JobTrackerModals = {
                 setTimeout(() => {
                     // Trigger sync to pull remote jobs
                     if (window.syncEngine) {
-                        window.syncEngine.sync().catch(e => console.error('Sync failed:', e));
+                        window.syncEngine.fullSync().catch(e => console.error('Sync failed:', e));
                     }
                     // Re-render with authenticated user
                     if (window.appRender) {
@@ -655,7 +655,7 @@ export const JobTrackerModals = {
                     setTimeout(() => {
                         // Trigger sync to pull remote jobs
                         if (window.syncEngine) {
-                            window.syncEngine.sync().catch(e => console.error('Sync failed:', e));
+                            window.syncEngine.fullSync().catch(e => console.error('Sync failed:', e));
                         }
                         // Re-render with authenticated user
                         if (window.appRender) {
