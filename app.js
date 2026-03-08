@@ -2135,7 +2135,8 @@ Object.assign(window, {
     confirmWipe,
     // the modal close helper lives in the modals module
     closeModal: JobTrackerModals.closeModal,
-    showToast
+    showToast,
+    sanitizeHTML
 });
 
 // ===========================
