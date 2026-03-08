@@ -231,6 +231,41 @@ class AppState {
     }
 
     /**
+     * Get job type config (alias for getType for compatibility)
+     */
+    getTypeConfig(code) {
+        return this.getType(code);
+    }
+
+    /**
+     * Get jobs for previous period (for trend comparison)
+     */
+    getPrevScope() {
+        const { isJobInRange } = JobTrackerUtils;
+        const prevDate = new Date(this.viewDate);
+        
+        if (this.range === 'day') {
+            prevDate.setDate(prevDate.getDate() - 1);
+        } else if (this.range === 'week') {
+            prevDate.setDate(prevDate.getDate() - 7);
+        } else if (this.range === 'month') {
+            prevDate.setMonth(prevDate.getMonth() - 1);
+        } else {
+            prevDate.setFullYear(prevDate.getFullYear() - 1);
+        }
+        
+        return this.jobs.filter(j => isJobInRange(j, prevDate, this.range));
+    }
+
+    /**
+     * Get current scope (filtered jobs for view)
+     */
+    getScope() {
+        const { isJobInRange } = JobTrackerUtils;
+        return this.jobs.filter(j => isJobInRange(j, this.viewDate, this.range));
+    }
+
+    /**
      * Save job type
      */
     async saveType(type) {

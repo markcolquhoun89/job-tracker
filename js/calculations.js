@@ -303,7 +303,28 @@ export const JobTrackerCalculations = {
         saturday.setDate(friday.getDate() - 6);
         saturday.setHours(0, 0, 0, 0);
 
-        return { start: saturday, end: friday };
+        // Calculate totals for this pay period
+        let total = 0;
+        let count = 0;
+        state.jobs.forEach(job => {
+            const jobDate = new Date(job.date + 'T00:00:00');
+            if (jobDate >= saturday && jobDate <= friday) {
+                total += parseFloat(job.fee || 0);
+                count++;
+            }
+        });
+
+        const fmt = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        
+        return { 
+            payWeekMon: saturday,
+            thisFriday: friday,
+            start: saturday, 
+            end: friday,
+            total,
+            count,
+            label: fmt(saturday) + ' – ' + fmt(friday)
+        };
     },
 
     /**
@@ -341,6 +362,7 @@ export const JobTrackerCalculations = {
             periods.push({
                 start: saturday,
                 end: friday,
+                mon: saturday,
                 total,
                 count,
                 label: `${fmt(saturday)} – ${fmt(friday)}`,

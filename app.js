@@ -1994,25 +1994,119 @@ function buildBgAnimOptions() {
 function handlePanelTouch() { /* TODO */ }
 function handleJobTouch() { /* TODO */ }
 function pressEdit() { /* TODO */ }
-// `toggleBatchSelect` is implemented earlier in the file; remove the
-// duplicate empty stub to avoid redeclaration errors.
+// toggleBatchSelect is implemented earlier in the file
 function getLeaderboardParticipationKey() { return 'nx_leaderboard_enabled'; }
-function getActiveUserId() { return 'user123'; } // Placeholder
-function editTarget() { /* TODO */ }
-function jumpToPayWeek() { /* TODO */ }
-function toggleTheme() { /* TODO */ }
-function setDisplayNameGlobal() { /* TODO */ }
-function setAccentColour() { /* TODO */ }
-function pickGradient() { /* TODO */ }
-function setBgAnimation() { /* TODO */ }
-function editTypeModal() { /* TODO */ }
-function addTypeModal() { /* TODO */ }
-function toggleLeaderboardParticipation() { /* TODO */ }
-// wake lock and notification handlers are defined earlier; stubs removed to
-// avoid 'already declared' errors
-function showNotesSearch() { /* TODO */ }
-function importCSV() { /* TODO */ }
-function confirmWipe() { /* TODO */ }
+function getActiveUserId() { return localStorage.getItem('nx_userId') || 'user_' + Date.now(); }
+function editTarget() { 
+    const current = parseInt(localStorage.getItem('nx_target')) || 80;
+    const newTarget = prompt('Enter completion rate target (%):', current);
+    if (newTarget !== null && !isNaN(newTarget)) {
+        localStorage.setItem('nx_target', newTarget);
+        render();
+    }
+}
+function jumpToPayWeek(monIsoDate) {
+    if (!monIsoDate) return;
+    state.setViewDate(new Date(monIsoDate + 'T00:00:00'));
+    state.setRange('week');
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.range-btn:nth-child(2)').classList.add('active');
+    render();
+}
+function toggleTheme(isLight) {
+    if (isLight) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('nx_theme', 'light');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('nx_theme', 'dark');
+    }
+}
+function setDisplayNameGlobal(name) {
+    state.setDisplayName(name);
+}
+function setAccentColour(dark, light) {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const colour = isLight ? light : dark;
+    document.documentElement.style.setProperty('--primary', colour);
+    localStorage.setItem('nx_accent', colour);
+    localStorage.setItem('nx_accent_dark', dark);
+    localStorage.setItem('nx_accent_light', light);
+}
+function pickGradient(index) {
+    if (!window._gradients || !window._gradients[index]) return;
+    const grad = window._gradients[index].grad;
+    document.documentElement.style.setProperty('--primary-grad', grad);
+    localStorage.setItem('nx_gradient', grad);
+    localStorage.removeItem('nx_accent');
+}
+function setBgAnimation(id) {
+    localStorage.setItem('nx_bg_anim', id);
+    initBackgroundAnimation();
+}
+function editTypeModal(typeName) {
+    window.JobTrackerModals.editType(typeName);
+}
+function addTypeModal() {
+    window.JobTrackerModals.addType();
+}
+function toggleLeaderboardParticipation() {
+    const key = getLeaderboardParticipationKey();
+    const current = localStorage.getItem(key);
+    if (current === '1') {
+        localStorage.setItem(key, '0');
+    } else {
+        localStorage.setItem(key, '1');
+    }
+    render();
+}
+function showNotesSearch() {
+    window.JobTrackerModals.showNotesSearch();
+}
+function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const text = e.target.result;
+            const lines = text.split('\n');
+            const jobs = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                if (cols.length >= 4) {
+                    jobs.push({
+                        date: cols[0].trim(),
+                        type: cols[1].trim(),
+                        status: cols[2].trim() || 'Pending',
+                        fee: parseFloat(cols[3]) || 0,
+                        jobID: cols[4]?.trim() || '',
+                        notes: cols[5]?.trim() || ''
+                    });
+                }
+            }
+            for (const job of jobs) {
+                await jobOps.createJob(job);
+            }
+            showToast(`Imported ${jobs.length} jobs`);
+            render(true);
+        } catch (err) {
+            customAlert('Import Error', err.message, true);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+function confirmWipe() {
+    if (confirm('Are you sure you want to wipe ALL data? This cannot be undone!')) {
+        if (confirm('Really delete everything? This will remove all jobs and settings!')) {
+            state.clearAllData().then(() => {
+                showToast('All data wiped');
+                render();
+            });
+        }
+    }
+}
 
 // expose globals for inline handlers (compatibility with existing HTML)
 Object.assign(window, {
