@@ -27,7 +27,7 @@ const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = JobTrackerConsta
 const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = JobTrackerUtils;
 const { db, STORES } = JobTrackerDB;
 const state = JobTrackerState;
-const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats } = JobTrackerCalculations;
+const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats, getPayPeriod } = JobTrackerCalculations;
 const jobOps = JobTrackerJobs;
 const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculationDialog, showDataManagement } = JobTrackerModals;
 
@@ -1169,8 +1169,8 @@ function renderFunds(container, list, s) {
     let bestDay = { date: 'N/A', val: 0 };
     Object.entries(daily).forEach(([d, v]) => { if(v > bestDay.val) bestDay = {date: d, val: v}; });
     const pp = getPayPeriod();
-    const payMonISO = pp.payWeekMon.toISOString().split('T')[0];
-    const payFriStr = pp.thisFriday.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    const payMonISO = pp.start.toISOString().split('T')[0];
+    const payFriStr = pp.end.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     // Trends
     const prevList = state.getPrevScope();
     const prevS = calculate(prevList);
