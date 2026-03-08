@@ -2134,7 +2134,8 @@ Object.assign(window, {
     importCSV,
     confirmWipe,
     // the modal close helper lives in the modals module
-    closeModal: JobTrackerModals.closeModal
+    closeModal: JobTrackerModals.closeModal,
+    showToast
 });
 
 // ===========================
