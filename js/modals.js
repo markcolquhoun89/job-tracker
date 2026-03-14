@@ -591,20 +591,12 @@ export const JobTrackerModals = {
             
             if (result.success) {
                 console.log('[Modals] Sign in successful:', result.user.id);
-                this.customAlert('Success', `Welcome back, ${result.user.email}!`);
+                // Revoke all other active sessions for shared-device security
+                try { await client.signOutOtherSessions(); } catch (_) {}
                 JobTrackerModals.closeModal();
-                showToast('Loading your jobs...', 2000);
-                // Don't reload - instead update UI in place
-                setTimeout(() => {
-                    // Trigger sync to pull remote jobs
-                    if (window.syncEngine) {
-                        window.syncEngine.fullSync().catch(e => console.error('Sync failed:', e));
-                    }
-                    // Re-render with authenticated user
-                    if (window.appRender) {
-                        window.appRender();
-                    }
-                }, 500);
+                showToast('Signed in! Loading your data...', 2000);
+                // Reload to fully reinitialise: sync engine, render, auth button
+                setTimeout(() => window.location.reload(), 400);
             } else {
                 console.warn('[Modals] Sign in failed:', result.error);
                 this.customAlert('Sign In Failed', result.error, true);

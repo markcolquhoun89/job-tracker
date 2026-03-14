@@ -165,6 +165,27 @@ export class SupabaseClient {
   }
 
   /**
+   * Revoke all other active sessions for this user (keeps current session alive).
+   * Called automatically after sign-in to prevent shared-device data leaks.
+   */
+  async signOutOtherSessions() {
+    if (!this.token) return;
+    try {
+      await fetch(`${this.url}/auth/v1/logout?scope=others`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.anonKey,
+          'Authorization': `Bearer ${this.token}`,
+        }
+      });
+      console.log('[Supabase] Other sessions revoked');
+    } catch (e) {
+      console.warn('[Supabase] Could not revoke other sessions (non-critical):', e.message);
+    }
+  }
+
+  /**
    * Full logout - clears session and tells state to wipe data
    */
   async fullLogout() {
@@ -206,14 +227,19 @@ export class SupabaseClient {
         return await this.refreshSession();
       }
 
-      // Session invalid - trigger data wipe
-      console.warn('[Supabase] Session verification failed - wiping data');
-      await this.fullLogout();
+      // Explicit auth rejection — clear tokens (no data wipe; only user action triggers that)
+      console.warn('[Supabase] Session explicitly rejected (status', response.status, ') - clearing tokens');
+      this.clearSession();
       return false;
     } catch (error) {
-      console.warn('[Supabase] Session verification failed:', error);
-      // On network error or timeout, assume session is bad and wipe data
-      await this.fullLogout();
+      // Network error — could be offline. Keep stored session so local data stays intact.
+      console.warn('[Supabase] Session verification network error:', error.message);
+      if (!this.isOnline) {
+        console.log('[Supabase] Offline — keeping stored session');
+        return true;
+      }
+      // Online but fetch failed (e.g. DNS/timeout) — don't wipe, just skip verification
+      this.clearSession();
       return false;
     }
   }

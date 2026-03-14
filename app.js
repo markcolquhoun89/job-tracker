@@ -121,6 +121,13 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
             showSignInModal();
         });
         
+        // Always dismiss the splash screen — sign-in modal lives beneath it
+        const splash = document.getElementById('splash');
+        if (splash) {
+            console.log('[App] Dismissing splash screen');
+            splash.style.display = 'none';
+        }
+
         // If user is not authenticated, show sign-in modal instead of main app
         if (!isAuthenticated) {
             console.log('[App] User not authenticated - checking supabase config');
@@ -147,13 +154,6 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         render();
         console.log('[App] UI rendered');
         
-        // Dismiss splash screen now that app is ready
-        const splash = document.getElementById('splash');
-        if (splash) {
-            console.log('[App] Dismissing splash screen');
-            splash.style.display = 'none';
-        }
-        
         // Initialize background animations
         initBackgroundAnimation();
         
@@ -173,25 +173,51 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         if (notif === '1' && 'Notification' in window && Notification.permission === 'granted') {
             scheduleNotification();
         }
+
+        // Auto-logout after 60 minutes of inactivity
+        setupInactivityTimeout(60);
         
         console.log('[App] Job Tracker initialized successfully');
         
-        // Export render and sync for use by modals after auth changes
+        // Export render for use by modals after auth changes
         window.appRender = () => render();
         if (window.supabaseClient?.syncEngine) {
             window.syncEngine = window.supabaseClient.syncEngine;
         }
     } catch (error) {
         console.error('[App] Initialization failed:', error);
-        // Still dismiss splash so user can see the app
+        // Still dismiss splash so user can see something
         const splash = document.getElementById('splash');
-        if (splash) {
-            splash.style.display = 'none';
-        }
-        // Show minimal UI - user can still interact, just without full features
+        if (splash) splash.style.display = 'none';
         showToast('⚠ App initialization error - some features may not work', 5000);
     }
 })();
+
+// ===========================
+// Inactivity Auto-Logout
+// ===========================
+
+let _inactivityTimer = null;
+
+function setupInactivityTimeout(minutes = 60) {
+    const ms = minutes * 60 * 1000;
+    const events = ['touchstart', 'click', 'keydown', 'scroll'];
+    const resetTimer = () => {
+        clearTimeout(_inactivityTimer);
+        _inactivityTimer = setTimeout(async () => {
+            const client = window.supabaseClient;
+            if (client?.getStatus?.().isAuthenticated) {
+                showToast('Signing out due to inactivity...', 2500);
+                setTimeout(async () => {
+                    await client.fullLogout();
+                    window.location.reload();
+                }, 600);
+            }
+        }, ms);
+    };
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+}
 
 // ===========================
 // Navigation Functions
