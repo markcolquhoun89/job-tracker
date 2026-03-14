@@ -18,6 +18,7 @@ export class SyncEngine {
     this.eventsBound = false;
     this.syncCycleDeletions = []; // Track deletions synced in this cycle
     this.hasPendingChanges = false; // Flag if new changes arrived during sync
+    this.stateFallbackLogged = false;
   }
 
   /**
@@ -521,18 +522,18 @@ export class SyncEngine {
       return false;
     }
     
-    // Only work with app.js state - simplified approach
+    // Prefer global state for compatibility, otherwise use modular state directly.
     let stateRef = window.state;
-    
-    if (!stateRef) {
-      console.warn('[SyncEngine] window.state not available, checking for fallback...');
-      // Fallback - try modular state
-      if (this.state && this.state.jobs) {
-        stateRef = { jobs: this.state.jobs };
-      } else {
-        console.error('[SyncEngine] No state available at all!');
-        return false;
+    if (!stateRef && this.state && this.state.jobs) {
+      stateRef = this.state;
+      if (!this.stateFallbackLogged) {
+        console.log('[SyncEngine] Using modular state fallback');
+        this.stateFallbackLogged = true;
       }
+    }
+    if (!stateRef) {
+      console.error('[SyncEngine] No state available at all!');
+      return false;
     }
 
     if (!stateRef.jobs) {

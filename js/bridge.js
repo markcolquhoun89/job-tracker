@@ -22,7 +22,7 @@ export async function initModules() {
     // prevent double-initialization
     if (modulesReady) {
         console.log('[Bridge] Modules already initialized, skipping');
-        return window.supabaseClient?.isAuthenticated || false;
+        return !!window.supabaseClient?.getStatus?.().isAuthenticated;
     }
 
     console.log('[Bridge] Initializing modular system...');
@@ -37,6 +37,8 @@ export async function initModules() {
         // Initialize state
         console.log('[Bridge] Initializing state...');
         await JobTrackerState.init();
+        // Keep legacy/global state reference for sync and inline handlers.
+        window.state = JobTrackerState;
         console.log('✓ State loaded');
         
         // Initialize Supabase client if configured

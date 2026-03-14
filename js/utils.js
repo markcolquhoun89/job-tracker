@@ -210,11 +210,11 @@ export const JobTrackerUtils = {
         const toast = document.getElementById('toast');
         if (!toast) return;
 
-        const safeMessage = sanitizeHTML(message);
+        const safeMessage = JobTrackerUtils.sanitizeHTML(message);
 
         let html = `<span>${safeMessage}</span>`;
         if (actions) {
-            const safeLabel = sanitizeHTML(actions.label);
+            const safeLabel = JobTrackerUtils.sanitizeHTML(actions.label);
             html += `<button class="toast-undo" onclick="${actions.onClick}">${safeLabel}</button>`;
         }
 

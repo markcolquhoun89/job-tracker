@@ -41,13 +41,13 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         console.log('[App] Starting initialization...');
         
         // Initialize all modular components (DB, state, Supabase, sync)
-        await initModules();
+        const hasAuthenticatedSession = await initModules();
         
         console.log('[App] Modules initialized, setting up UI...');
         
         // Get Supabase client to check auth state
         const supabase = window.supabaseClient;
-        const isAuthenticated = supabase?.isAuthenticated || false;
+        const isAuthenticated = !!hasAuthenticatedSession || !!supabase?.getStatus?.().isAuthenticated;
         console.log('[App] User authenticated:', isAuthenticated);
         
         // Subscribe to state changes for reactive updates
@@ -1022,7 +1022,7 @@ function renderStats(container, list, s) {
     list.forEach(j => { if (!dayMap[j.date]) dayMap[j.date] = { done:0, fail:0, total:0 }; dayMap[j.date].total++; if (j.status==='Completed') dayMap[j.date].done++; if (j.status==='Failed') dayMap[j.date].fail++; });
     const perfectDays = Object.values(dayMap).filter(d => d.total >= 3 && d.done === d.total).length;
     // Productivity score (jobs per day relative to target of 8)
-    const avgJobsPerDay = s.avgJobsPerDay != null ? s.avgJobsPerDay : 0;
+    const avgJobsPerDay = stats.avgJobsPerDay != null ? stats.avgJobsPerDay : 0;
     const prodScore = Math.min(100, Math.round((parseFloat(avgJobsPerDay) / 8) * 100));
     // Best streak in current scope
     const scopeSorted = [...list].filter(j => j.status !== 'Pending').sort((a,b) => (a.completedAt||0)-(b.completedAt||0));
@@ -1032,9 +1032,9 @@ function renderStats(container, list, s) {
         else tempStreak = 0;
     }
     // Momentum: compare key metrics to previous period
-    const volDelta = s.vol - prevS.vol;
-    const rateDelta = parseFloat(s.compRate) - parseFloat(prevS.compRate);
-    const cashDelta = s.totalCash - prevS.totalCash;
+    const volDelta = stats.vol - (prevS.vol || 0);
+    const rateDelta = parseFloat(stats.compRate) - parseFloat(prevS.compRate || 0);
+    const cashDelta = stats.totalCash - (prevS.totalCash || 0);
     const rc1 = s.compRate >= target ? 'var(--success)' : s.compRate >= target*0.75 ? 'var(--warning)' : 'var(--danger)';
     const rc2 = s.exclHy >= target ? 'var(--success)' : s.exclHy >= target*0.75 ? 'var(--warning)' : 'var(--danger)';
    
@@ -1045,34 +1045,34 @@ function renderStats(container, list, s) {
             title: 'Completion Metrics',
             content: `<div class="comp-meter" style="margin-bottom:16px;">
                 <div class="comp-meter-row">
-                    <div class="comp-meter-pct" style="color:${rc1}; font-size:2.4rem;">${s.compRate}%</div>
+                    <div class="comp-meter-pct" style="color:${rc1}; font-size:2.4rem;">${stats.compRate}%</div>
                     <div class="comp-meter-info">
-                        <div style="display:flex; justify-content:space-between; align-items:center;"><span class="comp-meter-label">Completion Rate</span><span style="font-size:0.6rem; color:var(--text-muted); font-weight:600;">${s.done} of ${s.done + s.fails + s.ints} resolved</span></div>
-                        <div class="comp-meter-track" style="height:12px;"><div class="comp-meter-fill" style="width:${Math.min(s.compRate,100)}%; background:${rc1};"></div><div class="comp-meter-target" style="left:${target}%;"></div></div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;"><span class="comp-meter-label">Completion Rate</span><span style="font-size:0.6rem; color:var(--text-muted); font-weight:600;">${stats.done} of ${stats.done + stats.fails + stats.ints} resolved</span></div>
+                        <div class="comp-meter-track" style="height:12px;"><div class="comp-meter-fill" style="width:${Math.min(stats.compRate,100)}%; background:${rc1};"></div><div class="comp-meter-target" style="left:${target}%;"></div></div>
                     </div>
                 </div>
                 <div style="height:1px; background:var(--border-t); margin:8px 0;"></div>
                 <div class="comp-meter-row">
-                    <div class="comp-meter-pct" style="color:${rc2}; font-size:2.4rem;">${s.exclHy}%</div>
+                    <div class="comp-meter-pct" style="color:${rc2}; font-size:2.4rem;">${stats.exclHy}%</div>
                     <div class="comp-meter-info">
                         <div style="display:flex; justify-content:space-between; align-items:center;"><span class="comp-meter-label">Excl. Hybrids</span><span style="font-size:0.6rem; color:var(--text-muted); font-weight:600;">Without HyOH / HyUG</span></div>
-                        <div class="comp-meter-track" style="height:12px;"><div class="comp-meter-fill" style="width:${Math.min(s.exclHy,100)}%; background:${rc2};"></div><div class="comp-meter-target" style="left:${target}%;"></div></div>
+                        <div class="comp-meter-track" style="height:12px;"><div class="comp-meter-fill" style="width:${Math.min(stats.exclHy,100)}%; background:${rc2};"></div><div class="comp-meter-target" style="left:${target}%;"></div></div>
                     </div>
                 </div>
                 <span class="comp-meter-tag" onclick="editTarget()" style="margin-top:8px;">\u270e TARGET ${target}%</span>
             </div>
-            <div class="metric-row"><span>Total Volume</span><b class="count-up" style="font-size:1.3rem;">${s.vol}</b></div>
-            <div class="metric-row"><span>Avg Jobs per Workday</span><b class="count-up" style="font-size:1.3rem;">${s.avgJobsPerDay != null ? s.avgJobsPerDay : 0}</b></div>
-            <div class="metric-row"><span>Total Earnings</span><b class="count-up" style="font-size:1.3rem; color:var(--success);">&pound;${s.totalCash.toFixed(0)}</b></div>`
+            <div class="metric-row"><span>Total Volume</span><b class="count-up" style="font-size:1.3rem;">${stats.vol}</b></div>
+            <div class="metric-row"><span>Avg Jobs per Workday</span><b class="count-up" style="font-size:1.3rem;">${stats.avgJobsPerDay != null ? stats.avgJobsPerDay : 0}</b></div>
+            <div class="metric-row"><span>Total Earnings</span><b class="count-up" style="font-size:1.3rem; color:var(--success);">&pound;${stats.totalCash.toFixed(0)}</b></div>`
         },
         {
             id: 'status-grid',
             title: 'Status Summary',
             content: `<div class="stat-grid" style="margin:-8px;">
-                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Done</small><b class="count-up" style="color:var(--success); font-size:1.8rem;">${s.done}</b></div>
-                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Failed</small><b class="count-up" style="color:var(--danger); font-size:1.8rem;">${s.fails}</b></div>
-                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Internal</small><b class="count-up" style="color:var(--warning); font-size:1.8rem;">${s.ints}</b></div>
-                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Pending</small><b class="count-up" style="color:var(--text-muted); font-size:1.8rem;">${s.pend}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Done</small><b class="count-up" style="color:var(--success); font-size:1.8rem;">${stats.done}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Failed</small><b class="count-up" style="color:var(--danger); font-size:1.8rem;">${stats.fails}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Internal</small><b class="count-up" style="color:var(--warning); font-size:1.8rem;">${stats.ints}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Pending</small><b class="count-up" style="color:var(--text-muted); font-size:1.8rem;">${stats.pend}</b></div>
             </div>`
         },
         {
@@ -1090,9 +1090,9 @@ function renderStats(container, list, s) {
             content: `<div class="metric-row"><span>Consistency</span><b class="count-up" style="color:${consistencyScore >= 75 ? 'var(--success)' : consistencyScore >= 50 ? 'var(--warning)' : 'var(--danger)'}">${consistencyScore}<span style="font-size:0.6rem; color:var(--text-muted)">/100</span></b></div>
             <div class="metric-row"><span>Productivity</span><b class="count-up" style="color:${prodScore >= 80 ? 'var(--success)' : prodScore >= 50 ? 'var(--warning)' : 'var(--text-muted)'}">${prodScore}% <span style="font-size:0.6rem; color:var(--text-muted)">of 8/day</span></b></div>
             <div class="metric-row"><span>Perfect Days</span><b class="count-up" style="color:${perfectDays > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${perfectDays}</b></div>
-            <div class="metric-row"><span>Resolution Rate</span><b class="count-up">${s.vol > 0 ? (((s.done + s.fails + s.ints) / s.vol) * 100).toFixed(0) : 0}% <span style="font-size:0.6rem; color:var(--text-muted)">resolved</span></b></div>
-            <div class="metric-row"><span>Fail Rate</span><b class="count-up" style="color:${s.fails > 0 ? 'var(--danger)' : 'var(--success)'}">${s.vol > 0 ? ((s.fails / s.vol) * 100).toFixed(1) : 0}%</b></div>
-            <div class="metric-row"><span>Internal Rate</span><b class="count-up" style="color:var(--warning)">${s.vol > 0 ? ((s.ints / s.vol) * 100).toFixed(1) : 0}%</b></div>`
+            <div class="metric-row"><span>Resolution Rate</span><b class="count-up">${stats.vol > 0 ? (((stats.done + stats.fails + stats.ints) / stats.vol) * 100).toFixed(0) : 0}% <span style="font-size:0.6rem; color:var(--text-muted)">resolved</span></b></div>
+            <div class="metric-row"><span>Fail Rate</span><b class="count-up" style="color:${stats.fails > 0 ? 'var(--danger)' : 'var(--success)'}">${stats.vol > 0 ? ((stats.fails / stats.vol) * 100).toFixed(1) : 0}%</b></div>
+            <div class="metric-row"><span>Internal Rate</span><b class="count-up" style="color:var(--warning)">${stats.vol > 0 ? ((stats.ints / stats.vol) * 100).toFixed(1) : 0}%</b></div>`
         },
         {
             id: 'volume-chart',
