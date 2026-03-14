@@ -102,6 +102,178 @@ export const JobTrackerModals = {
     },
 
     /**
+     * Edit an existing job type from settings.
+     */
+    editType(typeCode) {
+        const state = getState();
+        const { sanitizeHTML } = getUtils();
+        const type = state.getType(typeCode);
+        if (!type) {
+            this.customAlert('Type Not Found', `Could not find type ${typeCode}`, true);
+            return;
+        }
+
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:14px;">Edit Type: ${sanitizeHTML(type.code)}</h3>
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px; display:block;">Code</label>
+            <input id="type-code" class="input-box" value="${sanitizeHTML(type.code)}" disabled>
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin:10px 0 4px; display:block;">Completed Pay (£)</label>
+            <input id="type-pay" class="input-box" type="number" step="0.01" min="0" value="${Number(type.pay || 0)}">
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin:10px 0 4px; display:block;">Internals Pay (£)</label>
+            <input id="type-int" class="input-box" type="number" step="0.01" min="0" value="${type.int == null ? '' : Number(type.int)}" placeholder="Leave empty for N/A">
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin:10px 0 4px; display:block;">Upgrade Pay (£)</label>
+            <input id="type-upgrade" class="input-box" type="number" step="0.01" min="0" value="${type.upgradePay == null ? '' : Number(type.upgradePay)}" placeholder="Optional">
+
+            <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:0.8rem; color:var(--text-main);">
+                <input id="type-completion" type="checkbox" ${type.countTowardsCompletion === false ? '' : 'checked'}>
+                Counts toward completion metrics
+            </label>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;">
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+                <button class="btn" onclick="JobTrackerModals.saveTypeFromModal(false)">Save</button>
+            </div>
+        `;
+        this.showModal(content);
+    },
+
+    /**
+     * Create a new job type from settings.
+     */
+    addType() {
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:14px;">Create Job Type</h3>
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px; display:block;">Code</label>
+            <input id="type-code" class="input-box" maxlength="12" placeholder="e.g. OH2">
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin:10px 0 4px; display:block;">Completed Pay (£)</label>
+            <input id="type-pay" class="input-box" type="number" step="0.01" min="0" value="0">
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin:10px 0 4px; display:block;">Internals Pay (£)</label>
+            <input id="type-int" class="input-box" type="number" step="0.01" min="0" placeholder="Leave empty for N/A">
+
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin:10px 0 4px; display:block;">Upgrade Pay (£)</label>
+            <input id="type-upgrade" class="input-box" type="number" step="0.01" min="0" placeholder="Optional">
+
+            <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:0.8rem; color:var(--text-main);">
+                <input id="type-completion" type="checkbox" checked>
+                Counts toward completion metrics
+            </label>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;">
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+                <button class="btn" onclick="JobTrackerModals.saveTypeFromModal(true)">Create</button>
+            </div>
+        `;
+        this.showModal(content);
+    },
+
+    /**
+     * Save the type form from add/edit type modal.
+     */
+    async saveTypeFromModal(isCreate) {
+        const state = getState();
+        const { showToast } = getUtils();
+
+        const code = (document.getElementById('type-code')?.value || '').trim();
+        const pay = parseFloat(document.getElementById('type-pay')?.value || '0');
+        const intRaw = (document.getElementById('type-int')?.value || '').trim();
+        const upgradeRaw = (document.getElementById('type-upgrade')?.value || '').trim();
+        const countTowardsCompletion = !!document.getElementById('type-completion')?.checked;
+
+        if (!code) {
+            this.customAlert('Validation', 'Type code is required', true);
+            return;
+        }
+        if (!Number.isFinite(pay) || pay < 0) {
+            this.customAlert('Validation', 'Completed pay must be a valid non-negative number', true);
+            return;
+        }
+
+        const intVal = intRaw === '' ? null : parseFloat(intRaw);
+        if (intVal !== null && (!Number.isFinite(intVal) || intVal < 0)) {
+            this.customAlert('Validation', 'Internals pay must be blank or a valid non-negative number', true);
+            return;
+        }
+
+        const upgradeVal = upgradeRaw === '' ? null : parseFloat(upgradeRaw);
+        if (upgradeVal !== null && (!Number.isFinite(upgradeVal) || upgradeVal < 0)) {
+            this.customAlert('Validation', 'Upgrade pay must be blank or a valid non-negative number', true);
+            return;
+        }
+
+        if (isCreate && state.getType(code)) {
+            this.customAlert('Validation', `Type ${code} already exists`, true);
+            return;
+        }
+
+        try {
+            await state.saveType({
+                code,
+                pay,
+                int: intVal,
+                upgradePay: upgradeVal,
+                countTowardsCompletion
+            });
+            this.closeModal();
+            showToast(isCreate ? 'Type created' : 'Type updated');
+            if (window.render) window.render(true);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
+    },
+
+    /**
+     * Notes search tool from settings.
+     */
+    showNotesSearch() {
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:8px;">Search Notes</h3>
+            <p style="margin:0 0 10px 0; color:var(--text-muted); font-size:0.8rem;">Find jobs by note text</p>
+            <input id="notes-search-query" class="input-box" placeholder="Type keyword..." oninput="JobTrackerModals.runNotesSearch()">
+            <div id="notes-search-results" style="margin-top:10px; max-height:55vh; overflow-y:auto;"></div>
+        `;
+        this.showModal(content);
+        this.runNotesSearch();
+    },
+
+    runNotesSearch() {
+        const state = getState();
+        const { sanitizeHTML } = getUtils();
+        const q = (document.getElementById('notes-search-query')?.value || '').trim().toLowerCase();
+        const out = document.getElementById('notes-search-results');
+        if (!out) return;
+
+        const hits = state.jobs
+            .filter(j => (j.notes || '').toLowerCase().includes(q))
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+            .slice(0, 100);
+
+        if (hits.length === 0) {
+            out.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; padding:8px;">No matching notes</div>';
+            return;
+        }
+
+        out.innerHTML = hits.map(j => `
+            <div style="padding:10px; border:1px solid var(--border-subtle); border-radius:8px; margin-bottom:8px; background:var(--surface-elev); cursor:pointer;" onclick="window.JobTrackerModals.closeModal(); window.state.viewDate=new Date('${j.date}T00:00:00'); window.state.range='day'; if(window.render) window.render(); setTimeout(()=>window.JobTrackerModals.editJob('${j.id}'),120);">
+                <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:6px;">
+                    <b>${sanitizeHTML(j.type || 'JOB')}</b>
+                    <span style="font-size:0.72rem; color:var(--text-muted);">${sanitizeHTML(j.date || '')}</span>
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-main); line-height:1.4; white-space:pre-wrap;">${sanitizeHTML((j.notes || '').slice(0, 180))}${(j.notes || '').length > 180 ? '...' : ''}</div>
+            </div>
+        `).join('');
+    },
+
+    /**
      * Edit job modal with manual fee option
      */
     async editJob(jobId) {

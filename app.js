@@ -1815,13 +1815,17 @@ function renderSettings(container) {
             id: 'job-types',
             title: 'Job Type Configuration',
             icon: '<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" stroke=\"currentColor\" stroke-width=\"2.5\" fill=\"none\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\"/></svg>',
-            content: `<div style=\"max-height:250px; overflow-y:auto; margin-bottom:12px; padding-right:10px;\">
-                ${Object.entries(state.types).map(([name, data]) => `
-                    <div style=\"display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border-t); gap:12px;\">
+            content: `<div style="max-height:250px; overflow-y:auto; margin-bottom:12px; padding-right:10px;">
+                ${state.types.map((typeObj) => {
+                    const name = typeObj.code;
+                    const data = typeObj;
+                    return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border-t); gap:12px;">
                         <div style="min-width:0;"><b>${name}</b><br><span style="font-size:0.7rem; color:var(--text-muted)">&pound;${data.pay} · Int: ${data.int == null ? 'N/A' : '&pound;' + data.int} · Upgrade: ${data.upgradePay == null ? 'N/A' : '&pound;' + data.upgradePay} · Completion: ${data.countTowardsCompletion === false ? 'Off' : 'On'}</span></div>
-                        <button class=\"btn\" style=\"width:auto; min-width:54px; flex-shrink:0; padding:6px 12px; margin:0; font-size:0.6rem; background:var(--border)\" onclick=\"editTypeModal('${name}')\">EDIT</button>
+                        <button class="btn" style="width:auto; min-width:54px; flex-shrink:0; padding:6px 12px; margin:0; font-size:0.6rem; background:var(--border)" onclick="editTypeModal('${name}')">EDIT</button>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
             <button class=\"btn\" style=\"background:var(--primary); color:#fff\" onclick=\"addTypeModal()\">+ CREATE NEW JOB TYPE</button>`
         },
@@ -2222,6 +2226,17 @@ Object.assign(window, {
     shareReport,
     jumpToPayWeek,
     showNotesSearch,
+    toggleTheme,
+    setDisplayNameGlobal,
+    setAccentColour,
+    pickGradient,
+    setBgAnimation,
+    editTypeModal,
+    addTypeModal,
+    toggleLeaderboardParticipation,
+    toggleWakeLock,
+    requestNotifications,
+    exportCSV,
     importCSV,
     confirmWipe,
     togglePanel,
