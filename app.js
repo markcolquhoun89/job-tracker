@@ -358,109 +358,88 @@ function toggleAddPopup() {
 
 function showSingleAdd() {
     const types = state.types;
-    const today = new Date().toISOString().split('T')[0];
-    
-    const typeOptions = types.map(t => 
-        `<option value="${t.code}">${t.code} - £${t.pay}${t.int ? ` (Int: £${t.int})` : ''}</option>`
+    const viewDate = state.viewDate.toISOString().split('T')[0];
+    const typeButtons = types.map(t =>
+        `<button class="btn" style="padding:18px 8px; font-size:1rem; font-weight:800; background:var(--primary); color:#fff; margin:0;" onclick="saveNewJob('${sanitizeHTML(t.code)}')">${sanitizeHTML(t.code)}</button>`
     ).join('');
-    
+    const cols = types.length <= 3 ? `repeat(${types.length},1fr)` : 'repeat(3,1fr)';
     const content = `
         <button class="close-btn" onclick="window.JobTrackerModals.closeModal()">×</button>
-        <h3 style="margin-bottom:16px;">Add Job</h3>
-        
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Type</label>
-        <select id="add-type" class="input-box">
-            ${typeOptions}
-        </select>
-
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Date</label>
-        <input type="date" id="add-date" class="input-box" value="${today}">
-
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Job ID (Optional)</label>
-        <input type="text" id="add-jobid" class="input-box" placeholder="e.g., WO12345">
-
-        <button class="btn" onclick="saveNewJob()">Add Job</button>
+        <h3 style="margin-bottom:4px;">ADD JOB</h3>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:14px;">${viewDate}</p>
+        <input type="text" id="add-jobid" class="input-box" placeholder="Job ID (optional)" style="margin-bottom:14px;">
+        <div style="display:grid; grid-template-columns:${cols}; gap:8px;">
+            ${typeButtons}
+        </div>
     `;
-    
     window.JobTrackerModals.showModal(content);
 }
 
-async function saveNewJob() {
-    const type = document.getElementById('add-type').value;
-    const date = document.getElementById('add-date').value;
-    const jobID = document.getElementById('add-jobid').value;
-    
+async function saveNewJob(type) {
+    const date = state.viewDate.toISOString().split('T')[0];
+    const jobID = document.getElementById('add-jobid')?.value?.trim() || null;
     try {
-        await jobOps.createJob({
-            type,
-            date,
-            jobID,
-            status: STATUS.PENDING
-        });
-        
+        await jobOps.createJob({ type, date, jobID, status: STATUS.PENDING });
         window.JobTrackerModals.closeModal();
-        showToast('Job added successfully');
+        showToast(`${type} added`);
         render(true);
     } catch (error) {
         customAlert('Error', error.message, true);
     }
 }
+
+let _multiCounts = {};
 
 function showMultiAdd() {
-    const types = state.types;
-    const today = new Date().toISOString().split('T')[0];
-    
-    const typeOptions = types.map(t => 
-        `<option value="${t.code}">${t.code} - £${t.pay}${t.int ? ` (Int: £${t.int})` : ''}</option>`
-    ).join('');
-    
+    _multiCounts = {};
+    state.types.forEach(t => { _multiCounts[t.code] = 0; });
+    renderMultiAddList();
+}
+
+function renderMultiAddList() {
+    const total = Object.values(_multiCounts).reduce((a, b) => a + b, 0);
+    const viewDate = state.viewDate.toISOString().split('T')[0];
+    const rows = Object.entries(_multiCounts).map(([type, count]) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding:10px 12px; background:var(--surface-elev); border-radius:8px; border:1px solid var(--border);">
+            <b style="font-size:1rem;">${sanitizeHTML(type)}</b>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <button class="btn" style="background:var(--border); color:var(--text-main); margin:0; width:40px; height:40px; padding:0; font-size:1.4rem; line-height:1;" onclick="adjMulti('${sanitizeHTML(type)}',-1)">−</button>
+                <span style="font-weight:800; width:28px; text-align:center; font-size:1.1rem;">${count}</span>
+                <button class="btn" style="background:var(--primary); color:#fff; margin:0; width:40px; height:40px; padding:0; font-size:1.4rem; line-height:1;" onclick="adjMulti('${sanitizeHTML(type)}',1)">+</button>
+            </div>
+        </div>
+    `).join('');
+    const addBtnStyle = total > 0 ? 'background:var(--success);' : 'background:var(--border); color:var(--text-muted);';
     const content = `
         <button class="close-btn" onclick="window.JobTrackerModals.closeModal()">×</button>
-        <h3 style="margin-bottom:16px;">Add Multiple Jobs</h3>
-        
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Type</label>
-        <select id="bulk-type" class="input-box">
-            ${typeOptions}
-        </select>
-
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Date</label>
-        <input type="date" id="bulk-date" class="input-box" value="${today}">
-
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Quantity</label>
-        <input type="number" id="bulk-quantity" class="input-box" value="1" min="1" max="20">
-
-        <button class="btn" onclick="saveBulkJobs()">Add Jobs</button>
+        <h3 style="margin-bottom:4px;">MULTI ADD</h3>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:14px;">${viewDate}</p>
+        <div style="max-height:55vh; overflow-y:auto; margin-bottom:14px; padding-right:4px;">
+            ${rows}
+        </div>
+        <button class="btn" style="${addBtnStyle}" onclick="saveMultiJobs()" ${total === 0 ? 'disabled' : ''}>ADD ${total} JOB${total !== 1 ? 'S' : ''}</button>
     `;
-    
     window.JobTrackerModals.showModal(content);
 }
 
-async function saveBulkJobs() {
-    const type = document.getElementById('bulk-type').value;
-    const date = document.getElementById('bulk-date').value;
-    const quantity = parseInt(document.getElementById('bulk-quantity').value);
-    
-    if (quantity < 1 || quantity > 20) {
-        customAlert('Invalid Quantity', 'Please enter a number between 1 and 20', true);
-        return;
-    }
-    
-    try {
-        const jobs = [];
-        for (let i = 0; i < quantity; i++) {
-            const job = await jobOps.createJob({
-                type,
-                date,
-                status: STATUS.PENDING
-            });
-            jobs.push(job);
+function adjMulti(type, dir) {
+    const next = (_multiCounts[type] || 0) + dir;
+    if (next >= 0) { _multiCounts[type] = next; renderMultiAddList(); }
+}
+
+async function saveMultiJobs() {
+    const date = state.viewDate.toISOString().split('T')[0];
+    let added = 0;
+    for (const [type, count] of Object.entries(_multiCounts)) {
+        for (let i = 0; i < count; i++) {
+            await jobOps.createJob({ type, date, status: STATUS.PENDING });
+            added++;
         }
-        
+    }
+    if (added > 0) {
         window.JobTrackerModals.closeModal();
-        showToast(`Added ${quantity} job${quantity !== 1 ? 's' : ''} successfully`);
+        showToast(`Added ${added} job${added !== 1 ? 's' : ''}`);
         render(true);
-    } catch (error) {
-        customAlert('Error', error.message, true);
     }
 }
 
@@ -2231,7 +2210,9 @@ Object.assign(window, {
     showSingleAdd,
     showMultiAdd,
     saveNewJob,
-    saveBulkJobs,
+    adjMulti,
+    renderMultiAddList,
+    saveMultiJobs,
     toggleBatchMode,
     clearJobOrder,
     quickStatus,

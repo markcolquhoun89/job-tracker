@@ -27,8 +27,19 @@ export const JobTrackerModals = {
         
         if (!modal || !modalBody) return;
 
+        // Clear any lockout set by previous auth modal
+        delete modal.dataset.nodismiss;
         modalBody.innerHTML = content;
         modal.style.display = 'flex';
+    },
+
+    /**
+     * Lock the current modal so backdrop clicks and close buttons are ignored.
+     * Used for sign-in / sign-up where the app is unusable without auth.
+     */
+    lockModal() {
+        const modal = document.getElementById('modal');
+        if (modal) modal.dataset.nodismiss = 'true';
     },
 
     /**
@@ -36,9 +47,10 @@ export const JobTrackerModals = {
      */
     closeModal() {
         const modal = document.getElementById('modal');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        if (!modal) return;
+        // Block dismissal when the app requires authentication
+        if (modal.dataset.nodismiss === 'true') return;
+        modal.style.display = 'none';
     },
 
     /**
@@ -114,14 +126,23 @@ export const JobTrackerModals = {
                 `<option value="${t.code}" ${job.type === t.code ? 'selected' : ''}>${t.code}</option>`
             ).join('');
 
-            const statusOptions = Object.values(STATUS).map(s =>
-                `<option value="${s}" ${job.status === s ? 'selected' : ''}>${s}</option>`
-            ).join('');
-
             // Calculate what the auto fee would be
             const autoFee = jobOps.calculateJobFee(job);
             const currentFee = parseFloat(job.fee || 0);
             const isManual = job.manualFee || false;
+
+            // Determine if this job type supports Internals
+            const typeObj = types.find(t => t.code === job.type);
+            const supportsInt = !!(typeObj && typeObj.int !== null && typeObj.int !== undefined);
+            const statusCols = supportsInt ? 'repeat(4,1fr)' : 'repeat(3,1fr)';
+
+            const statusBtn = (s, label, bg, color = '#fff') => {
+                const active = job.status === s;
+                const activeStyle = s === STATUS.PENDING
+                    ? (active ? 'outline:2px solid var(--primary); outline-offset:-3px;' : '')
+                    : (active ? 'outline:2px solid #fff; outline-offset:-3px;' : '');
+                return `<button class="btn" id="status-btn-${s}" style="margin:0; padding:14px 4px; font-size:0.8rem; font-weight:800; background:${bg}; color:${color}; ${activeStyle}" onclick="JobTrackerModals.selectStatus('${s}','${jobId}')">${label}</button>`;
+            };
 
             const content = `
                 <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
@@ -133,9 +154,13 @@ export const JobTrackerModals = {
                 </select>
 
                 <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Status</label>
-                <select id="edit-status" class="input-box" onchange="JobTrackerModals.updateFeePreview('${jobId}')">
-                    ${statusOptions}
-                </select>
+                <input type="hidden" id="edit-status-value" value="${job.status}">
+                <div style="display:grid; grid-template-columns:${statusCols}; gap:6px; margin-bottom:12px;">
+                    ${statusBtn(STATUS.PENDING, 'PENDING', 'var(--border)', 'var(--text-main)')}
+                    ${statusBtn(STATUS.COMPLETED, 'DONE', 'var(--success)')}
+                    ${supportsInt ? statusBtn(STATUS.INTERNALS, 'INT', 'var(--warning)') : ''}
+                    ${statusBtn(STATUS.FAILED, 'FAIL', 'var(--danger)')}
+                </div>
 
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Date</label>
             <input type="date" id="edit-date" class="input-box" value="${job.date}" onchange="JobTrackerModals.updateFeePreview('${jobId}')">
@@ -190,6 +215,28 @@ export const JobTrackerModals = {
     },
 
     /**
+     * Update status button highlights and hidden input when user taps a status button
+     */
+    selectStatus(status, jobId) {
+        const el = document.getElementById('edit-status-value');
+        if (el) el.value = status;
+        const outlineColors = {
+            [STATUS.PENDING]: 'var(--primary)',
+            [STATUS.COMPLETED]: '#fff',
+            [STATUS.INTERNALS]: '#fff',
+            [STATUS.FAILED]: '#fff'
+        };
+        [STATUS.PENDING, STATUS.COMPLETED, STATUS.INTERNALS, STATUS.FAILED].forEach(s => {
+            const btn = document.getElementById(`status-btn-${s}`);
+            if (!btn) return;
+            const isActive = s === status;
+            btn.style.outline = isActive ? `2px solid ${outlineColors[s]}` : 'none';
+            btn.style.outlineOffset = isActive ? '-3px' : '';
+        });
+        if (jobId) this.updateFeePreview(jobId);
+    },
+
+    /**
      * Toggle manual fee mode
      */
     toggleManualFee(jobId) {
@@ -216,7 +263,7 @@ export const JobTrackerModals = {
         if (!job) return;
 
         const type = document.getElementById('edit-type').value;
-        const status = document.getElementById('edit-status').value;
+        const status = document.getElementById('edit-status-value').value;
         const date = document.getElementById('edit-date').value;
         const isManual = document.getElementById('manual-fee-toggle').checked;
 
@@ -244,7 +291,7 @@ export const JobTrackerModals = {
         const { showToast } = getUtils();
         
         const type = document.getElementById('edit-type').value;
-        const status = document.getElementById('edit-status').value;
+        const status = document.getElementById('edit-status-value').value;
         const date = document.getElementById('edit-date').value;
         const jobID = document.getElementById('edit-jobid').value;
         const notes = document.getElementById('edit-notes').value;
@@ -473,37 +520,37 @@ export const JobTrackerModals = {
      * Authentication Modal
      */
     async showSignIn() {
-        const { sanitizeHTML } = getUtils();
         const content = `
-            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
-            <h3 style="margin-bottom:20px;">Sign In</h3>
+            <h3 style="margin-bottom:8px; text-align:center;">Sign In</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:20px; text-align:center;">Sign in to access your jobs</p>
             <div style="display:grid; gap:12px;">
-                <input type="email" id="auth-email" placeholder="Email" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <input type="password" id="auth-password" placeholder="Password" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSignIn()">Sign In</button>
+                <input type="email" id="auth-email" placeholder="Email" autocomplete="email" style="padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:1rem;">
+                <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" style="padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:1rem;">
+                <button class="btn" style="background:var(--primary); color:#fff; padding:14px; font-size:1rem;" onclick="JobTrackerModals.handleSignIn()">Sign In</button>
                 <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.showSignUp()">Create Account</button>
             </div>
         `;
         JobTrackerModals.showModal(content);
+        JobTrackerModals.lockModal();
     },
 
     /**
      * Sign Up Modal
      */
     async showSignUp() {
-        const { sanitizeHTML } = getUtils();
         const content = `
-            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
-            <h3 style="margin-bottom:20px;">Create Account</h3>
+            <h3 style="margin-bottom:8px; text-align:center;">Create Account</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:20px; text-align:center;">Fill in your details to get started</p>
             <div style="display:grid; gap:12px;">
-                <input type="text" id="auth-displayname" placeholder="Display Name" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <input type="email" id="auth-email" placeholder="Email" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <input type="password" id="auth-password" placeholder="Password" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSignUp()">Create Account</button>
+                <input type="text" id="auth-displayname" placeholder="Display Name" autocomplete="name" style="padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:1rem;">
+                <input type="email" id="auth-email" placeholder="Email" autocomplete="email" style="padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:1rem;">
+                <input type="password" id="auth-password" placeholder="Password" autocomplete="new-password" style="padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:1rem;">
+                <button class="btn" style="background:var(--primary); color:#fff; padding:14px; font-size:1rem;" onclick="JobTrackerModals.handleSignUp()">Create Account</button>
                 <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.showSignIn()">Back to Sign In</button>
             </div>
         `;
         JobTrackerModals.showModal(content);
+        JobTrackerModals.lockModal();
     },
 
     /**
