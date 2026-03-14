@@ -2055,10 +2055,21 @@ function buildBgAnimOptions() {
 
 function handlePanelTouch() { /* TODO */ }
 function handleJobTouch() { /* TODO */ }
-function pressEdit() { /* TODO */ }
+function pressEdit(_el, jobId) {
+    if (!jobId) return;
+    if (navigator.vibrate) navigator.vibrate(6);
+    editJob(jobId);
+}
 // toggleBatchSelect is implemented earlier in the file
 function getLeaderboardParticipationKey() { return 'nx_leaderboard_enabled'; }
-function getActiveUserId() { return localStorage.getItem('nx_userId') || 'user_' + Date.now(); }
+function getActiveUserId() {
+    let id = localStorage.getItem('nx_userId');
+    if (!id) {
+        id = 'user_' + Date.now();
+        localStorage.setItem('nx_userId', id);
+    }
+    return id;
+}
 function editTarget() { 
     const current = parseInt(localStorage.getItem('nx_target')) || 80;
     const newTarget = prompt('Enter completion rate target (%):', current);
