@@ -8,13 +8,16 @@ import { JobTrackerState } from './state.js';
 import { JobTrackerJobs } from './jobs.js';
 import { JobTrackerUtils } from './utils.js';
 
-const { STATUS, NOTE_TEMPLATES } = JobTrackerConstants;
+const { STATUS } = JobTrackerConstants;
 // accessor helpers
 const getState = () => JobTrackerState;
 const getJobOps = () => JobTrackerJobs;
 const getUtils = () => JobTrackerUtils;
 // supabase client is set globally during bridge initialization
 const getSupabase = () => window.supabaseClient;
+
+let notesWizardJobId = null;
+let notesWizardStep = 1;
 
 
 export const JobTrackerModals = {
@@ -309,6 +312,7 @@ export const JobTrackerModals = {
             const typeObj = types.find(t => t.code === job.type);
             const supportsInt = !!(typeObj && typeObj.int !== null && typeObj.int !== undefined);
             const statusCols = supportsInt ? 'repeat(4,1fr)' : 'repeat(3,1fr)';
+            const supportsNotesWizard = ['OH', 'UG', 'HyOH', 'HyUG'].includes(job.type) || (job.type === 'BTTW' && job.isUpgraded);
 
             const statusBtn = (s, label, bg, color = '#fff') => {
                 const active = job.status === s;
@@ -374,11 +378,7 @@ export const JobTrackerModals = {
 
             <div style="margin-top:10px;">
                 <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:6px;">Notes Assistant</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                    ${Object.keys(NOTE_TEMPLATES).filter(name => name !== 'Custom').map(name =>
-                        `<button class="btn" style="margin:0; background:var(--border); color:var(--text-main); font-size:0.72rem; padding:10px 6px;" onclick="JobTrackerModals.applyNoteTemplate('${name.replace(/'/g, "\\'")}')">${name}</button>`
-                    ).join('')}
-                </div>
+                ${supportsNotesWizard ? `<button class="btn" style="margin:0 0 8px 0; background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.openNotesWizard('${jobId}')">NOTES ASSISTANT</button>` : ''}
             </div>
 
             ${canManageFlags ? `
@@ -494,18 +494,402 @@ export const JobTrackerModals = {
     },
 
     /**
-     * Insert a notes template into the edit notes field.
+     * Open the original guided FTTP notes assistant modal.
      */
-    applyNoteTemplate(templateName) {
-        const notesField = document.getElementById('edit-notes');
-        if (!notesField) return;
+    openNotesWizard(jobId) {
+        notesWizardJobId = jobId;
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:16px;">FTTP Notes Generator</h3>
+            <div id="fttp-wizard">
+                <div class="step" data-step="1">
+                    <label>Span</label>
+                    <div class="btn-group">
+                        <button class="option-btn" data-value="Pole">Pole</button>
+                        <button class="option-btn" data-value="Pit">Pit</button>
+                    </div>
+                </div>
+                <div class="step" data-step="2">
+                    <label>CBT</label>
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Port</label>
+                            <div class="btn-group" style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;">
+                                ${Array.from({ length: 12 }, (_, i) => `<button class="option-btn" data-value="${i + 1}">${i + 1}</button>`).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Light (dBm)</label>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <button type="button" class="inc" data-target="cbt-light" data-step="-0.1">-</button>
+                                <input type="text" id="cbt-light" class="light-input" value="-15.0" style="flex:1; min-height:48px;" oninput="JobTrackerModals.validateLight(this)">
+                                <button type="button" class="inc" data-target="cbt-light" data-step="0.1">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="step" data-step="3">
+                    <label>ONT</label>
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Manufacturer</label>
+                            <div class="btn-group">
+                                <button class="option-btn" data-value="Adtran">Adtran</button>
+                                <button class="option-btn" data-value="Nokia">Nokia</button>
+                                <button class="option-btn" data-value="Zyxel">Zyxel</button>
+                                <button class="option-btn" data-value="Other">Other</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Light (dBm)</label>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <button type="button" class="inc" data-target="ont-light" data-step="-0.1">-</button>
+                                <input type="text" id="ont-light" class="light-input" value="-15.0" style="flex:1; min-height:48px;" oninput="JobTrackerModals.validateLight(this)">
+                                <button type="button" class="inc" data-target="ont-light" data-step="0.1">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="step" data-step="4">
+                    <label>CSP</label>
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Type</label>
+                            <div class="btn-group">
+                                <button class="option-btn" data-value="Internal">Internal</button>
+                                <button class="option-btn" data-value="External">External</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Splice Loss (dB)</label>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <button type="button" class="inc" data-target="splice-loss" data-step="-0.01">-</button>
+                                <input type="text" id="splice-loss" class="light-input" value="0.03" style="flex:1; min-height:48px;" oninput="JobTrackerModals.validateSplice(this)">
+                                <button type="button" class="inc" data-target="splice-loss" data-step="0.01">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="step" data-step="5">
+                    <label>Cable</label>
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Rip (m)</label>
+                            <div class="btn-group" style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;">
+                                <button class="option-btn" data-value="0" data-type="rip">0m</button>
+                                <button class="option-btn" data-value="5" data-type="rip">5m</button>
+                                <button class="option-btn" data-value="10" data-type="rip">10m</button>
+                                <button class="option-btn" data-value="15" data-type="rip">15m</button>
+                                <button class="option-btn" data-value="20" data-type="rip">20m</button>
+                                <button class="option-btn" data-value="30" data-type="rip">30m</button>
+                                <button class="option-btn" data-value="40" data-type="rip">40m</button>
+                                <button class="option-btn" data-value="50" data-type="rip">50m</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Drop (m)</label>
+                            <div class="btn-group" style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.5rem;">
+                                <button class="option-btn" data-value="35" data-type="drop">35m</button>
+                                <button class="option-btn" data-value="65" data-type="drop">65m</button>
+                                <button class="option-btn" data-value="105" data-type="drop">105m</button>
+                                <button class="option-btn" data-value="160+" data-type="drop">160m+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="step" data-step="6">
+                    <label>Router</label>
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Status</label>
+                            <div class="btn-group">
+                                <button class="option-btn" data-value="Online">Online</button>
+                                <button class="option-btn" data-value="Offline">Offline</button>
+                                <button class="option-btn" data-value="No Router">No Router</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:1rem; color:var(--text-main); font-weight:600; margin-bottom:0.5rem; display:block;">Speed (Mbps)</label>
+                            <input type="text" id="router-speed" class="light-input" value="500" style="width:100%; min-height:48px;">
+                        </div>
+                    </div>
+                </div>
+                <div class="step" data-step="7">
+                    <label>Live & Proven</label>
+                    <div class="btn-group">
+                        <button class="option-btn" data-value="Yes">Yes</button>
+                        <button class="option-btn" data-value="No">No</button>
+                    </div>
+                </div>
+                <div class="nav-btns">
+                    <button id="prev-fttp" class="nav-btn">Back</button>
+                    <button id="next-fttp" class="nav-btn">Next</button>
+                </div>
+            </div>
+            <pre id="fttp-output" style="margin-top:2rem; padding:1rem; background:var(--surface-t); border-radius:8px; border:1px solid var(--border-t); white-space:pre-wrap; font-family:monospace; display:none;"></pre>
+            <button id="apply-fttp" style="margin-top:1rem; padding:0.5rem 1rem; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer; display:none;" onclick="JobTrackerModals.applyFTTPNotes()">Apply to Notes</button>
+        `;
 
-        const template = NOTE_TEMPLATES[templateName] || '';
-        if (!template) return;
+        this.showModal(content);
+        this.initFTTPWizard();
+    },
 
-        const current = notesField.value?.trim();
-        notesField.value = current ? `${current}\n\n${template}` : template;
-        notesField.focus();
+    validateLight(input) {
+        const val = parseFloat(input.value);
+        if (Number.isNaN(val)) {
+            input.style.color = 'var(--text-main)';
+            return;
+        }
+        input.style.color = (val > -14 || val < -25) ? 'var(--danger)' : 'var(--success)';
+    },
+
+    validateSplice(input) {
+        const val = parseFloat(input.value);
+        if (Number.isNaN(val)) {
+            input.style.color = 'var(--text-main)';
+            return;
+        }
+        input.style.color = (val < 0 || val > 0.05) ? 'var(--danger)' : 'var(--success)';
+    },
+
+    initFTTPWizard() {
+        notesWizardStep = 1;
+        this.updateFTTPWizardDisplay();
+
+        const state = getState();
+        const job = state.getJob(notesWizardJobId);
+        const defaultSpan = (job && (['UG', 'HyUG'].includes(job.type) || (job.type === 'BTTW' && job.isUpgraded))) ? 'Pit' : 'Pole';
+
+        const defaults = [
+            { step: 1, val: defaultSpan },
+            { step: 2, val: '8' },
+            { step: 3, val: 'Nokia' },
+            { step: 4, val: 'External' },
+            { step: 5, val: '5', type: 'rip' },
+            { step: 5, val: '65', type: 'drop' },
+            { step: 6, val: 'Online' },
+            { step: 7, val: 'Yes' }
+        ];
+
+        document.querySelectorAll('#fttp-wizard .option-btn').forEach(btn => {
+            btn.classList.remove('selected');
+            btn.onclick = () => {
+                const stepContainer = btn.closest('.step');
+                if (!stepContainer) return;
+                const stepNum = parseInt(stepContainer.getAttribute('data-step'), 10);
+
+                if (stepNum === 7 && btn.getAttribute('data-value') === 'Yes') {
+                    const routerSel = document.querySelector('.step[data-step="6"] .option-btn.selected');
+                    if (routerSel && routerSel.getAttribute('data-value') !== 'Online') return;
+                }
+
+                const siblings = btn.parentElement.querySelectorAll('.option-btn');
+                siblings.forEach(s => s.classList.remove('selected'));
+                btn.classList.add('selected');
+
+                if ([1, 4, 7].includes(stepNum)) {
+                    setTimeout(() => JobTrackerModals.nextFTTPWizardStep(), 300);
+                }
+
+                if (stepNum === 6) {
+                    const routerVal = btn.getAttribute('data-value');
+                    const speedInput = document.getElementById('router-speed');
+                    if (routerVal !== 'Online') {
+                        if (speedInput) {
+                            speedInput.value = 'N/A';
+                            speedInput.disabled = true;
+                            speedInput.style.opacity = '0.4';
+                        }
+                        const lpBtns = document.querySelectorAll('.step[data-step="7"] .option-btn');
+                        lpBtns.forEach(lp => {
+                            lp.classList.remove('selected');
+                            if (lp.getAttribute('data-value') === 'No') lp.classList.add('selected');
+                        });
+                    } else if (speedInput) {
+                        speedInput.value = '500';
+                        speedInput.disabled = false;
+                        speedInput.style.opacity = '1';
+                    }
+                }
+
+                if (stepNum === 7) JobTrackerModals.generateFTTPNotes();
+            };
+        });
+
+        defaults.forEach(d => {
+            let selector = `.step[data-step="${d.step}"] .option-btn[data-value="${d.val}"]`;
+            if (d.type) selector += `[data-type="${d.type}"]`;
+            const btn = document.querySelector(selector);
+            if (btn) btn.classList.add('selected');
+        });
+
+        const cbtLight = document.getElementById('cbt-light');
+        const ontLight = document.getElementById('ont-light');
+        const spliceLoss = document.getElementById('splice-loss');
+        if (cbtLight) this.validateLight(cbtLight);
+        if (ontLight) this.validateLight(ontLight);
+        if (spliceLoss) this.validateSplice(spliceLoss);
+
+        document.querySelectorAll('#fttp-wizard .inc').forEach(btn => {
+            btn.onclick = () => {
+                const target = btn.getAttribute('data-target');
+                const delta = parseFloat(btn.getAttribute('data-step'));
+                const input = document.getElementById(target);
+                if (!input) return;
+                let val = parseFloat(input.value) || 0;
+                val += delta;
+
+                if (Math.abs(delta) < 0.1) {
+                    val = Math.round(val * 100) / 100;
+                    if (val < 0) val = 0;
+                    if (target === 'splice-loss' && val > 0.05) val = 0.05;
+                    input.value = val.toFixed(2);
+                    JobTrackerModals.validateSplice(input);
+                } else {
+                    val = Math.round(val * 10) / 10;
+                    input.value = val.toFixed(1);
+                    JobTrackerModals.validateLight(input);
+                }
+            };
+        });
+
+        const prevBtn = document.getElementById('prev-fttp');
+        const nextBtn = document.getElementById('next-fttp');
+        if (prevBtn) prevBtn.onclick = () => this.prevFTTPWizardStep();
+        if (nextBtn) nextBtn.onclick = () => this.nextFTTPWizardStep();
+    },
+
+    updateFTTPWizardDisplay() {
+        document.querySelectorAll('#fttp-wizard .step').forEach(step => {
+            const stepNumber = parseInt(step.getAttribute('data-step'), 10);
+            step.classList.toggle('active', stepNumber === notesWizardStep);
+        });
+
+        const prevBtn = document.getElementById('prev-fttp');
+        const nextBtn = document.getElementById('next-fttp');
+        if (prevBtn) prevBtn.style.display = notesWizardStep > 1 ? 'inline-block' : 'none';
+        if (nextBtn) nextBtn.style.display = notesWizardStep < 7 ? 'inline-block' : 'none';
+    },
+
+    nextFTTPWizardStep() {
+        if (notesWizardStep < 7) {
+            notesWizardStep += 1;
+            this.updateFTTPWizardDisplay();
+            if (notesWizardStep === 7) this.generateFTTPNotes();
+        }
+    },
+
+    prevFTTPWizardStep() {
+        if (notesWizardStep > 1) {
+            notesWizardStep -= 1;
+            this.updateFTTPWizardDisplay();
+        }
+    },
+
+    getFTTPSelectedValue(step, type = '') {
+        let selector = `.step[data-step="${step}"] .option-btn.selected`;
+        if (type) selector = `.step[data-step="${step}"] button[data-type="${type}"].selected`;
+        return document.querySelector(selector)?.getAttribute('data-value');
+    },
+
+    generateFTTPNotes() {
+        const span = this.getFTTPSelectedValue(1) || 'Pole';
+        const cbtPort = this.getFTTPSelectedValue(2) || '8';
+        const cbtLight = document.getElementById('cbt-light')?.value || '-15.0';
+        const ontMake = this.getFTTPSelectedValue(3) || 'Nokia';
+        const ontLight = document.getElementById('ont-light')?.value || '-15.0';
+        const cspType = this.getFTTPSelectedValue(4) || 'External';
+        const cspLoss = document.getElementById('splice-loss')?.value || '0.03';
+        const rip = this.getFTTPSelectedValue(5, 'rip') || '5';
+        const drop = this.getFTTPSelectedValue(5, 'drop') || '65';
+        const routerStatus = this.getFTTPSelectedValue(6) || 'Online';
+        const routerSpeed = document.getElementById('router-speed')?.value || '500';
+
+        const isOnline = routerStatus === 'Online';
+        const effectiveSpeed = isOnline ? routerSpeed : 'N/A';
+        const liveProven = isOnline ? (this.getFTTPSelectedValue(7) || 'Yes') : 'No';
+        const routerLine = isOnline ? `Router: ${routerStatus}/${effectiveSpeed}Mbps` : `Router: ${routerStatus}`;
+
+        const notes = [
+            'FTTP provided',
+            `Span: ${span} to Premises`,
+            `CBT: Port${cbtPort} / ${cbtLight}dBm`,
+            `ONT: ${ontMake} / ${ontLight}dBm`,
+            `CSP: ${cspType} / ${cspLoss}dB`,
+            `Cable: Rip ${rip}m / Drop ${drop}m`,
+            routerLine,
+            `Live & proven: ${liveProven}`
+        ].join('\n');
+
+        const output = document.getElementById('fttp-output');
+        const applyBtn = document.getElementById('apply-fttp');
+        if (!output || !applyBtn) return;
+
+        output.textContent = notes;
+        output.style.display = 'block';
+        applyBtn.textContent = 'Apply to Notes & Copy to Clipboard';
+        applyBtn.style.display = 'block';
+    },
+
+    async applyFTTPNotes() {
+        const state = getState();
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+
+        const output = document.getElementById('fttp-output');
+        if (!output) return;
+        if (!output.textContent) this.generateFTTPNotes();
+
+        const textToApply = output.textContent || '';
+        if (!textToApply) {
+            this.customAlert('Error', 'No notes to apply. Please complete the wizard.', true);
+            return;
+        }
+
+        const job = state.getJob(notesWizardJobId);
+        if (!job) {
+            this.customAlert('Error', 'Job not found. Please reopen the editor and try again.', true);
+            return;
+        }
+
+        try {
+            await jobOps.updateJob(notesWizardJobId, { notes: textToApply });
+
+            let copied = false;
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(textToApply);
+                    copied = true;
+                }
+            } catch (_) {
+                copied = false;
+            }
+
+            if (!copied) {
+                const textArea = document.createElement('textarea');
+                textArea.value = textToApply;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                textArea.style.top = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    copied = document.execCommand('copy');
+                } catch (_) {
+                    copied = false;
+                }
+                document.body.removeChild(textArea);
+            }
+
+            this.closeModal();
+            if (copied) showToast('Applied to job and copied to clipboard');
+            else showToast('Applied to job (clipboard copy failed)');
+
+            setTimeout(() => this.editJob(notesWizardJobId), 100);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
     },
 
     /**
