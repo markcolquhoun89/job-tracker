@@ -130,6 +130,8 @@ export const JobTrackerModals = {
             const autoFee = jobOps.calculateJobFee(job);
             const currentFee = parseFloat(job.fee || 0);
             const isManual = job.manualFee || false;
+            const role = (state.userRole || '').toLowerCase();
+            const canManageFlags = role === 'admin' || role === 'manager';
 
             // Determine if this job type supports Internals
             const typeObj = types.find(t => t.code === job.type);
@@ -206,6 +208,24 @@ export const JobTrackerModals = {
                     ).join('')}
                 </div>
             </div>
+
+            ${canManageFlags ? `
+            <div style="margin-top:12px; padding:12px; border:1px solid var(--border-subtle); border-radius:8px; background:var(--surface-elev);">
+                <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:8px;">Admin Flags</div>
+
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                    <div style="font-size:0.8rem; color:var(--text-main);">ELF ${job.elf ? '🧝' : ''}</div>
+                    <button class="btn" style="margin:0; padding:8px 10px; font-size:0.75rem; background:${job.elf ? 'var(--danger)' : 'var(--warning)'};" onclick="JobTrackerModals.toggleELF('${jobId}')">${job.elf ? 'REMOVE' : 'ADD'}</button>
+                </div>
+
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    <div style="font-size:0.8rem; color:var(--text-main);">Candid ${job.candids ? '📷' : ''}</div>
+                    <button class="btn" style="margin:0; padding:8px 10px; font-size:0.75rem; background:${job.candids ? 'var(--danger)' : 'var(--warning)'};" onclick="JobTrackerModals.editCandid('${jobId}')">${job.candids ? 'EDIT/REMOVE' : 'ADD'}</button>
+                </div>
+
+                ${job.candids ? `<div style="font-size:0.72rem; color:var(--text-muted); margin-top:8px;">Reason: ${sanitizeHTML(job.candidsReason || 'Flagged')}</div>` : ''}
+            </div>
+            ` : ''}
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;">
                 <button class="btn" style="background:var(--danger);" onclick="JobTrackerModals.deleteJobConfirm('${jobId}')">Delete</button>
@@ -304,6 +324,64 @@ export const JobTrackerModals = {
         const current = notesField.value?.trim();
         notesField.value = current ? `${current}\n\n${template}` : template;
         notesField.focus();
+    },
+
+    /**
+     * Toggle ELF flag for admin/manager users.
+     */
+    async toggleELF(jobId) {
+        const state = getState();
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        const job = state.getJob(jobId);
+        if (!job) return;
+
+        try {
+            const next = !job.elf;
+            await jobOps.updateJob(jobId, {
+                elf: next,
+                elfAddedDate: next ? new Date().toISOString() : null
+            });
+            showToast(next ? 'ELF flag added' : 'ELF flag removed');
+            await this.editJob(jobId);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
+    },
+
+    /**
+     * Add, update, or remove Candid flag for admin/manager users.
+     */
+    async editCandid(jobId) {
+        const state = getState();
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        const job = state.getJob(jobId);
+        if (!job) return;
+
+        try {
+            if (job.candids) {
+                const remove = window.confirm('Remove Candid flag? Click Cancel to edit reason.');
+                if (remove) {
+                    await jobOps.updateJob(jobId, { candids: false, candidsReason: '' });
+                    showToast('Candid flag removed');
+                    await this.editJob(jobId);
+                    return;
+                }
+            }
+
+            const reason = window.prompt('Enter Candid reason:', job.candidsReason || '');
+            if (reason === null) return;
+
+            await jobOps.updateJob(jobId, {
+                candids: true,
+                candidsReason: reason.trim() || 'Flagged'
+            });
+            showToast('Candid flag saved');
+            await this.editJob(jobId);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
     },
 
     /**
