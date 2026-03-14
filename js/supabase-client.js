@@ -172,6 +172,7 @@ export class SupabaseClient {
     await this.signOut();
     // Let listeners know to wipe all data
     window.dispatchEvent(new Event('supabase:wipe-data'));
+    return { success: true };
   }
 
   persistSession(user) {

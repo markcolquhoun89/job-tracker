@@ -180,7 +180,7 @@ export const JobTrackerModals = {
         `;
 
             console.log('About to show modal for job:', jobId);
-            this.showModal(content);
+            JobTrackerModals.showModal(content);
             console.log('Modal displayed');
         } catch (error) {
             console.error('Error in editJob:', error);
@@ -511,10 +511,12 @@ export const JobTrackerModals = {
      */
     async showProfile() {
         const { sanitizeHTML } = getUtils();
+        const state = getState();
         const session = JSON.parse(localStorage.getItem('nx_supabase_session') || 'null');
         const user = session?.user || {};
         const email = sanitizeHTML(user?.email || 'Unknown');
         const displayName = sanitizeHTML(user?.user_metadata?.display_name || localStorage.getItem('nx_displayName') || 'User');
+        const userLevel = sanitizeHTML((state?.userRole || user?.user_metadata?.role || 'engineer').toString());
         const content = `
             <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
             <h3 style="margin-bottom:8px;">Profile</h3>
@@ -527,6 +529,10 @@ export const JobTrackerModals = {
                 <div style="padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--surface-elev);">
                     <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:4px;">Email</div>
                     <div style="font-weight:700;">${email}</div>
+                </div>
+                <div style="padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--surface-elev);">
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:4px;">User Level</div>
+                    <div style="font-weight:700; text-transform:capitalize;">${userLevel}</div>
                 </div>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -545,13 +551,11 @@ export const JobTrackerModals = {
             return;
         }
 
-        const result = await client.signOut();
+        const result = await client.fullLogout();
         if (result?.success) {
             JobTrackerModals.closeModal();
             showToast('Signed out', 1500);
-            if (window.appRender) {
-                window.appRender();
-            }
+            setTimeout(() => window.location.reload(), 350);
         } else {
             this.customAlert('Sign Out Error', result?.error || 'Unable to sign out', true);
         }
