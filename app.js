@@ -577,25 +577,39 @@ async function batchSetStatus(status) {
 // Background Animation
 // ===========================
 
+let bgAnimationFrame = null;
+
+function stopBackgroundAnimation() {
+    if (bgAnimationFrame) {
+        cancelAnimationFrame(bgAnimationFrame);
+        bgAnimationFrame = null;
+    }
+}
+
 function initBackgroundAnimation() {
     const canvas = document.getElementById('bg-canvas');
     if (!canvas) return;
-    
+
+    stopBackgroundAnimation();
+
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    
-    const bgAnim = state.getSetting('nx_bg_anim', 'particles');
-    
+
+    const bgAnim = state.getSetting('nx_bg_anim', localStorage.getItem('nx_bg_anim') || 'particles');
+
     if (bgAnim === 'none') {
         canvas.style.display = 'none';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         return;
     }
-    
+
+    canvas.style.display = 'block';
+
     // Simple particle animation
     const particles = [];
     const particleCount = 50;
-    
+
     for (let i = 0; i < particleCount; i++) {
         particles.push({
             x: Math.random() * canvas.width,
@@ -605,30 +619,59 @@ function initBackgroundAnimation() {
             radius: Math.random() * 2 + 1
         });
     }
-    
+
+    const waveLines = [
+        { amp: 18, len: 0.012, speed: 0.018, offset: 0, y: 0.3 },
+        { amp: 24, len: 0.009, speed: 0.014, offset: 1.7, y: 0.5 },
+        { amp: 16, len: 0.015, speed: 0.021, offset: 3.2, y: 0.7 }
+    ];
+    let tick = 0;
+
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         const isDark = !document.documentElement.hasAttribute('data-theme') || 
                       document.documentElement.getAttribute('data-theme') !== 'light';
-        ctx.fillStyle = isDark ? 'rgba(88, 166, 255, 0.1)' : 'rgba(9, 105, 218, 0.15)';
-        
-        particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-            
-            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-            
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        
-        requestAnimationFrame(animate);
+
+        if (bgAnim === 'particles') {
+            ctx.fillStyle = isDark ? 'rgba(88, 166, 255, 0.1)' : 'rgba(9, 105, 218, 0.15)';
+
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        } else if (bgAnim === 'waves') {
+            tick += 1;
+            waveLines.forEach((line, index) => {
+                ctx.beginPath();
+                ctx.lineWidth = index === 1 ? 2.5 : 1.5;
+                ctx.strokeStyle = isDark
+                    ? `rgba(88, 166, 255, ${0.12 + index * 0.06})`
+                    : `rgba(9, 105, 218, ${0.16 + index * 0.05})`;
+
+                for (let x = 0; x <= canvas.width; x += 8) {
+                    const y = canvas.height * line.y + Math.sin((x * line.len) + (tick * line.speed) + line.offset) * line.amp;
+                    if (x === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            });
+        }
+
+        bgAnimationFrame = requestAnimationFrame(animate);
     }
-    
-    if (bgAnim === 'particles') {
+
+    if (bgAnim === 'particles' || bgAnim === 'waves') {
         animate();
     }
 }
@@ -2057,12 +2100,9 @@ function buildBgAnimOptions() {
     var anims = [
         { id: 'waves', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>', label: 'Waves' },
         { id: 'particles', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="6" r="1"/><circle cx="19" cy="6" r="1"/><circle cx="6" cy="18" r="1"/><circle cx="18" cy="18" r="1"/><path d="M12 12L5 6"/><path d="M12 12l7-6"/><path d="M12 12l-6 6"/><path d="M12 12l6 6"/></svg>', label: 'Particles' },
-        { id: 'matrix', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><line x1="14" y1="4" x2="10" y2="20"/></svg>', label: 'Matrix' },
-        { id: 'aurora', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9c3-4 7-4 10 0s7 4 10 0"/><path d="M2 15c3-4 7-4 10 0s7 4 10 0"/></svg>', label: 'Aurora' },
-        { id: 'constellation', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', label: 'Stars' },
         { id: 'none', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>', label: 'None' }
     ];
-    var current = localStorage.getItem('nx_bg_anim') || 'waves';
+    var current = state.getSetting('nx_bg_anim', localStorage.getItem('nx_bg_anim') || 'particles');
     return anims.map(function(a) {
         return '<div class="bg-anim-option ' + (current === a.id ? 'active' : '') + '" onclick="setBgAnimation(\'' + a.id + '\')"><span class="bg-anim-icon">' + a.icon + '</span><span class="bg-anim-label">' + a.label + '</span></div>';
     }).join('');
@@ -2132,9 +2172,13 @@ function pickGradient(index) {
     localStorage.setItem('nx_gradient', grad);
     localStorage.removeItem('nx_accent');
 }
-function setBgAnimation(id) {
+async function setBgAnimation(id) {
     localStorage.setItem('nx_bg_anim', id);
+    await state.saveSetting('nx_bg_anim', id);
     initBackgroundAnimation();
+    if (state.activeTab === 'settings' && typeof window.render === 'function') {
+        window.render(true);
+    }
 }
 function editTypeModal(typeName) {
     window.JobTrackerModals.editType(typeName);
