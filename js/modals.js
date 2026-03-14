@@ -223,9 +223,19 @@ export const JobTrackerModals = {
                     <button class="btn" style="margin:0; padding:8px 10px; font-size:0.75rem; background:${job.candids ? 'var(--danger)' : 'var(--warning)'};" onclick="JobTrackerModals.editCandid('${jobId}')">${job.candids ? 'EDIT/REMOVE' : 'ADD'}</button>
                 </div>
 
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px;">
+                    <div style="font-size:0.8rem; color:var(--text-main);">Chargeback ${job.chargeback ? '💸' : ''}</div>
+                    <button class="btn" style="margin:0; padding:8px 10px; font-size:0.75rem; background:${job.chargeback ? 'var(--danger)' : 'var(--warning)'};" onclick="JobTrackerModals.editChargeback('${jobId}')">${job.chargeback ? 'EDIT/REMOVE' : 'ADD'}</button>
+                </div>
+
                 ${job.candids ? `<div style="font-size:0.72rem; color:var(--text-muted); margin-top:8px;">Reason: ${sanitizeHTML(job.candidsReason || 'Flagged')}</div>` : ''}
+                ${job.chargeback ? `<div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Chargeback: £${Number(job.chargebackAmount || 0).toFixed(2)} (${sanitizeHTML(job.chargebackReason || 'other')})</div>` : ''}
             </div>
             ` : ''}
+
+            ${job.status !== STATUS.PENDING ? `<button class="btn" style="background:var(--border); color:var(--text-main); margin-top:12px;" onclick="JobTrackerModals.revertToPending('${jobId}')">↺ Revert To Pending</button>` : ''}
+
+            <button class="btn" style="background:var(--border); color:var(--text-main); margin-top:8px;" onclick="JobTrackerModals.duplicateJob('${jobId}')">Duplicate Job</button>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;">
                 <button class="btn" style="background:var(--danger);" onclick="JobTrackerModals.deleteJobConfirm('${jobId}')">Delete</button>
@@ -338,10 +348,8 @@ export const JobTrackerModals = {
 
         try {
             const next = !job.elf;
-            await jobOps.updateJob(jobId, {
-                elf: next,
-                elfAddedDate: next ? new Date().toISOString() : null
-            });
+            const ok = await jobOps.setELF(jobId, next);
+            if (!ok) throw new Error('Unable to update ELF flag');
             showToast(next ? 'ELF flag added' : 'ELF flag removed');
             await this.editJob(jobId);
         } catch (error) {
@@ -363,7 +371,8 @@ export const JobTrackerModals = {
             if (job.candids) {
                 const remove = window.confirm('Remove Candid flag? Click Cancel to edit reason.');
                 if (remove) {
-                    await jobOps.updateJob(jobId, { candids: false, candidsReason: '' });
+                    const ok = await jobOps.setCandids(jobId, false, '');
+                    if (!ok) throw new Error('Unable to remove Candid flag');
                     showToast('Candid flag removed');
                     await this.editJob(jobId);
                     return;
@@ -373,12 +382,115 @@ export const JobTrackerModals = {
             const reason = window.prompt('Enter Candid reason:', job.candidsReason || '');
             if (reason === null) return;
 
-            await jobOps.updateJob(jobId, {
-                candids: true,
-                candidsReason: reason.trim() || 'Flagged'
-            });
+            const ok = await jobOps.setCandids(jobId, true, reason.trim() || 'Flagged');
+            if (!ok) throw new Error('Unable to save Candid flag');
             showToast('Candid flag saved');
             await this.editJob(jobId);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
+    },
+
+    /**
+     * Add/update/remove chargeback details for admin/manager users.
+     */
+    async editChargeback(jobId) {
+        const state = getState();
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        const job = state.getJob(jobId);
+        if (!job) return;
+
+        try {
+            if (job.chargeback) {
+                const remove = window.confirm('Remove current chargeback? Click Cancel to edit it instead.');
+                if (remove) {
+                    const ok = await jobOps.removeChargeback(jobId);
+                    if (!ok) throw new Error('Unable to remove chargeback');
+                    showToast('Chargeback removed');
+                    await this.editJob(jobId);
+                    return;
+                }
+            }
+
+            const reasonInput = window.prompt(
+                'Chargeback reason (ELF, Candids, other):',
+                (job.chargebackReason || (job.candids ? 'Candids' : (job.elf ? 'ELF' : 'other')))
+            );
+            if (reasonInput === null) return;
+
+            const amountInput = window.prompt('Chargeback amount (£):', String(job.chargebackAmount || job.fee || 0));
+            if (amountInput === null) return;
+            const amount = parseFloat(amountInput);
+            if (!Number.isFinite(amount) || amount < 0) {
+                this.customAlert('Validation', 'Please enter a valid non-negative amount', true);
+                return;
+            }
+
+            const weekDefault = new Date().toISOString().split('T')[0];
+            const weekInput = window.prompt('Week date for deduction (YYYY-MM-DD):', weekDefault);
+            if (weekInput === null) return;
+            const weekDate = new Date(`${weekInput}T00:00:00`);
+            if (Number.isNaN(weekDate.getTime())) {
+                this.customAlert('Validation', 'Invalid date format. Use YYYY-MM-DD', true);
+                return;
+            }
+
+            const reasonRaw = (reasonInput || '').trim().toLowerCase();
+            const normalizedReason = reasonRaw === 'elf'
+                ? 'ELF'
+                : (reasonRaw === 'candids' ? 'Candids' : 'other');
+            const ok = await jobOps.addChargeback(jobId, normalizedReason, amount, weekDate.toDateString());
+            if (!ok) throw new Error('Unable to save chargeback');
+
+            showToast('Chargeback saved');
+            await this.editJob(jobId);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
+    },
+
+    /**
+     * Revert a completed/failed/internal job back to pending.
+     */
+    async revertToPending(jobId) {
+        const state = getState();
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        const job = state.getJob(jobId);
+        if (!job) return;
+
+        const confirmed = window.confirm('Revert this job to Pending status?');
+        if (!confirmed) return;
+
+        try {
+            await jobOps.updateJob(jobId, {
+                status: STATUS.PENDING,
+                fee: 0,
+                completedAt: null,
+                manualFee: false,
+                isUpgraded: false,
+                saturdayPremium: false,
+                baseFee: null
+            });
+            showToast('Job reverted to pending');
+            await this.editJob(jobId);
+        } catch (error) {
+            this.customAlert('Error', error.message, true);
+        }
+    },
+
+    /**
+     * Duplicate job for quick repeat entry.
+     */
+    async duplicateJob(jobId) {
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        try {
+            await jobOps.cloneJob(jobId);
+            this.closeModal();
+            showToast('Job duplicated');
+            if (window.render) window.render(true);
         } catch (error) {
             this.customAlert('Error', error.message, true);
         }
