@@ -1,169 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Job Tracker - New UI</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./ui-lab.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121212">
+    <title>Job Tracker - Modern UI</title>
+    <!-- Core UI Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="ui-lab.css">
 </head>
-<body class="motion-on" data-view="queue">
-  <canvas id="lab-canvas" aria-hidden="true"></canvas>
-  <div class="atmosphere" aria-hidden="true"></div>
+<body>
+    <div id="app-root">
+        <!-- Persistent Top Header -->
+        <header class="app-header">
+            <h1 id="header-title">Queue</h1>
+            <div class="header-actions">
+                <button id="btn-search" aria-label="Search" class="icon-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+                <button id="btn-add" class="primary-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    New Job
+                </button>
+            </div>
+        </header>
 
-  <div class="lab-shell">
+        <!-- Main Content Area (Scrollable) -->
+        <main id="main-content">
+            <!-- 1. Queue View -->
+            <section id="view-queue" class="view active">
+                <div class="list-filters">
+                    <select id="filter-status">
+                        <option value="all">All Jobs</option>
+                        <option value="active">Active (Created/Saved/Docs)</option>
+                        <option value="complete">Pending Payment (Done)</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
+                <div id="queue-list" class="job-list">
+                    <!-- Cards injected via JS -->
+                    <div class="empty-state">Loading jobs...</div>
+                </div>
+            </section>
+            
+            <!-- 2. Payweek View -->
+            <section id="view-payweek" class="view">
+                <div class="stats-overview">
+                    <div class="stat-card">
+                        <h3>This Week</h3>
+                        <div id="stat-week-total" class="stat-value">£0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Jobs Done</h3>
+                        <div id="stat-week-count" class="stat-value">0</div>
+                    </div>
+                </div>
+                <h2 class="section-title">Current Payweek Jobs</h2>
+                <div id="payweek-list" class="job-list">
+                    <!-- Cards injected via JS -->
+                </div>
+            </section>
+            
+            <!-- 3. History View -->
+            <section id="view-history" class="view">
+                <h2 class="section-title">Past Payweeks</h2>
+                <div id="history-list" class="history-list">
+                    <div class="empty-state">No history available</div>
+                </div>
+            </section>
+            
+            <!-- 4. Settings View -->
+            <section id="view-settings" class="view">
+                <h2 class="section-title">Preferences</h2>
+                <div class="settings-group">
+                    <div class="setting-item">
+                        <span>Dark Mode</span>
+                        <input type="checkbox" id="setting-theme" checked>
+                    </div>
+                    <div class="setting-item">
+                        <span>Compact Layout</span>
+                        <input type="checkbox" id="setting-compact">
+                    </div>
+                </div>
+                
+                <h2 class="section-title" style="margin-top: 24px;">Cloud Sync</h2>
+                <div class="settings-group">
+                    <button id="btn-force-sync" class="secondary-btn">Force Sync</button>
+                    <button id="btn-export" class="secondary-btn">Export Data</button>
+                </div>
+            </section>
+        </main>
 
-    <!-- -- Header --------------------------------------------------- -->
-    <header class="lab-header glass">
-      <div class="header-top">
-        <a class="pill-btn" href="./index.html"><span aria-hidden="true">&lt;</span> Live App</a>
-        <button id="auth-btn" class="pill-btn auth-pill" type="button">Account</button>
-      </div>
-      <div class="date-nav">
-        <button class="nav-arrow" id="prev-btn" type="button" onclick="labAdjDate(-1)">&#8249;</button>
-        <div class="date-center" id="lab-date-label">Today</div>
-        <button class="nav-arrow" id="next-btn" type="button" onclick="labAdjDate(1)">&#8250;</button>
-        <button class="today-chip" type="button" onclick="labGoToday()">Today</button>
-      </div>
-      <div class="range-bar">
-        <button class="range-chip active" data-range="day"   onclick="labSetRange('day',this)">Day</button>
-        <button class="range-chip"        data-range="week"  onclick="labSetRange('week',this)">Week</button>
-        <button class="range-chip"        data-range="month" onclick="labSetRange('month',this)">Month</button>
-        <button class="range-chip"        data-range="year"  onclick="labSetRange('year',this)">Year</button>
-      </div>
-    </header>
-
-    <!-- -- KPI strip ------------------------------------------------ -->
-    <section class="kpi-strip">
-      <article class="kpi glass">
-        <span>Pending</span>
-        <strong id="kpi-pending">0</strong>
-      </article>
-      <article class="kpi glass">
-        <span>Done</span>
-        <strong id="kpi-done">0</strong>
-      </article>
-      <article class="kpi glass">
-        <span>Rate</span>
-        <strong id="kpi-rate">--</strong>
-      </article>
-      <article class="kpi glass">
-        <span>Earned</span>
-        <strong id="kpi-pay">GBP 0</strong>
-      </article>
-    </section>
-
-    <!-- -- View stack ----------------------------------------------- -->
-    <main class="view-stack">
-
-      <!-- Queue -->
-      <section class="view-panel active" data-panel="queue">
-        <div class="view-head">
-          <h2>Job Queue</h2>
-          <p>Swipe right to complete, left to fail. Tap a card to edit.</p>
-        </div>
-        <div class="queue-tools glass">
-          <input id="queue-search" class="queue-search" type="search" placeholder="Search type, job ID or notes">
-          <select id="queue-filter" class="queue-select">
-            <option value="all">All statuses</option>
-            <option value="Pending">Pending</option>
-            <option value="Completed">Completed</option>
-            <option value="Internals">Internals</option>
-            <option value="Failed">Failed</option>
-          </select>
-        </div>
-        <div id="job-stream" class="job-stream bounce-scroll"></div>
-      </section>
-
-      <!-- Stats -->
-      <section class="view-panel" data-panel="stats">
-        <div class="view-head">
-          <h2>Statistics</h2>
-          <p>Performance for the selected period.</p>
-        </div>
-        <div id="stats-body" class="stats-body"></div>
-      </section>
-
-      <!-- Payweek -->
-      <section class="view-panel" data-panel="payweek">
-        <div class="view-head">
-          <h2>Pay Week</h2>
-          <p>Sat-Fri pay cycle overview.</p>
-        </div>
-        <div class="pay-card glass">
-          <small>Current week total</small>
-          <strong id="pay-figure">GBP 0.00</strong>
-          <p id="pay-detail">Loading...</p>
-        </div>
-        <div id="micro-bars" class="micro-bars glass"></div>
-      </section>
-
-      <!-- Toolkit -->
-      <section class="view-panel" data-panel="toolkit">
-        <div class="view-head">
-          <h2>UI Lab Settings</h2>
-          <p>Tune the prototype look while testing.</p>
-        </div>
-        <div class="tool-grid glass">
-          <label>
-            Motion
-            <button id="motion-toggle" class="pill-btn" type="button">On</button>
-          </label>
-          <label>
-            Accent
-            <input id="accent" type="color" value="#58a6ff">
-          </label>
-          <label>
-            Background
-            <input id="bg-intensity" type="range" min="15" max="90" value="52">
-          </label>
-          <label>
-            Particle Density
-            <select id="density">
-              <option value="regular">Regular</option>
-              <option value="dense">Dense</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <label>
-            Idle Style
-            <select id="idle-pack">
-              <option value="pulse">Pulse</option>
-              <option value="drift">Drift</option>
-              <option value="calm">Calm</option>
-            </select>
-          </label>
-        </div>
-      </section>
-
-    </main>
-
-    <!-- -- Bottom nav ----------------------------------------------- -->
-    <nav class="smart-nav glass" aria-label="UI Lab Navigation">
-      <button class="nav-chip active" data-view="queue"   onclick="setLabView('queue')">Queue</button>
-      <button class="nav-chip"        data-view="stats"   onclick="setLabView('stats')">Stats</button>
-      <button class="nav-chip"        data-view="payweek" onclick="setLabView('payweek')">Payweek</button>
-      <button class="nav-chip"        data-view="toolkit" onclick="setLabView('toolkit')">Toolkit</button>
-    </nav>
-
-    <!-- -- Thumb dock ----------------------------------------------- -->
-    <div class="thumb-dock">
-      <button id="add-job-btn" class="thumb-btn primary" type="button">+ Add Job</button>
-      <button class="thumb-btn" type="button" onclick="labGoToday()">Today</button>
+        <!-- Persistent Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="view-queue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+                <span class="label">Queue</span>
+            </button>
+            <button class="nav-item" data-target="view-payweek">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                <span class="label">Payweek</span>
+            </button>
+            <button class="nav-item" data-target="view-history">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span class="label">History</span>
+            </button>
+            <button class="nav-item" data-target="view-settings">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span class="label">Settings</span>
+            </button>
+        </nav>
     </div>
 
-  </div>
+    <!-- Modals Layer (Overlays Main App) -->
+    <div id="modal-container" class="hidden">
+        <div class="modal-backdrop"></div>
+        <!-- Tap-to-expand Action Sheet -->
+        <div id="job-action-sheet" class="bottom-sheet hidden">
+            <div class="sheet-drag-handle"></div>
+            <h3 id="sheet-job-title">Job Actions</h3>
+            <div class="sheet-actions">
+                <button class="sheet-btn" data-action="status-done">
+                    <span class="icon">✅</span> Mark as Done
+                </button>
+                <button class="sheet-btn" data-action="status-paid">
+                    <span class="icon">💳</span> Mark as Paid
+                </button>
+                <button class="sheet-btn" data-action="edit">
+                    <span class="icon">✏️</span> Edit Details
+                </button>
+                <button class="sheet-btn danger" data-action="delete">
+                    <span class="icon">🗑️</span> Delete Job
+                </button>
+            </div>
+            <button class="sheet-cancel" id="btn-close-sheet">Cancel</button>
+        </div>
+    </div>
 
-  <!-- -- Modal (required by modals.js) ------------------------------- -->
-  <div id="modal" class="modal-backdrop" style="display:none"
-       onclick="if(event.target===this && !this.dataset.nodismiss) JobTrackerModals.closeModal()">
-    <div class="modal-box glass" id="modal-body" onclick="event.stopPropagation()"></div>
-  </div>
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-  <script type="module" src="./ui-lab.js"></script>
+    <script type="module" src="ui-lab.js"></script>
 </body>
 </html>
