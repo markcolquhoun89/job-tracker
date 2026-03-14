@@ -9,7 +9,6 @@
 
 import { JobTrackerConstants } from './js/constants.js';
 import { JobTrackerUtils } from './js/utils.js';
-import { JobTrackerDB } from './js/database.js';
 import { JobTrackerState } from './js/state.js';
 import { JobTrackerCalculations } from './js/calculations.js';
 import { JobTrackerJobs } from './js/jobs.js';
@@ -60,13 +59,12 @@ function updateAuthButton() {
 }
 
 // Locals for convenience
-const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = JobTrackerConstants;
+const { STATUS } = JobTrackerConstants;
 const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = JobTrackerUtils;
-const { db, STORES } = JobTrackerDB;
 const state = JobTrackerState;
-const { calculate, updatePersonalBests, getProjection, getExpensesForScope, getGoal, saveGoal, getTaxRate, setTaxRate, getPayPeriodHistory, getPreviousPeriodStats, getPayPeriod } = JobTrackerCalculations;
+const { calculate, updatePersonalBests, getProjection, getGoal, saveGoal, getTaxRate, getPayPeriodHistory, getPayPeriod } = JobTrackerCalculations;
 const jobOps = JobTrackerJobs;
-const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculationDialog, showDataManagement } = JobTrackerModals;
+const { customAlert, editJob: editJobModal } = JobTrackerModals;
 
 // ===========================
 // Application Initialization

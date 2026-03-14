@@ -6,7 +6,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: 'index.html'
+      input: {
+        main: 'index.html',
+        uiLab: 'ui-lab.html'
+      }
     }
   },
   server: {

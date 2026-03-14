@@ -4,11 +4,9 @@
  */
 
 import { JobTrackerConstants } from './constants.js';
-import { JobTrackerUtils } from './utils.js';
 import { JobTrackerState } from './state.js';
 
 const { STATUS } = JobTrackerConstants;
-const { isSaturday, calculateSaturdayFee, getBaseFeeFromSaturday } = JobTrackerUtils;
 const state = JobTrackerState;
 
 export const JobTrackerCalculations = {
