@@ -198,6 +198,15 @@ export const JobTrackerModals = {
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block; margin-top:12px;">Notes</label>
             <textarea id="edit-notes" class="input-box" rows="4" placeholder="Add notes...">${sanitizeHTML(job.notes || '')}</textarea>
 
+            <div style="margin-top:10px;">
+                <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:6px;">Notes Assistant</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    ${Object.keys(NOTE_TEMPLATES).filter(name => name !== 'Custom').map(name =>
+                        `<button class="btn" style="margin:0; background:var(--border); color:var(--text-main); font-size:0.72rem; padding:10px 6px;" onclick="JobTrackerModals.applyNoteTemplate('${name.replace(/'/g, "\\'")}')">${name}</button>`
+                    ).join('')}
+                </div>
+            </div>
+
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;">
                 <button class="btn" style="background:var(--danger);" onclick="JobTrackerModals.deleteJobConfirm('${jobId}')">Delete</button>
                 <button class="btn" onclick="JobTrackerModals.saveJobEdit('${jobId}')">Save</button>
@@ -280,6 +289,21 @@ export const JobTrackerModals = {
             const isSat = JobTrackerUtils.isSaturday(date);
             feeInfo.innerHTML = `<span>Auto: £${autoFee.toFixed(2)}${isSat && status === STATUS.COMPLETED ? ' (Sat 1.5×)' : ''}</span>`;
         }
+    },
+
+    /**
+     * Insert a notes template into the edit notes field.
+     */
+    applyNoteTemplate(templateName) {
+        const notesField = document.getElementById('edit-notes');
+        if (!notesField) return;
+
+        const template = NOTE_TEMPLATES[templateName] || '';
+        if (!template) return;
+
+        const current = notesField.value?.trim();
+        notesField.value = current ? `${current}\n\n${template}` : template;
+        notesField.focus();
     },
 
     /**
