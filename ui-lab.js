@@ -8,9 +8,10 @@ import { JobTrackerJobs } from './js/jobs.js';
  */
 class UILab {
     constructor() {
-        this.state = new JobTrackerState();
-        this.calculations = new JobTrackerCalculations(this.state);
-        this.jobs = new JobTrackerJobs(this.state, this.calculations);
+        // Use the singleton instances directly
+        this.state = JobTrackerState;
+        this.calculations = JobTrackerCalculations;
+        this.jobs = JobTrackerJobs;
 
         this.currentView = 'jobs';
         this.currentDate = new Date();
@@ -486,15 +487,20 @@ class UILab {
 
     renderPayweekView() {
         const payweekStats = document.querySelector('.payweek-stats');
-        const calculations = this.calculations.getPayweekCalculations(this.currentDate);
+        const payPeriod = this.calculations.getPayPeriod(this.currentDate);
+        const periodJobs = this.state.jobs.filter(job => {
+            const jobDate = new Date(job.date + 'T00:00:00');
+            return jobDate >= payPeriod.start && jobDate <= payPeriod.end;
+        });
+        const calculations = this.calculations.calculate(periodJobs);
 
         payweekStats.innerHTML = `
             <div class="stat-large">
-                <div class="stat-value">$${calculations.totalEarnings.toFixed(2)}</div>
+                <div class="stat-value">$${calculations.totalCash.toFixed(2)}</div>
                 <div class="stat-label">Total Earnings</div>
             </div>
             <div class="stat-large">
-                <div class="stat-value">${calculations.completedJobs}</div>
+                <div class="stat-value">${calculations.done}</div>
                 <div class="stat-label">Completed Jobs</div>
             </div>
         `;
@@ -518,23 +524,25 @@ class UILab {
     }
 
     renderStatsSummary(container) {
-        const stats = this.calculations.getPeriodStats(this.currentDate, this.selectedRange);
+        // Get jobs for the current period based on selected range
+        const periodJobs = this.getJobsForPeriod();
+        const stats = this.calculations.calculate(periodJobs);
 
         container.innerHTML = `
             <div class="stat-card">
-                <div class="stat-value">${stats.totalJobs}</div>
+                <div class="stat-value">${periodJobs.length}</div>
                 <div class="stat-label">Total Jobs</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${stats.completedJobs}</div>
+                <div class="stat-value">${stats.done}</div>
                 <div class="stat-label">Completed</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">$${stats.totalEarnings.toFixed(2)}</div>
+                <div class="stat-value">$${stats.totalCash.toFixed(2)}</div>
                 <div class="stat-label">Earnings</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">$${stats.averageJob.toFixed(2)}</div>
+                <div class="stat-value">$${stats.avgJobPay}</div>
                 <div class="stat-label">Average</div>
             </div>
         `;
@@ -542,7 +550,7 @@ class UILab {
 
     // Job Management
     getJobsForPeriod() {
-        return this.jobs.getJobsInPeriod(this.currentDate, this.selectedRange);
+        return this.jobs.getJobsInScope(this.currentDate, this.selectedRange);
     }
 
     createJobCard(job) {
@@ -560,7 +568,7 @@ class UILab {
                         ${job.notes ? `<span>📝</span>` : ''}
                     </div>
                 </div>
-                <div class="job-price">$${job.price ? job.price.toFixed(2) : '0.00'}</div>
+                <div class="job-price">$${job.fee ? parseFloat(job.fee).toFixed(2) : '0.00'}</div>
             </div>
         `;
     }
@@ -641,7 +649,7 @@ class UILab {
             status: 'pending'
         };
 
-        if (this.jobs.addJob(jobData)) {
+        if (this.jobs.createJob(jobData)) {
             this.hideModal();
             this.renderCurrentView();
             this.showToast('Job added successfully', 'success');
@@ -810,8 +818,8 @@ class UILab {
 
     exportData() {
         const data = {
-            jobs: this.state.getAllJobs(),
-            settings: this.state.getSettings(),
+            jobs: this.state.jobs,
+            settings: this.state.settings,
             exportDate: new Date().toISOString()
         };
 
