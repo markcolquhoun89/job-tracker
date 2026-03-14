@@ -1024,29 +1024,39 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
  * @param {Object} s - Stats object
  */
 function renderStats(container, list, s) {
+    const toNum = (v, d = 0) => Number.isFinite(Number(v)) ? Number(v) : d;
+
     // Ensure all stats have defaults to prevent undefined errors
     const stats = {
-        vol: s.vol || 0,
-        done: s.done || 0,
-        fails: s.fails || 0,
-        ints: s.ints || 0,
-        pend: s.pend || 0,
-        compRate: s.compRate || 0,
-        exclHy: s.exclHy || 0,
-        totalCash: s.totalCash || 0,
-        avgDailyPay: s.avgDailyPay || 0,
-        avgJobPay: s.avgJobPay || 0,
-        daysWorked: s.daysWorked || 0,
-        completedRev: s.completedRev || 0,
-        internalRev: s.internalRev || 0,
-        streak: s.streak || 0,
+        vol: toNum(s.vol),
+        done: toNum(s.done),
+        fails: toNum(s.fails),
+        ints: toNum(s.ints),
+        pend: toNum(s.pend),
+        compRate: toNum(s.compRate),
+        exclHy: toNum(s.exclHy),
+        totalCash: toNum(s.totalCash),
+        avgDailyPay: toNum(s.avgDailyPay),
+        avgJobPay: toNum(s.avgJobPay),
+        avgJobsPerDay: toNum(s.avgJobsPerDay),
+        daysWorked: toNum(s.daysWorked),
+        completedRev: toNum(s.completedRev),
+        internalRev: toNum(s.internalRev),
+        streak: toNum(s.streak),
         byWeekday: s.byWeekday || {Mon:{count:0,rev:0},Tue:{count:0,rev:0},Wed:{count:0,rev:0},Thu:{count:0,rev:0},Fri:{count:0,rev:0},Sat:{count:0,rev:0},Sun:{count:0,rev:0}},
         typeBreakdown: s.typeBreakdown || {}
     };
     const byType = {}; list.forEach(j => byType[j.type] = (byType[j.type] || 0) + 1);
     const maxType = Math.max(...Object.values(byType), 1);
     const target = parseInt(localStorage.getItem('nx_target')) || 80;
-    const bests = updatePersonalBests(list);
+    const bestsRaw = updatePersonalBests(list) || {};
+    const bests = {
+        longestStreak: toNum(bestsRaw.longestStreak),
+        bestDayEarnings: toNum(bestsRaw.bestDayEarnings),
+        bestDayDate: bestsRaw.bestDayDate || null,
+        mostJobsDay: toNum(bestsRaw.mostJobsDay),
+        mostJobsDayDate: bestsRaw.mostJobsDayDate || null
+    };
     // Trend comparison with previous period
     const prevList = state.getPrevScope();
     const prevS = calculate(prevList);
@@ -1064,8 +1074,8 @@ function renderStats(container, list, s) {
     list.forEach(j => { if (!dayMap[j.date]) dayMap[j.date] = { done:0, fail:0, total:0 }; dayMap[j.date].total++; if (j.status==='Completed') dayMap[j.date].done++; if (j.status==='Failed') dayMap[j.date].fail++; });
     const perfectDays = Object.values(dayMap).filter(d => d.total >= 3 && d.done === d.total).length;
     // Productivity score (jobs per day relative to target of 8)
-    const avgJobsPerDay = stats.avgJobsPerDay != null ? stats.avgJobsPerDay : 0;
-    const prodScore = Math.min(100, Math.round((parseFloat(avgJobsPerDay) / 8) * 100));
+    const avgJobsPerDay = toNum(stats.avgJobsPerDay);
+    const prodScore = Math.min(100, Math.round((avgJobsPerDay / 8) * 100));
     // Best streak in current scope
     const scopeSorted = [...list].filter(j => j.status !== 'Pending').sort((a,b) => (a.completedAt||0)-(b.completedAt||0));
     let scopeBestStreak = 0, tempStreak = 0;
@@ -1077,8 +1087,8 @@ function renderStats(container, list, s) {
     const volDelta = stats.vol - (prevS.vol || 0);
     const rateDelta = parseFloat(stats.compRate) - parseFloat(prevS.compRate || 0);
     const cashDelta = stats.totalCash - (prevS.totalCash || 0);
-    const rc1 = s.compRate >= target ? 'var(--success)' : s.compRate >= target*0.75 ? 'var(--warning)' : 'var(--danger)';
-    const rc2 = s.exclHy >= target ? 'var(--success)' : s.exclHy >= target*0.75 ? 'var(--warning)' : 'var(--danger)';
+    const rc1 = stats.compRate >= target ? 'var(--success)' : stats.compRate >= target*0.75 ? 'var(--warning)' : 'var(--danger)';
+    const rc2 = stats.exclHy >= target ? 'var(--success)' : stats.exclHy >= target*0.75 ? 'var(--warning)' : 'var(--danger)';
    
     // Build panel contents
     const panels = [
