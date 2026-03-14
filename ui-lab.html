@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Job Tracker UI Lab</title>
+  <title>Job Tracker – New UI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -14,97 +14,99 @@
   <div class="atmosphere" aria-hidden="true"></div>
 
   <div class="lab-shell">
+
+    <!-- -- Header --------------------------------------------------- -->
     <header class="lab-header glass">
-      <div class="header-copy">
-        <p class="eyebrow">FTTP Dispatch</p>
-        <h1>Field Operations Interface</h1>
-        <p class="sub">Gesture-first workflow for one-handed engineer operation</p>
+      <div class="header-top">
+        <a class="pill-btn" href="./index.html">? Live App</a>
+        <button id="auth-btn" class="pill-btn auth-pill" type="button">Account</button>
       </div>
-      <div class="header-actions">
-        <a class="pill-btn" href="./index.html">Back To Live App</a>
-        <button id="motion-toggle" class="pill-btn" type="button">Motion On</button>
+      <div class="date-nav">
+        <button class="nav-arrow" id="prev-btn" type="button" onclick="labAdjDate(-1)">&#8249;</button>
+        <div class="date-center" id="lab-date-label">Today</div>
+        <button class="nav-arrow" id="next-btn" type="button" onclick="labAdjDate(1)">&#8250;</button>
+        <button class="today-chip" type="button" onclick="labGoToday()">•</button>
+      </div>
+      <div class="range-bar">
+        <button class="range-chip active" data-range="day"   onclick="labSetRange('day',this)">Day</button>
+        <button class="range-chip"        data-range="week"  onclick="labSetRange('week',this)">Week</button>
+        <button class="range-chip"        data-range="month" onclick="labSetRange('month',this)">Month</button>
+        <button class="range-chip"        data-range="year"  onclick="labSetRange('year',this)">Year</button>
       </div>
     </header>
 
+    <!-- -- KPI strip ------------------------------------------------ -->
     <section class="kpi-strip">
       <article class="kpi glass">
-        <span>Queue</span>
-        <strong id="kpi-queue">0</strong>
+        <span>Pending</span>
+        <strong id="kpi-pending">0</strong>
       </article>
       <article class="kpi glass">
-        <span>Completed</span>
+        <span>Done</span>
         <strong id="kpi-done">0</strong>
       </article>
       <article class="kpi glass">
-        <span>At Risk</span>
-        <strong id="kpi-risk">0</strong>
+        <span>Rate</span>
+        <strong id="kpi-rate">--</strong>
       </article>
       <article class="kpi glass">
-        <span>Projected</span>
-        <strong id="kpi-pay">0</strong>
+        <span>Earned</span>
+        <strong id="kpi-pay">£0</strong>
       </article>
     </section>
 
+    <!-- -- View stack ----------------------------------------------- -->
     <main class="view-stack">
+
+      <!-- Queue -->
       <section class="view-panel active" data-panel="queue">
         <div class="view-head">
-          <h2>Live Job Stream</h2>
-          <p>Swipe right to complete, swipe left to fail. Tap center to inspect.</p>
-        </div>
-        <div class="swipe-legend glass">
-          <span><i class="dot done"></i> Right swipe: Complete</span>
-          <span><i class="dot fail"></i> Left swipe: Fail</span>
-          <span><i class="dot int"></i> Rail: Reopen or mark failed</span>
+          <h2>Job Queue</h2>
+          <p>Swipe right to complete &middot; left to fail &middot; action rail for internals</p>
         </div>
         <div id="job-stream" class="job-stream bounce-scroll"></div>
       </section>
 
-      <section class="view-panel" data-panel="network">
+      <!-- Stats -->
+      <section class="view-panel" data-panel="stats">
         <div class="view-head">
-          <h2>Fiber Network Health</h2>
-          <p>Idle pulse map with live route pressure simulation.</p>
+          <h2>Statistics</h2>
+          <p>Performance for the selected period.</p>
         </div>
-        <div class="network-grid glass">
-          <div class="network-node"><span>Exchange</span><b class="ok">Up</b></div>
-          <div class="network-node"><span>Pole / Pit</span><b class="ok">CBT Clear</b></div>
-          <div class="network-node"><span>Ext. Access</span><b class="warn">CSP Watch</b></div>
-          <div class="network-node"><span>Premises</span><b class="ok">ONT Ready</b></div>
-        </div>
-        <div class="route-timeline glass">
-          <div class="route-track"><div class="route-wave"></div></div>
-          <div class="route-keys">
-            <span>Exchange â†’ Pole/Pit</span>
-            <span>CBT â†’ CSP (Ext. Access)</span>
-            <span>CSP â†’ ONT Install</span>
-          </div>
-        </div>
+        <div id="stats-body" class="stats-body"></div>
       </section>
 
+      <!-- Payweek -->
       <section class="view-panel" data-panel="payweek">
         <div class="view-head">
-          <h2>Payweek Radar</h2>
-          <p>Fast forecasting and workload balancing for the current cycle.</p>
+          <h2>Pay Week</h2>
+          <p>Sat–Fri pay cycle overview.</p>
         </div>
         <div class="pay-card glass">
-          <small>Expected Friday</small>
-          <strong id="pay-figure">0</strong>
-          <p id="pay-detail">0 jobs resolved this week</p>
+          <small>Current week total</small>
+          <strong id="pay-figure">£0.00</strong>
+          <p id="pay-detail">Loading…</p>
         </div>
         <div id="micro-bars" class="micro-bars glass"></div>
       </section>
 
+      <!-- Toolkit -->
       <section class="view-panel" data-panel="toolkit">
         <div class="view-head">
-          <h2>UI Tuning Console</h2>
-          <p>Adjust responsiveness and atmosphere while prototyping.</p>
+          <h2>UI Lab Settings</h2>
+          <p>Tune the prototype look while testing.</p>
         </div>
         <div class="tool-grid glass">
+          <label>
+            Motion
+            <button id="motion-toggle" class="pill-btn" type="button">On</button>
+          </label>
           <label>
             Accent
             <input id="accent" type="color" value="#58a6ff">
           </label>
           <label>
-            Background Intensity
+            Background
             <input id="bg-intensity" type="range" min="15" max="90" value="52">
           </label>
           <label>
@@ -116,7 +118,7 @@
             </select>
           </label>
           <label>
-            Idle Animation Pack
+            Idle Style
             <select id="idle-pack">
               <option value="pulse">Pulse</option>
               <option value="drift">Drift</option>
@@ -125,19 +127,29 @@
           </label>
         </div>
       </section>
+
     </main>
 
+    <!-- -- Bottom nav ----------------------------------------------- -->
     <nav class="smart-nav glass" aria-label="UI Lab Navigation">
-      <button class="nav-chip active" data-view="queue">Queue</button>
-      <button class="nav-chip" data-view="network">Network</button>
-      <button class="nav-chip" data-view="payweek">Payweek</button>
-      <button class="nav-chip" data-view="toolkit">Toolkit</button>
+      <button class="nav-chip active" data-view="queue"   onclick="setLabView('queue')">Queue</button>
+      <button class="nav-chip"        data-view="stats"   onclick="setLabView('stats')">Stats</button>
+      <button class="nav-chip"        data-view="payweek" onclick="setLabView('payweek')">Payweek</button>
+      <button class="nav-chip"        data-view="toolkit" onclick="setLabView('toolkit')">Toolkit</button>
     </nav>
 
+    <!-- -- Thumb dock ----------------------------------------------- -->
     <div class="thumb-dock">
-      <button id="shuffle-jobs" class="thumb-btn primary" type="button">Shuffle Jobs</button>
-      <button id="boost-energy" class="thumb-btn" type="button">Pulse Boost</button>
+      <button id="add-job-btn" class="thumb-btn primary" type="button">+ Add Job</button>
+      <button class="thumb-btn" type="button" onclick="labGoToday()">Today</button>
     </div>
+
+  </div>
+
+  <!-- -- Modal (required by modals.js) ------------------------------- -->
+  <div id="modal" class="modal-backdrop" style="display:none"
+       onclick="if(event.target===this && !this.dataset.nodismiss) JobTrackerModals.closeModal()">
+    <div class="modal-box glass" id="modal-body" onclick="event.stopPropagation()"></div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

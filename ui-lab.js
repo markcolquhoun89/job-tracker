@@ -1,425 +1,505 @@
-const seedJobs = [
-  { id: "j1", premise: "12 Ridgeway Close",  type: "CBT", location: "Pole 14",        status: "pending", eta: "10:40", port: "Spl-8 P3",  risk: "low",  pay: 42 },
-  { id: "j2", premise: "77 Hawthorn Ave",    type: "CSP", location: "External box",   status: "pending", eta: "11:05", port: "Spl-2 P1",  risk: "med",  pay: 44 },
-  { id: "j3", premise: "5 Mayfield Road",    type: "ONT", location: "Hallway",         status: "done",    eta: "11:20", port: "Spl-11 P4", risk: "low",  pay: 55 },
-  { id: "j4", premise: "18 Kingfisher Dr",   type: "CBT", location: "Pit C14",         status: "failed",  eta: "12:00", port: "Spl-4 P7",  risk: "high", pay: 20 },
-  { id: "j5", premise: "9 Cedar Mews",       type: "CSP", location: "Flats block B",   status: "pending", eta: "12:25", port: "Spl-1 P2",  risk: "med",  pay: 55 },
-  { id: "j6", premise: "20 Brookfield Way",  type: "ONT", location: "Living room",     status: "pending", eta: "13:10", port: "Spl-6 P5",  risk: "low",  pay: 42 }
-];
+import { JobTrackerConstants }   from './js/constants.js';
+import { JobTrackerUtils }        from './js/utils.js';
+import { JobTrackerState }        from './js/state.js';
+import { JobTrackerCalculations } from './js/calculations.js';
+import { JobTrackerJobs }         from './js/jobs.js';
+import { JobTrackerModals }       from './js/modals.js';
+import { initModules }            from './js/bridge.js';
 
-const state = {
-  jobs: [...seedJobs],
-  view: "queue",
-  motion: true,
-  energy: 0.35,
-  density: "regular",
-  idlePack: "pulse",
-  pointer: { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 },
-  pointerDown: false
+// -- Globals required by inline onclick handlers ------------------
+window.JobTrackerModals = JobTrackerModals;
+
+const { STATUS }                                           = JobTrackerConstants;
+const { sanitizeHTML, showToast, formatDate, getWeekNumber } = JobTrackerUtils;
+const state                                                = JobTrackerState;
+const { calculate, getPayPeriod, getPayPeriodHistory }     = JobTrackerCalculations;
+const jobOps                                               = JobTrackerJobs;
+
+// -- Lab-local state (UI only) -------------------------------------
+const lab = {
+  motion:   true,
+  energy:   0.4,
+  density:  'regular',
+  idlePack: 'pulse',
+  pointer:  { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 }
 };
 
-const els = {
-  jobStream: document.getElementById("job-stream"),
-  navChips: [...document.querySelectorAll(".nav-chip")],
-  panels: [...document.querySelectorAll(".view-panel")],
-  motionToggle: document.getElementById("motion-toggle"),
-  shuffleBtn: document.getElementById("shuffle-jobs"),
-  boostBtn: document.getElementById("boost-energy"),
-  accent: document.getElementById("accent"),
-  bgIntensity: document.getElementById("bg-intensity"),
-  density: document.getElementById("density"),
-  idlePack: document.getElementById("idle-pack"),
-  toast: document.getElementById("toast"),
-  kpiQueue: document.getElementById("kpi-queue"),
-  kpiDone: document.getElementById("kpi-done"),
-  kpiRisk: document.getElementById("kpi-risk"),
-  kpiPay: document.getElementById("kpi-pay"),
-  payFigure: document.getElementById("pay-figure"),
-  payDetail: document.getElementById("pay-detail"),
-  microBars: document.getElementById("micro-bars"),
-  canvas: document.getElementById("lab-canvas")
-};
+// -- Expose nav helpers to window (used by onclick= attributes) ----
+window.labAdjDate  = labAdjDate;
+window.labGoToday  = labGoToday;
+window.labSetRange = labSetRange;
+window.setLabView  = setLabView;
+window.labShowAuth = labShowAuth;
 
-function showToast(message) {
-  els.toast.textContent = message;
-  els.toast.classList.add("show");
-  setTimeout(() => els.toast.classList.remove("show"), 1300);
+// -- Date navigation -----------------------------------------------
+function labAdjDate(n) {
+  const d = new Date(state.viewDate);
+  if      (state.range === 'day')   d.setDate(d.getDate() + n);
+  else if (state.range === 'week')  d.setDate(d.getDate() + n * 7);
+  else if (state.range === 'month') d.setMonth(d.getMonth() + n);
+  else                               d.setFullYear(d.getFullYear() + n);
+  state.setViewDate(d);
+  render();
 }
 
-function randomTime() {
-  const hour = 9 + Math.floor(Math.random() * 7);
-  const minute = Math.floor(Math.random() * 60);
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+function labGoToday() {
+  state.setViewDate(new Date());
+  if (navigator.vibrate) navigator.vibrate(8);
+  render();
 }
 
-function randomLocation(type) {
-  if (type === "CBT") return ["Pole 4", "Pole 9", "Pit A3", "Pit C12", "Pole 17"][Math.floor(Math.random() * 5)];
-  if (type === "CSP") return ["External box", "Side wall", "Flats block A", "Flats block B", "Front elevation"][Math.floor(Math.random() * 5)];
-  return ["Hallway", "Living room", "Kitchen", "Flat 2", "Utility room"][Math.floor(Math.random() * 5)];
+function labSetRange(range, el) {
+  state.setRange(range);
+  document.querySelectorAll('.range-chip').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  render();
 }
 
-function randomPort() {
-  const sp = Math.ceil(Math.random() * 12);
-  const p = Math.ceil(Math.random() * 8);
-  return `Spl-${sp} P${p}`;
+function labShowAuth() {
+  const isAuth = !!window.supabaseClient?.getStatus?.().isAuthenticated;
+  if (isAuth) JobTrackerModals.showProfile();
+  else         JobTrackerModals.showSignIn();
 }
 
-function shuffledJobs() {
-  const types = ["CBT", "CSP", "ONT"];
-  const risks = ["low", "med", "high"];
-  return [...state.jobs]
-    .sort(() => Math.random() - 0.5)
-    .map((job) => {
-      const type = types[Math.floor(Math.random() * types.length)];
-      return {
-        ...job,
-        type,
-        location: randomLocation(type),
-        port: randomPort(),
-        eta: randomTime(),
-        pay: Math.max(18, job.pay + Math.round((Math.random() - 0.5) * 12)),
-        risk: risks[Math.floor(Math.random() * risks.length)]
-      };
-    });
-}
-
-function setView(view) {
-  state.view = view;
+// -- View switching ------------------------------------------------
+function setLabView(view) {
   document.body.dataset.view = view;
-  els.navChips.forEach((chip) => chip.classList.toggle("active", chip.dataset.view === view));
-  els.panels.forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === view));
+  document.querySelectorAll('.nav-chip').forEach(c => c.classList.toggle('active', c.dataset.view === view));
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === view));
+  if (view === 'stats')   renderStats();
+  if (view === 'payweek') renderPayweek();
 }
 
-function setJobStatus(id, status) {
-  const next = state.jobs.map((job) => {
-    if (job.id !== id) return job;
-    return { ...job, status };
-  });
-  state.jobs = next;
-  state.energy = Math.min(1.6, state.energy + 0.25);
-  if (navigator.vibrate) navigator.vibrate(10);
-  renderAll();
-  const changed = next.find((j) => j.id === id);
-  showToast(`${changed ? changed.premise : id} â†’ ${status}`);
+// -- Auth button ---------------------------------------------------
+function updateAuthBtn() {
+  const btn = document.getElementById('auth-btn');
+  if (!btn) return;
+  const isAuth = !!window.supabaseClient?.getStatus?.().isAuthenticated;
+  if (isAuth) {
+    const name = (state.displayName || 'Account').trim();
+    btn.textContent = name;
+  } else {
+    btn.textContent = 'Sign In';
+  }
 }
 
-const TYPE_LABELS = { CBT: "Pole / Pit", CSP: "Ext. Access", ONT: "Internal" };
+// -- Date label ----------------------------------------------------
+function updateDateLabel() {
+  const el  = document.getElementById('lab-date-label');
+  if (!el) return;
+  const d   = state.viewDate;
+  if (state.range === 'day') {
+    el.textContent = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  } else if (state.range === 'week') {
+    const ref = new Date(d); ref.setHours(0,0,0,0);
+    const toSat = (ref.getDay() + 1) % 7;
+    const sat   = new Date(ref); sat.setDate(ref.getDate() - toSat);
+    const fri   = new Date(sat); fri.setDate(sat.getDate() + 6);
+    const fmt   = x => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    el.textContent = `Wk ${getWeekNumber(d)} · ${fmt(sat)} – ${fmt(fri)}`;
+  } else if (state.range === 'month') {
+    el.textContent = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  } else {
+    el.textContent = String(d.getFullYear());
+  }
+}
 
-function swipeTemplate(job) {
-  const statusClass = job.status === "done" ? "done" : (job.status === "failed" ? "failed" : "pending");
-  const typeKey = job.type.toLowerCase();
+// -- KPI strip -----------------------------------------------------
+function updateKpi(s) {
+  document.getElementById('kpi-pending').textContent = String(s.pend ?? 0);
+  document.getElementById('kpi-done').textContent    = String(s.done ?? 0);
+  document.getElementById('kpi-rate').textContent    = s.compRate != null ? s.compRate + '%' : '--';
+  document.getElementById('kpi-pay').textContent     = '£' + (s.totalCash ?? 0).toFixed(0);
+}
+
+// -- Type badge colours --------------------------------------------
+const TYPE_COLORS = {
+  OH:    '#f6b93b',  // amber
+  UG:    '#74b9ff',  // sky blue
+  HyOH:  '#a29bfe',  // lavender
+  HyUG:  '#55efc4',  // teal
+  RC:    '#b2bec3',  // grey
+  BTTW:  '#fd79a8',  // pink-red
+};
+
+function typeBadge(type) {
+  const color = TYPE_COLORS[type] ?? '#b2bec3';
+  return `<span class="type-badge" style="color:${color};border-color:${color}44;background:${color}18;">${sanitizeHTML(type)}</span>`;
+}
+
+// -- Empty state ---------------------------------------------------
+function emptyCard() {
+  return `<div class="empty-state glass">
+    <p>No jobs for this period.</p>
+    <button class="pill-btn" onclick="document.getElementById('add-job-btn').click()">+ Add Job</button>
+  </div>`;
+}
+
+// -- Job card template (swipe-based) ------------------------------
+function jobCardHTML(job) {
+  const s = job.status.toLowerCase().replace(' ', '-');
+  const fee = parseFloat(job.fee || 0).toFixed(2);
+  const jobID = job.jobID ? `<span class="job-id">${sanitizeHTML(job.jobID)}</span>` : '';
   return `
     <div class="swipe-wrap" data-job-id="${job.id}">
       <div class="action-rail">
         <div class="rail-left">
-          <button class="rail-btn done" data-action="done">Complete</button>
-          <button class="rail-btn int" data-action="pending">Reopen</button>
+          <button class="rail-btn done"  data-action="${STATUS.COMPLETED}">Done</button>
+          <button class="rail-btn int"   data-action="${STATUS.INTERNALS}">Int</button>
         </div>
         <div class="rail-right">
-          <button class="rail-btn fail" data-action="failed">Fail</button>
+          <button class="rail-btn fail"  data-action="${STATUS.FAILED}">Fail</button>
         </div>
       </div>
-      <article class="job-card" data-job-id="${job.id}">
+      <article class="job-card status-${s}" data-job-id="${job.id}">
         <div class="job-top">
-          <span class="type-badge type-${typeKey}">${job.type}<em>${TYPE_LABELS[job.type] ?? ""}</em></span>
-          <span class="job-status ${statusClass}">${job.status.toUpperCase()}</span>
+          ${typeBadge(job.type)}
+          <span class="job-status-badge s-${s}">${sanitizeHTML(job.status)}</span>
         </div>
-        <strong class="job-premise">${job.premise}</strong>
+        <div class="job-mid">
+          ${jobID}
+          ${job.notes ? `<span class="job-notes-preview">${sanitizeHTML(job.notes.slice(0,60))}${job.notes.length > 60 ? '…' : ''}</span>` : ''}
+        </div>
         <div class="job-bottom">
-          <span>${job.eta}</span>
-          <strong>GBP ${job.pay.toFixed(2)}</strong>
-        </div>
-        <div class="job-meta">
-          <span>${job.location}</span>
-          <span>${job.port}</span>
+          <span class="job-date">${job.date}</span>
+          <strong class="job-fee">£${fee}</strong>
         </div>
       </article>
-    </div>
-  `;
+    </div>`;
 }
 
-function attachCardGestures(cardWrap) {
-  const card = cardWrap.querySelector(".job-card");
-  const jobId = card.dataset.jobId;
-  let startX = 0;
+// -- Attach swipe + rail gestures to a card wrapper ----------------
+async function setStatus(id, newStatus) {
+  try {
+    await jobOps.updateJobStatus(id, newStatus);
+    if (navigator.vibrate) navigator.vibrate(10);
+    render();
+    showToast(`${newStatus}`);
+  } catch (e) {
+    JobTrackerModals.customAlert('Error', e.message, true);
+  }
+}
+
+function attachCardGestures(wrap) {
+  const card   = wrap.querySelector('.job-card');
+  const jobId  = card.dataset.jobId;
+  let startX   = 0;
   let currentX = 0;
-  let dragging = false;
+  let dragging  = false;
 
-  const updateDrag = (x) => {
-    const clamped = Math.max(-150, Math.min(150, x));
-    card.style.setProperty("--drag", `${clamped}px`);
-  };
-
-  const resetDrag = () => {
-    card.style.setProperty("--drag", "0px");
-  };
-
-  const onPointerDown = (event) => {
-    dragging = true;
-    startX = event.clientX;
-    currentX = 0;
-    card.setPointerCapture(event.pointerId);
-  };
-
-  const onPointerMove = (event) => {
+  card.addEventListener('pointerdown', (e) => {
+    dragging = true; startX = e.clientX; currentX = 0;
+    card.setPointerCapture(e.pointerId);
+  });
+  card.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    currentX = event.clientX - startX;
-    updateDrag(currentX);
-  };
-
-  const onPointerUp = () => {
+    currentX = e.clientX - startX;
+    const clamped = Math.max(-160, Math.min(160, currentX));
+    card.style.setProperty('--drag', `${clamped}px`);
+  });
+  card.addEventListener('pointerup', () => {
     if (!dragging) return;
     dragging = false;
-    if (currentX > 110) {
-      setJobStatus(jobId, "done");
-    } else if (currentX < -110) {
-      setJobStatus(jobId, "failed");
-    }
-    resetDrag();
-  };
+    if      (currentX >  110) setStatus(jobId, STATUS.COMPLETED);
+    else if (currentX < -110) setStatus(jobId, STATUS.FAILED);
+    card.style.setProperty('--drag', '0px');
+  });
+  card.addEventListener('pointercancel', () => {
+    dragging = false;
+    card.style.setProperty('--drag', '0px');
+  });
+  card.addEventListener('click', (e) => {
+    if (Math.abs(currentX) < 8) JobTrackerModals.editJob(jobId);
+  });
 
-  card.addEventListener("pointerdown", onPointerDown);
-  card.addEventListener("pointermove", onPointerMove);
-  card.addEventListener("pointerup", onPointerUp);
-  card.addEventListener("pointercancel", onPointerUp);
-
-  cardWrap.querySelectorAll(".rail-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const action = btn.dataset.action;
-      setJobStatus(jobId, action);
-    });
+  wrap.querySelectorAll('.rail-btn').forEach(btn => {
+    btn.addEventListener('click', () => setStatus(jobId, btn.dataset.action));
   });
 }
 
-function renderJobs() {
-  els.jobStream.innerHTML = state.jobs.map(swipeTemplate).join("");
-  [...els.jobStream.querySelectorAll(".swipe-wrap")].forEach(attachCardGestures);
+// -- Render queue --------------------------------------------------
+function renderQueue(list) {
+  const stream = document.getElementById('job-stream');
+  if (!stream) return;
+  if (list.length === 0) { stream.innerHTML = emptyCard(); return; }
+
+  // Sort: pending first, then completed/failed/internals
+  const sorted = [...list].sort((a, b) => {
+    const ap = a.status === STATUS.PENDING ? 0 : 1;
+    const bp = b.status === STATUS.PENDING ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return (b.completedAt || 0) - (a.completedAt || 0);
+  });
+
+  stream.innerHTML = sorted.map(jobCardHTML).join('');
+  stream.querySelectorAll('.swipe-wrap').forEach(attachCardGestures);
 }
 
-function renderPayWeek() {
-  const done = state.jobs.filter((j) => j.status === "done");
-  const total = done.reduce((sum, j) => sum + j.pay, 0);
-  els.payFigure.textContent = `GBP ${total.toFixed(2)}`;
-  els.payDetail.textContent = `${done.length} jobs resolved this cycle`;
+// -- Render stats --------------------------------------------------
+function renderStats() {
+  const el = document.getElementById('stats-body');
+  if (!el) return;
+  const list = state.getScope();
+  const s    = calculate(list);
 
-  const rows = [
-    { label: "Mon", value: 42 },
-    { label: "Tue", value: 58 },
-    { label: "Wed", value: 69 },
-    { label: "Thu", value: 51 },
-    { label: "Fri", value: 76 }
-  ];
-  const maxVal = Math.max(...rows.map((r) => r.value));
-  els.microBars.innerHTML = rows
-    .map((row) => `
-      <div class="micro-row">
-        <span>${row.label}</span>
-        <div class="micro-track"><div class="micro-fill" style="width:${(row.value / maxVal) * 100}%"></div></div>
-        <b>${row.value}</b>
+  if (list.length === 0) {
+    el.innerHTML = `<div class="glass stat-card"><p style="color:var(--muted)">No data for this period.</p></div>`;
+    return;
+  }
+
+  const typeRows = Object.entries(s.typeBreakdown || {}).map(([type, tb]) => `
+    <div class="type-row">
+      ${typeBadge(type)}
+      <span>${tb.count} jobs</span>
+      <span style="color:var(--success)">?${tb.done}</span>
+      <span style="color:var(--danger)">?${tb.fails}</span>
+      <span style="color:var(--warning)">?${tb.ints}</span>
+      <b>£${tb.rev.toFixed(0)}</b>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="stat-card glass">
+      <div class="stat-row"><span>Completion</span><b>${s.compRate}%</b></div>
+      <div class="stat-row"><span>Excl. Hybrid</span><b>${s.exclHy}%</b></div>
+      <div class="stat-row"><span>Streak</span><b>${s.streak} ??</b></div>
+      <div class="stat-row"><span>Jobs</span><b>${s.vol}</b></div>
+      <div class="stat-row"><span>Avg / Job</span><b>£${s.avgJobPay}</b></div>
+      <div class="stat-row"><span>Avg / Day</span><b>£${s.avgDailyPay}</b></div>
+      <div class="stat-row"><span>Days worked</span><b>${s.daysWorked}</b></div>
+    </div>
+    <div class="stat-card glass type-breakdown">
+      <h3>By Type</h3>
+      ${typeRows || '<p style="color:var(--muted)">No breakdown available.</p>'}
+    </div>`;
+}
+
+// -- Render payweek ------------------------------------------------
+function renderPayweek() {
+  const current = getPayPeriod();
+  const fig     = document.getElementById('pay-figure');
+  const det     = document.getElementById('pay-detail');
+  if (fig) fig.textContent = `£${current.total.toFixed(2)}`;
+  if (det) det.textContent = `${current.label} · ${current.count} job${current.count !== 1 ? 's' : ''}`;
+
+  const history = getPayPeriodHistory(8);
+  const bars    = document.getElementById('micro-bars');
+  if (!bars || !history.length) return;
+
+  const maxPay = Math.max(...history.map(p => p.total), 1);
+  bars.innerHTML = history.map(period => `
+    <div class="micro-row">
+      <span>${period.payDate}</span>
+      <div class="micro-track">
+        <div class="micro-fill" style="width:${(period.total / maxPay) * 100}%"></div>
       </div>
-    `)
-    .join("");
+      <b>£${period.total.toFixed(0)}</b>
+    </div>`).join('');
 }
 
-function renderKpi() {
-  const queue = state.jobs.filter((j) => j.status === "pending").length;
-  const done = state.jobs.filter((j) => j.status === "done").length;
-  const risk = state.jobs.filter((j) => j.risk === "high").length;
-  const pay = state.jobs.reduce((sum, j) => sum + j.pay, 0);
+// -- Add job picker ------------------------------------------------
+function showAddJobPicker() {
+  const types   = state.types;
+  const date    = state.viewDate.toISOString().split('T')[0];
+  const btnGrid = types.map(t => {
+    const color = TYPE_COLORS[t.code] ?? '#b2bec3';
+    return `<button class="type-pick-btn" style="border-color:${color};color:${color};"
+      onclick="labQuickAdd('${sanitizeHTML(t.code)}')">${sanitizeHTML(t.code)}</button>`;
+  }).join('');
 
-  els.kpiQueue.textContent = String(queue);
-  els.kpiDone.textContent = String(done);
-  els.kpiRisk.textContent = String(risk);
-  els.kpiPay.textContent = `GBP ${pay.toFixed(0)}`;
+  JobTrackerModals.showModal(`
+    <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+    <h3 style="margin-bottom:4px">ADD JOB</h3>
+    <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:14px">${date}</p>
+    <input type="text" id="lab-add-jobid" class="input-box" placeholder="Job ID (optional)" style="margin-bottom:14px">
+    <div class="type-pick-grid">${btnGrid}</div>`);
 }
 
-function renderAll() {
-  renderKpi();
-  renderJobs();
-  renderPayWeek();
-}
+window.labQuickAdd = async function labQuickAdd(type) {
+  const date  = state.viewDate.toISOString().split('T')[0];
+  const jobID = document.getElementById('lab-add-jobid')?.value?.trim() || null;
+  try {
+    await jobOps.createJob({ type, date, jobID, status: STATUS.PENDING });
+    JobTrackerModals.closeModal();
+    showToast(`${type} added`);
+    render();
+  } catch (e) {
+    JobTrackerModals.customAlert('Error', e.message, true);
+  }
+};
 
+// -- Touch scroll bounce -------------------------------------------
 function attachScrollBounce() {
-  const list = els.jobStream;
+  const list   = document.getElementById('job-stream');
+  if (!list) return;
   let touchStart = 0;
-
-  list.addEventListener("touchstart", (event) => {
-    touchStart = event.touches[0].clientY;
-  }, { passive: true });
-
-  list.addEventListener("touchmove", (event) => {
-    const y = event.touches[0].clientY;
-    const delta = y - touchStart;
-    const atTop = list.scrollTop <= 0;
-    const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
-
-    if ((atTop && delta > 0) || (atBottom && delta < 0)) {
-      const shift = Math.max(-18, Math.min(18, delta * 0.18));
-      list.style.transform = `translateY(${shift}px)`;
+  list.addEventListener('touchstart',  (e) => { touchStart = e.touches[0].clientY; }, { passive: true });
+  list.addEventListener('touchmove',   (e) => {
+    const delta   = e.touches[0].clientY - touchStart;
+    const atTop   = list.scrollTop <= 0;
+    const atBtm   = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+    if ((atTop && delta > 0) || (atBtm && delta < 0)) {
+      list.style.transform = `translateY(${Math.max(-20, Math.min(20, delta * 0.18))}px)`;
     }
   }, { passive: true });
-
-  list.addEventListener("touchend", () => {
-    list.style.transform = "translateY(0px)";
-  }, { passive: true });
+  list.addEventListener('touchend',    () => { list.style.transform = ''; }, { passive: true });
 }
 
+// -- Procedural canvas background ---------------------------------
 function startBackground() {
-  const canvas = els.canvas;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  let width = 0;
-  let height = 0;
-  let nodes = [];
-  let t = 0;
+  const canvas = document.getElementById('lab-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h, nodes = [], t = 0;
 
   function densityCount() {
-    if (state.density === "dense") return 80;
-    if (state.density === "low") return 34;
+    if (lab.density === 'dense') return 80;
+    if (lab.density === 'low')   return 34;
     return 54;
   }
 
   function resetNodes() {
     nodes = Array.from({ length: densityCount() }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
+      x:  Math.random() * w,
+      y:  Math.random() * h,
       vx: (Math.random() - 0.5) * 0.45,
       vy: (Math.random() - 0.5) * 0.45,
-      r: 1 + Math.random() * 2
+      r:  1 + Math.random() * 2
     }));
   }
 
   function resize() {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
+    w = canvas.width  = window.innerWidth;
+    h = canvas.height = window.innerHeight;
     resetNodes();
   }
 
-  function drawBackground() {
+  function draw() {
     t += 0.014;
-    state.energy = Math.max(0.28, state.energy * 0.994);
+    lab.energy = Math.max(0.28, lab.energy * 0.996);
 
-    const intensity = Number(els.bgIntensity.value) / 100;
-    const hueShift = state.idlePack === "drift" ? Math.sin(t * 0.6) * 18 : 0;
+    const intensity  = Number(document.getElementById('bg-intensity')?.value ?? 52) / 100;
+    const hueShift   = lab.idlePack === 'drift' ? Math.sin(t * 0.6) * 18 : 0;
 
-    ctx.clearRect(0, 0, width, height);
-    ctx.globalAlpha = 0.8;
+    ctx.clearRect(0, 0, w, h);
 
-    nodes.forEach((node) => {
-      node.x += node.vx;
-      node.y += node.vy;
-
-      if (node.x < -20) node.x = width + 20;
-      if (node.x > width + 20) node.x = -20;
-      if (node.y < -20) node.y = height + 20;
-      if (node.y > height + 20) node.y = -20;
-
-      const dx = state.pointer.x - node.x;
-      const dy = state.pointer.y - node.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 180) {
-        node.vx -= dx * 0.00002;
-        node.vy -= dy * 0.00002;
-      }
+    nodes.forEach(node => {
+      node.x += node.vx; node.y += node.vy;
+      if (node.x < -20) node.x = w + 20;
+      if (node.x > w + 20) node.x = -20;
+      if (node.y < -20) node.y = h + 20;
+      if (node.y > h + 20) node.y = -20;
+      const dx = lab.pointer.x - node.x;
+      const dy = lab.pointer.y - node.y;
+      if (Math.hypot(dx, dy) < 180) { node.vx -= dx * 0.00002; node.vy -= dy * 0.00002; }
     });
 
-    for (let i = 0; i < nodes.length; i += 1) {
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const a = nodes[i];
-        const b = nodes[j];
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i]; const b = nodes[j];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
         if (d > 130) continue;
-        const alpha = (1 - d / 130) * 0.28 * intensity * (1 + state.energy * 0.35);
+        const alpha = (1 - d / 130) * 0.28 * intensity * (1 + lab.energy * 0.35);
         ctx.strokeStyle = `hsla(${210 + hueShift}, 100%, 70%, ${alpha})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+        ctx.lineWidth   = 1;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
     }
 
-    nodes.forEach((node) => {
-      const wave = Math.sin((node.x + t * 90) * 0.01) * 0.65;
-      const pulse = state.idlePack === "calm" ? 0.7 : (1 + Math.sin(t * 3 + node.x * 0.01) * 0.2);
-      const radius = (node.r + wave) * pulse;
-      ctx.fillStyle = `hsla(${208 + hueShift}, 100%, 72%, ${0.3 + state.energy * 0.22})`;
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, Math.max(0.8, radius), 0, Math.PI * 2);
-      ctx.fill();
+    nodes.forEach(node => {
+      const wave   = Math.sin((node.x + t * 90) * 0.01) * 0.65;
+      const pulse  = lab.idlePack === 'calm' ? 0.7 : (1 + Math.sin(t * 3 + node.x * 0.01) * 0.2);
+      const radius = Math.max(0.8, (node.r + wave) * pulse);
+      ctx.fillStyle = `hsla(${208 + hueShift}, 100%, 72%, ${0.3 + lab.energy * 0.22})`;
+      ctx.beginPath(); ctx.arc(node.x, node.y, radius, 0, Math.PI * 2); ctx.fill();
     });
 
-    requestAnimationFrame(drawBackground);
+    requestAnimationFrame(draw);
   }
 
-  window.addEventListener("resize", resize);
+  window.addEventListener('resize', resize);
   resize();
-  requestAnimationFrame(drawBackground);
+  requestAnimationFrame(draw);
 }
 
-els.navChips.forEach((chip) => {
-  chip.addEventListener("click", () => setView(chip.dataset.view));
-});
+// -- Main render ---------------------------------------------------
+function render() {
+  updateAuthBtn();
+  updateDateLabel();
+  const list = state.getScope();
+  const s    = calculate(list);
+  updateKpi(s);
+  renderQueue(list);
+  // Update active panel data too
+  const view = document.body.dataset.view;
+  if (view === 'stats')   renderStats();
+  if (view === 'payweek') renderPayweek();
+}
 
-els.motionToggle.addEventListener("click", () => {
-  state.motion = !state.motion;
-  document.body.classList.toggle("motion-on", state.motion);
-  els.motionToggle.textContent = state.motion ? "Motion On" : "Motion Off";
-  showToast(state.motion ? "Motion enabled" : "Motion reduced");
-});
+// -- Toolkit controls ---------------------------------------------
+function wireToolkit() {
+  const motionBtn  = document.getElementById('motion-toggle');
+  const accentEl   = document.getElementById('accent');
+  const bgEl       = document.getElementById('bg-intensity');
+  const densityEl  = document.getElementById('density');
+  const idlePackEl = document.getElementById('idle-pack');
 
-els.shuffleBtn.addEventListener("click", () => {
-  state.jobs = shuffledJobs();
-  state.energy = Math.min(1.8, state.energy + 0.35);
-  renderAll();
-  showToast("Queue shuffled");
-});
+  motionBtn?.addEventListener('click', () => {
+    lab.motion = !lab.motion;
+    document.body.classList.toggle('motion-on', lab.motion);
+    motionBtn.textContent = lab.motion ? 'On' : 'Off';
+    showToast(lab.motion ? 'Motion enabled' : 'Motion reduced');
+  });
 
-els.boostBtn.addEventListener("click", () => {
-  state.energy = Math.min(2, state.energy + 0.55);
-  showToast("Network pulse boosted");
-});
+  accentEl?.addEventListener('input', (e) => {
+    document.documentElement.style.setProperty('--primary', e.target.value);
+  });
 
-els.accent.addEventListener("input", (event) => {
-  document.documentElement.style.setProperty("--primary", event.target.value);
-});
+  bgEl?.addEventListener('input', (e) => {
+    const v    = Number(e.target.value);
+    const base = Math.max(5, Math.min(26, Math.round(v / 2.5)));
+    document.documentElement.style.setProperty('--surface',   `hsl(216 24% ${base}%)`);
+    document.documentElement.style.setProperty('--surface-2', `hsl(216 23% ${Math.max(8, base - 4)}%)`);
+  });
 
-els.bgIntensity.addEventListener("input", (event) => {
-  const value = Number(event.target.value);
-  const bgLight = Math.max(5, Math.min(26, Math.round(value / 2.5)));
-  document.documentElement.style.setProperty("--surface", `hsl(216 24% ${bgLight}%)`);
-  document.documentElement.style.setProperty("--surface-2", `hsl(216 23% ${Math.max(8, bgLight - 4)}%)`);
-});
+  densityEl?.addEventListener('change', (e) => {
+    lab.density = e.target.value;
+    lab.energy  = Math.min(1.6, lab.energy + 0.2);
+    showToast(`Density: ${lab.density}`);
+  });
 
-els.density.addEventListener("change", (event) => {
-  state.density = event.target.value;
-  state.energy = Math.min(1.6, state.energy + 0.2);
-  showToast(`Particle density: ${state.density}`);
-});
+  idlePackEl?.addEventListener('change', (e) => {
+    lab.idlePack = e.target.value;
+    showToast(`Idle: ${lab.idlePack}`);
+  });
 
-els.idlePack.addEventListener("change", (event) => {
-  state.idlePack = event.target.value;
-  state.energy = Math.min(1.6, state.energy + 0.2);
-  showToast(`Idle pack: ${state.idlePack}`);
-});
+  document.getElementById('add-job-btn')?.addEventListener('click', showAddJobPicker);
+}
 
-window.addEventListener("pointermove", (event) => {
-  state.pointer.x = event.clientX;
-  state.pointer.y = event.clientY;
-});
+// -- Pointer tracking for canvas -----------------------------------
+window.addEventListener('pointermove', (e) => { lab.pointer.x = e.clientX; lab.pointer.y = e.clientY; });
+window.addEventListener('pointerdown', ()  => { lab.energy = Math.min(1.8, lab.energy + 0.22); });
 
-window.addEventListener("pointerdown", () => {
-  state.pointerDown = true;
-  state.energy = Math.min(1.8, state.energy + 0.25);
-});
+// -- Bootstrap ----------------------------------------------------
+(async function boot() {
+  // Expose render for modal callbacks
+  window.appRender = () => render();
 
-window.addEventListener("pointerup", () => {
-  state.pointerDown = false;
-});
+  const isAuth = await initModules();
 
-attachScrollBounce();
-renderAll();
-startBackground();
+  updateAuthBtn();
+
+  if (!isAuth) {
+    // Show sign-in gate; modals.js will call window.appRender after login
+    JobTrackerModals.showSignIn();
+  }
+
+  // Subscribe to state changes and re-render
+  state.subscribe((event) => {
+    if (event.startsWith('job:') || event.startsWith('jobs:')) render();
+  });
+
+  wireToolkit();
+  attachScrollBounce();
+  startBackground();
+  render();
+})();

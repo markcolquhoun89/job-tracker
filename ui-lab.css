@@ -1,24 +1,25 @@
+/* ================================================================
+   Job Tracker – New UI Lab Styles
+   ================================================================ */
+
 :root {
-  --bg: #0a0e14;
-  --surface: #131920;
+  --bg:        #0a0e14;
+  --surface:   #131920;
   --surface-2: #1a212b;
-  --line: #2d3748;
-  --text: #e6edf3;
-  --muted: #7d8590;
-  --primary: #58a6ff;
-  --success: #3fb950;
-  --warning: #d29922;
-  --danger: #f85149;
-  --radius: 18px;
+  --line:      #2d3748;
+  --text:      #e6edf3;
+  --muted:     #7d8590;
+  --primary:   #58a6ff;
+  --success:   #3fb950;
+  --warning:   #d29922;
+  --danger:    #f85149;
+  --radius:    18px;
   --safe-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html,
-body {
+html, body {
   margin: 0;
   min-height: 100%;
 }
@@ -26,138 +27,166 @@ body {
 body {
   color: var(--text);
   font-family: "Outfit", sans-serif;
-  background: radial-gradient(1250px 700px at 8% -8%, rgba(88, 166, 255, 0.22), transparent 60%),
-              radial-gradient(900px 620px at 92% 110%, rgba(88, 166, 255, 0.14), transparent 62%),
-              var(--bg);
+  background:
+    radial-gradient(1250px 700px at 8% -8%,  rgba(88,166,255,0.22), transparent 60%),
+    radial-gradient(900px  620px at 92% 110%, rgba(88,166,255,0.14), transparent 62%),
+    var(--bg);
   overflow: hidden;
 }
 
-#lab-canvas,
-.atmosphere {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
+/* -- Canvas + atmosphere ---------------------------------------- */
+#lab-canvas, .atmosphere {
+  position: fixed; inset: 0; pointer-events: none;
 }
-
-#lab-canvas {
-  z-index: 0;
-  opacity: 0.72;
-}
-
-.atmosphere {
+#lab-canvas   { z-index: 0; opacity: 0.72; }
+.atmosphere   {
   z-index: 1;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right,  rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
   background-size: 28px 28px;
   opacity: 0.5;
 }
 
+/* -- Shell grid ------------------------------------------------- */
 .lab-shell {
-  position: relative;
-  z-index: 2;
+  position: relative; z-index: 2;
   height: 100dvh;
   display: grid;
   grid-template-rows: auto auto 1fr auto auto;
-  gap: 12px;
-  padding: 14px 14px var(--safe-bottom);
+  gap: 10px;
+  padding: 12px 12px var(--safe-bottom);
 }
 
+/* -- Glass surface ---------------------------------------------- */
 .glass {
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: blur(14px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.28);
 }
 
+/* -- Header ----------------------------------------------------- */
 .lab-header {
   border-radius: 20px;
-  padding: 14px;
+  padding: 10px 14px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
-h1 {
-  margin: 4px 0;
-  font-size: clamp(1.2rem, 3.8vw, 2rem);
-  line-height: 1.1;
-}
-
-.sub {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 8px;
 }
 
-.pill-btn,
-.thumb-btn,
-.nav-chip {
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+/* -- Date nav row ----------------------------------------------- */
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-center {
+  flex: 1;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-arrow {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.nav-arrow:hover { border-color: var(--primary); }
+
+.today-chip {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--primary);
+  font-size: 1.2rem;
+  line-height: 1;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+/* -- Range bar -------------------------------------------------- */
+.range-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.range-chip {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  padding: 5px 4px;
+  cursor: pointer;
+  text-align: center;
+}
+.range-chip.active {
+  background: var(--primary);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* -- Pill / thumb / nav shared base ---------------------------- */
+.pill-btn, .thumb-btn, .nav-chip {
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--text);
   background: color-mix(in srgb, var(--surface-2) 80%, transparent);
-  padding: 9px 13px;
+  padding: 8px 12px;
   font-family: "Space Mono", monospace;
-  font-size: 12px;
+  font-size: 11px;
   text-decoration: none;
   cursor: pointer;
 }
+.pill-btn:hover, .thumb-btn:hover, .nav-chip:hover { border-color: var(--primary); }
 
-.pill-btn:hover,
-.thumb-btn:hover,
-.nav-chip:hover {
-  border-color: var(--primary);
-}
-
+/* -- KPI strip -------------------------------------------------- */
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0,1fr));
   gap: 8px;
 }
-
 .kpi {
   border-radius: 14px;
   padding: 10px;
-  min-height: 72px;
+  min-height: 68px;
   display: grid;
   gap: 3px;
 }
-
 .kpi span {
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
+  font-size: 0.62rem; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted);
 }
+.kpi strong { font-size: clamp(0.95rem, 2.8vw, 1.25rem); }
 
-.kpi strong {
-  font-size: clamp(0.95rem, 2.8vw, 1.25rem);
-}
-
-.view-stack {
-  min-height: 0;
-  position: relative;
-}
+/* -- View stack ------------------------------------------------- */
+.view-stack { min-height: 0; position: relative; }
 
 .view-panel {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -168,49 +197,17 @@ h1 {
   transition: opacity 0.25s ease, transform 0.25s ease;
   overflow: hidden;
 }
-
 .view-panel.active {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
+  opacity: 1; transform: none; pointer-events: auto;
 }
 
-.view-head h2 {
-  margin: 0;
-  font-size: 1.05rem;
-}
+.view-head h2  { margin: 0; font-size: 1.05rem; }
+.view-head p   { margin: 4px 0 10px; color: var(--muted); font-size: 0.74rem; }
 
-.view-head p {
-  margin: 4px 0 10px;
-  color: var(--muted);
-  font-size: 0.74rem;
-}
-
-.swipe-legend {
-  border-radius: 12px;
-  padding: 8px 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  font-size: 0.67rem;
-  color: var(--muted);
-}
-
-.dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 5px;
-}
-
-.dot.done { background: var(--success); }
-.dot.fail { background: var(--danger); }
-.dot.int { background: var(--warning); }
-
+/* -- Job stream ------------------------------------------------- */
 .job-stream {
-  margin-top: 10px;
-  height: calc(100% - 74px);
+  margin-top: 8px;
+  height: calc(100% - 68px);
   overflow-y: auto;
   padding-right: 4px;
   display: grid;
@@ -218,16 +215,12 @@ h1 {
   transform: translateY(0);
   transition: transform 0.2s ease;
 }
-
-.job-stream::-webkit-scrollbar {
-  width: 6px;
-}
-
+.job-stream::-webkit-scrollbar { width: 6px; }
 .job-stream::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--line) 85%, transparent);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--line) 85%, transparent); border-radius: 8px;
 }
 
+/* -- Swipe card ------------------------------------------------- */
 .swipe-wrap {
   position: relative;
   border-radius: 14px;
@@ -237,226 +230,170 @@ h1 {
 }
 
 .action-rail {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  position: absolute; inset: 0;
+  display: flex; justify-content: space-between; align-items: center;
   padding: 0 8px;
 }
-
-.rail-left,
-.rail-right {
-  display: flex;
-  gap: 6px;
-}
-
+.rail-left, .rail-right { display: flex; gap: 6px; }
 .rail-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 6px 10px;
-  color: #fff;
-  font-size: 11px;
-  font-family: "Space Mono", monospace;
+  border: none; border-radius: 999px;
+  padding: 6px 10px; color: #fff;
+  font-size: 11px; font-family: "Space Mono", monospace;
   cursor: pointer;
 }
-
 .rail-btn.done { background: var(--success); }
-.rail-btn.int { background: var(--warning); }
-.rail-btn.fail { background: var(--danger); }
+.rail-btn.int  { background: var(--warning); }
+.rail-btn.fail { background: var(--danger);  }
 
 .job-card {
-  position: relative;
-  z-index: 1;
+  position: relative; z-index: 1;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
-  padding: 10px;
+  padding: 10px 12px;
   border-radius: 12px;
   transform: translateX(var(--drag, 0px));
   transition: transform 0.18s ease;
+  cursor: pointer;
 }
+.job-card:hover { background: color-mix(in srgb, var(--surface) 85%, var(--primary) 8%); }
+.motion-on .job-card { animation: jobLift 450ms ease both; }
 
-.job-card:hover {
-  border-color: color-mix(in srgb, var(--primary) 60%, var(--line));
+.job-card.status-completed { border-left: 3px solid var(--success); }
+.job-card.status-failed    { border-left: 3px solid var(--danger);  }
+.job-card.status-internals { border-left: 3px solid var(--warning); }
+.job-card.status-pending   { border-left: 3px solid var(--primary); }
+
+.job-top, .job-bottom {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
 }
-
-.motion-on .job-card {
-  animation: jobLift 500ms ease both;
+.job-mid {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: 4px 0;
 }
-
-.job-top,
-.job-bottom,
-.job-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.job-name { font-weight: 700; }
-
-.job-premise {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin: 4px 0 2px;
-}
-
-/* CBT = amber/street  CSP = sky-blue  ONT = teal/green */
-.type-badge {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
+.job-id {
   font-family: "Space Mono", monospace;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  padding: 3px 7px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.job-notes-preview {
+  font-size: 0.73rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.job-date  { font-size: 0.72rem; color: var(--muted); }
+.job-fee   { font-size: 0.98rem; color: var(--success); font-weight: 700; }
+
+/* -- Type badge (inline style in JS, class just for base shape) - */
+.type-badge {
+  display: inline-block;
+  font-family: "Space Mono", monospace;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid;
 }
-.type-badge em {
-  font-style: normal;
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 0;
-  opacity: 0.75;
-}
-.type-cbt { color: #f6b93b; border-color: #f6b93b44; background: #f6b93b18; }
-.type-csp { color: #74b9ff; border-color: #74b9ff44; background: #74b9ff18; }
-.type-ont { color: #55efc4; border-color: #55efc444; background: #55efc418; }
 
-.job-status {
+/* -- Status badge ----------------------------------------------- */
+.job-status-badge {
   font-family: "Space Mono", monospace;
-  font-size: 11px;
-  border-radius: 999px;
+  font-size: 10px;
   padding: 3px 7px;
+  border-radius: 999px;
   border: 1px solid var(--line);
 }
+.job-status-badge.s-completed { color: var(--success); border-color: var(--success)44; }
+.job-status-badge.s-failed    { color: var(--danger);  border-color: var(--danger)44;  }
+.job-status-badge.s-internals { color: var(--warning); border-color: var(--warning)44; }
+.job-status-badge.s-pending   { color: var(--primary); border-color: var(--primary)44; }
 
-.job-status.pending { color: var(--warning); }
-.job-status.done { color: var(--success); }
-.job-status.failed { color: var(--danger); }
-
-.job-meta {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.network-grid {
-  margin-top: 10px;
+/* -- Empty state ------------------------------------------------ */
+.empty-state {
   border-radius: 14px;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 
-.network-node {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px;
+/* -- Stats panel ----------------------------------------------- */
+.stats-body {
+  height: calc(100% - 52px);
+  overflow-y: auto;
   display: grid;
-  gap: 4px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  animation: nodePulse 2.8s ease-in-out infinite;
+  gap: 10px;
+  padding-right: 4px;
 }
-
-.network-node b.ok { color: var(--success); }
-.network-node b.warn { color: var(--warning); }
-
-.route-timeline {
-  margin-top: 10px;
+.stat-card {
   border-radius: 14px;
   padding: 12px;
 }
-
-.route-track {
-  height: 14px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 82%, black 10%);
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-
-.route-wave {
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, var(--primary), transparent);
-  animation: routeFlow 2.4s linear infinite;
-}
-
-.route-keys {
-  margin-top: 8px;
+.stat-row {
   display: flex;
   justify-content: space-between;
-  color: var(--muted);
-  font-size: 0.64rem;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  font-size: 0.83rem;
 }
+.stat-row:last-child { border-bottom: none; }
+.stat-row span { color: var(--muted); }
 
-.pay-card,
-.micro-bars,
-.tool-grid {
-  margin-top: 10px;
+.type-breakdown h3 { margin: 0 0 10px; font-size: 0.85rem; }
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
+  font-size: 0.76rem;
+}
+.type-row:last-child { border-bottom: none; }
+.type-row span, .type-row b { white-space: nowrap; }
+.type-row b { margin-left: auto; color: var(--success); }
+
+/* -- Payweek panel ---------------------------------------------- */
+.pay-card, .micro-bars {
   border-radius: 14px;
   padding: 12px;
 }
-
 .pay-card strong {
   display: block;
   font-size: 2rem;
   color: var(--primary);
   margin-top: 4px;
 }
-
-.pay-card p,
-.pay-card small {
-  margin: 0;
-  color: var(--muted);
-}
-
-.micro-bars {
-  display: grid;
-  gap: 8px;
-}
-
+.pay-card p, .pay-card small { margin: 0; color: var(--muted); }
+.micro-bars { display: grid; gap: 8px; }
 .micro-row {
   display: grid;
-  grid-template-columns: 90px 1fr 54px;
-  gap: 8px;
-  align-items: center;
+  grid-template-columns: 100px 1fr 52px;
+  gap: 8px; align-items: center;
   font-size: 0.67rem;
 }
-
 .micro-track {
-  height: 8px;
-  border-radius: 999px;
+  height: 8px; border-radius: 999px;
   background: color-mix(in srgb, var(--surface) 85%, black 12%);
   overflow: hidden;
 }
-
 .micro-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 65%, #ffffff 8%), var(--primary));
+  height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--primary) 65%, #fff 8%),
+    var(--primary));
 }
 
+/* -- Toolkit panel ---------------------------------------------- */
 .tool-grid {
+  border-radius: 14px;
+  padding: 12px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
-
 .tool-grid label {
-  display: grid;
-  gap: 7px;
-  font-size: 0.72rem;
-  color: var(--muted);
+  display: grid; gap: 6px;
+  font-size: 0.72rem; color: var(--muted);
 }
-
-.tool-grid input,
-.tool-grid select {
+.tool-grid input, .tool-grid select, .tool-grid button {
   border-radius: 10px;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface-2) 90%, transparent);
@@ -465,6 +402,38 @@ h1 {
   font-family: "Space Mono", monospace;
 }
 
+/* -- Add job type picker ---------------------------------------- */
+.type-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.type-pick-btn {
+  padding: 16px 8px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 12px;
+  border: 2px solid;
+  background: transparent;
+  cursor: pointer;
+  font-family: "Outfit", sans-serif;
+}
+.type-pick-btn:hover { filter: brightness(1.15); }
+
+/* -- Input box (modal forms) ------------------------------------ */
+.input-box {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  color: var(--text);
+  padding: 10px;
+  font-family: "Outfit", sans-serif;
+  font-size: 0.9rem;
+}
+.input-box::placeholder { color: var(--muted); }
+
+/* -- Bottom nav ------------------------------------------------- */
 .smart-nav {
   border-radius: 999px;
   padding: 7px;
@@ -472,34 +441,58 @@ h1 {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
-
-.nav-chip {
-  padding: 10px 6px;
-  border-radius: 999px;
-}
-
+.nav-chip { padding: 10px 6px; border-radius: 999px; text-align: center; }
 .nav-chip.active {
   background: linear-gradient(140deg, color-mix(in srgb, var(--primary) 70%, #91c4ff), var(--primary));
   border-color: transparent;
   color: #fff;
 }
 
-.thumb-dock {
-  display: flex;
-  gap: 8px;
-}
-
-.thumb-btn {
-  flex: 1;
-  padding: 12px;
-}
-
+/* -- Thumb dock ------------------------------------------------- */
+.thumb-dock { display: flex; gap: 8px; }
+.thumb-btn  { flex: 1; padding: 12px; text-align: center; }
 .thumb-btn.primary {
-  background: linear-gradient(140deg, color-mix(in srgb, var(--primary) 70%, #9bd2ff), var(--primary));
-  border-color: transparent;
-  color: #fff;
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--primary) 70%, #9bd2ff),
+    var(--primary));
+  border-color: transparent; color: #fff;
 }
 
+/* -- Modal ------------------------------------------------------ */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+}
+.modal-box {
+  border-radius: 22px;
+  padding: 20px;
+  width: min(480px, calc(100vw - 28px));
+  max-height: calc(100dvh - 60px);
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Inherit existing app modal button styles */
+.close-btn {
+  position: absolute; top: 14px; right: 14px;
+  background: none; border: none;
+  font-size: 1.4rem; color: var(--muted);
+  cursor: pointer; line-height: 1;
+}
+.btn {
+  display: block; width: 100%;
+  padding: 12px; border-radius: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  color: var(--text); cursor: pointer;
+  font-family: "Outfit", sans-serif; font-size: 0.9rem;
+  margin-top: 8px;
+}
+.btn:hover { border-color: var(--primary); }
+
+/* -- Toast ------------------------------------------------------ */
 .toast {
   position: fixed;
   left: 50%;
@@ -510,57 +503,23 @@ h1 {
   border-radius: 999px;
   padding: 9px 14px;
   font-size: 0.73rem;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 0; pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 10;
+  z-index: 110;
+  white-space: nowrap;
 }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-@keyframes routeFlow {
-  from { transform: translateX(-140%); }
-  to { transform: translateX(380%); }
-}
-
-@keyframes nodePulse {
-  0%, 100% { box-shadow: 0 0 0 rgba(88, 166, 255, 0); }
-  50% { box-shadow: 0 0 16px rgba(88, 166, 255, 0.2); }
-}
-
+/* -- Animations ------------------------------------------------- */
 @keyframes jobLift {
   from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
 
+/* -- Responsive ------------------------------------------------- */
 @media (max-width: 900px) {
-  .lab-shell {
-    padding: 10px 10px var(--safe-bottom);
-    gap: 9px;
-  }
-
-  .lab-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .kpi-strip {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .network-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .micro-row {
-    grid-template-columns: 74px 1fr 42px;
-  }
+  .lab-shell { padding: 8px 8px var(--safe-bottom); gap: 8px; }
+  .kpi-strip { grid-template-columns: 1fr 1fr; }
+  .micro-row { grid-template-columns: 74px 1fr 42px; }
+  .type-pick-grid { grid-template-columns: repeat(2, 1fr); }
 }
