@@ -4,12 +4,9 @@
  * NEVER commit API keys - use .env files
  */
 
-// Try to get credentials from window.ENV (set in index.html for local testing)
-// or from import.meta.env with VITE_ prefix (set by Vite/Cloudflare)
-// or from localStorage (runtime override)
-
-const _windowUrl = window.ENV?.SUPABASE_URL || '';
-const _windowKey = window.ENV?.SUPABASE_ANON_KEY || '';
+// Read credentials from Vite-exposed environment variables.
+// For Cloudflare Pages, provide these as build-time env vars:
+// VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
 let _viteEnvUrl = '';
 let _viteEnvKey = '';
@@ -20,21 +17,13 @@ try {
   // import.meta may not exist in some contexts
 }
 
-const _storageUrl = (typeof localStorage !== 'undefined') ? localStorage.getItem('nx_supabase_url') || '' : '';
-const _storageKey = (typeof localStorage !== 'undefined') ? localStorage.getItem('nx_supabase_key') || '' : '';
-
-// Priority: Vite env vars → window.ENV → localStorage
-const DEFAULT_SUPABASE_URL = _viteEnvUrl || _windowUrl || _storageUrl || '';
-const DEFAULT_SUPABASE_KEY = _viteEnvKey || _windowKey || _storageKey || '';
+const DEFAULT_SUPABASE_URL = _viteEnvUrl || '';
+const DEFAULT_SUPABASE_KEY = _viteEnvKey || '';
 
 // Log what we found for debugging
 console.log('[Config] Sources checked:', {
   viteUrl: _viteEnvUrl ? '✓ set' : '✗ empty',
   viteKey: _viteEnvKey ? '✓ set' : '✗ empty',
-  windowUrl: _windowUrl ? '✓ set' : '✗ empty',
-  windowKey: _windowKey ? '✓ set' : '✗ empty',
-  storageUrl: _storageUrl ? '✓ set' : '✗ empty',
-  storageKey: _storageKey ? '✓ set' : '✗ empty',
   finalUrl: DEFAULT_SUPABASE_URL ? DEFAULT_SUPABASE_URL.substring(0, 30) + '...' : '✗ EMPTY',
   finalKey: DEFAULT_SUPABASE_KEY ? '✓ set' : '✗ EMPTY'
 });
@@ -47,30 +36,7 @@ export const SUPABASE_CONFIG = {
 // warn if we ended up with empty values after initialization
 if (!DEFAULT_SUPABASE_URL || !DEFAULT_SUPABASE_KEY) {
   console.error('[Config] ❌ Supabase config is MISSING - app will not work');
-  console.error('[Config] Make sure window.ENV is set in index.html or VITE_ env vars are configured');
-}
-
-/**
- * Save Supabase configuration to localStorage (runtime override).
- * Also updates global APP_CONFIG and SUPABASE_CONFIG.
- * @param {string} url
- * @param {string} anonKey
- */
-export function saveSupabaseConfig(url, anonKey) {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem('nx_supabase_url', url);
-      localStorage.setItem('nx_supabase_key', anonKey);
-    } catch (e) {
-      console.warn('[Config] Failed to write supabase config to storage', e);
-    }
-  }
-  SUPABASE_CONFIG.url = url;
-  SUPABASE_CONFIG.anonKey = anonKey;
-  if (APP_CONFIG) {
-    APP_CONFIG.SUPABASE_URL = url;
-    APP_CONFIG.SUPABASE_ANON_KEY = anonKey;
-  }
+  console.error('[Config] Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in environment variables');
 }
 
 const APP_CONFIG = {

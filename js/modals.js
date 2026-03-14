@@ -482,7 +482,6 @@ export const JobTrackerModals = {
                 <input type="password" id="auth-password" placeholder="Password" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
                 <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSignIn()">Sign In</button>
                 <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.showSignUp()">Create Account</button>
-                <button class="btn" style="background:var(--warning); color:#fff;" onclick="JobTrackerModals.showSupabaseSetup()">⚙ Configure Supabase</button>
             </div>
         `;
         JobTrackerModals.showModal(content);
@@ -508,52 +507,52 @@ export const JobTrackerModals = {
     },
 
     /**
-     * Supabase configuration modal (shown when env vars are missing)
+     * Profile modal for authenticated users
      */
-    async showSupabaseSetup() {
+    async showProfile() {
+        const session = JSON.parse(localStorage.getItem('nx_supabase_session') || 'null');
+        const user = session?.user || {};
+        const email = user?.email || 'Unknown';
+        const displayName = user?.user_metadata?.display_name || localStorage.getItem('nx_displayName') || 'User';
         const content = `
             <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
-            <h3 style="margin-bottom:20px;">Supabase Configuration</h3>
-            <div style="display:grid; gap:12px;">
-                <input type="url" id="config-url" placeholder="Supabase URL" value="${window.APP_CONFIG?.SUPABASE_URL || ''}" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <input type="text" id="config-key" placeholder="Anon Key" value="${window.APP_CONFIG?.SUPABASE_ANON_KEY || ''}" style="padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--surface-elev); color:var(--text-main); font-size:0.9rem;">
-                <button class="btn" style="background:var(--primary); color:#fff;" onclick="JobTrackerModals.handleSupabaseSetup()">Save</button>
-                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+            <h3 style="margin-bottom:8px;">Profile</h3>
+            <p style="margin:0 0 14px 0; color:var(--text-muted); font-size:0.85rem;">Signed in account details</p>
+            <div style="display:grid; gap:10px; margin-bottom:16px;">
+                <div style="padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--surface-elev);">
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:4px;">Display Name</div>
+                    <div style="font-weight:700;">${displayName}</div>
+                </div>
+                <div style="padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--surface-elev);">
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:4px;">Email</div>
+                    <div style="font-weight:700;">${email}</div>
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Close</button>
+                <button class="btn" style="background:var(--danger);" onclick="JobTrackerModals.handleSignOut()">Sign Out</button>
             </div>
         `;
         JobTrackerModals.showModal(content);
     },
 
-    async handleSupabaseSetup() {
-        const url = document.getElementById('config-url')?.value.trim();
-        const key = document.getElementById('config-key')?.value.trim();
-        
-        // Get showToast from utils
+    async handleSignOut() {
+        const client = getSupabase();
         const { showToast } = getUtils();
-        
-        if (!url || !key) {
-            this.customAlert('Validation', 'Please provide both URL and anon key', true);
+        if (!client) {
+            this.customAlert('Sign Out Error', 'No active client found.', true);
             return;
         }
-        try {
-            // save to storage and config
-            import('../config.js').then(cfg => {
-                cfg.saveSupabaseConfig(url, key);
-                // re-init supabase client if bridge already ran
-                if (window.supabaseClient) {
-                    window.supabaseClient = null;
-                }
-                if (window.SyncEngine) {
-                    // nothing to do until user signs in again
-                }
-                // close modal and reload page to reinitialize
-                JobTrackerModals.closeModal();
-                showToast('Configuration saved, reloading...', 1500);
-                setTimeout(() => location.reload(), 1000);
-            });
-        } catch (err) {
-            console.error('[Modals] Failed to save supabase config', err);
-            this.customAlert('Error', 'Failed to save configuration', true);
+
+        const result = await client.signOut();
+        if (result?.success) {
+            JobTrackerModals.closeModal();
+            showToast('Signed out', 1500);
+            if (window.appRender) {
+                window.appRender();
+            }
+        } else {
+            this.customAlert('Sign Out Error', result?.error || 'Unable to sign out', true);
         }
     },
 

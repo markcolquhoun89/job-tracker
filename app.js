@@ -14,11 +14,20 @@ import { JobTrackerState } from './js/state.js';
 import { JobTrackerCalculations } from './js/calculations.js';
 import { JobTrackerJobs } from './js/jobs.js';
 import { JobTrackerModals } from './js/modals.js';
-import { initModules, whenModulesReady } from './js/bridge.js';
+import { initModules } from './js/bridge.js';
 import { SUPABASE_CONFIG } from './config.js';
 
 // Basic authentication handler
+function showProfileModal() {
+    JobTrackerModals.showProfile();
+}
+
 function showSignInModal() {
+    const isAuthenticated = !!window.supabaseClient?.getStatus?.().isAuthenticated;
+    if (isAuthenticated) {
+        showProfileModal();
+        return;
+    }
     JobTrackerModals.showSignIn();
 }
 
@@ -41,7 +50,7 @@ function updateAuthButton() {
         const label = getSignedInLabel();
         btn.textContent = `👤 ${label}`;
         btn.title = `Signed in as ${label}`;
-        btn.setAttribute('onclick', 'showSignInModal()');
+        btn.setAttribute('onclick', 'showProfileModal()');
         return;
     }
 
@@ -106,23 +115,25 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
                 showToast('Error clearing session data', 3000);
             }
         });
+
+        window.addEventListener('supabase:logout', () => {
+            updateAuthButton();
+            showSignInModal();
+        });
         
         // If user is not authenticated, show sign-in modal instead of main app
         if (!isAuthenticated) {
             console.log('[App] User not authenticated - checking supabase config');
             updateAuthButton();
-            // If Supabase is not configured, show config modal first
+            // If Supabase is not configured, show setup guidance
             if (!SUPABASE_CONFIG?.url || !SUPABASE_CONFIG?.anonKey) {
-                console.log('[App] Supabase not configured - showing config modal');
-                if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
-                    window.JobTrackerModals.showSupabaseSetup();
-                } else {
-                    // fallback if modals not loaded yet
-                    setTimeout(() => {
-                        if (window.JobTrackerModals && typeof window.JobTrackerModals.showSupabaseSetup === 'function') {
-                            window.JobTrackerModals.showSupabaseSetup();
-                        }
-                    }, 500);
+                console.log('[App] Supabase not configured');
+                if (window.JobTrackerModals && typeof window.JobTrackerModals.customAlert === 'function') {
+                    window.JobTrackerModals.customAlert(
+                        'Configuration Error',
+                        'Supabase credentials are missing. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your deployment environment.',
+                        true
+                    );
                 }
                 return; // Don't show sign-in until configured
             }
@@ -2161,6 +2172,7 @@ function confirmWipe() {
 
 // expose globals for inline handlers (compatibility with existing HTML)
 Object.assign(window, {
+    showProfileModal,
     showSignInModal,
     setRange,
     nav,

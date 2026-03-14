@@ -65,10 +65,9 @@ SUPABASE_ANON_KEY: eyJhbGc...
    VITE_SUPABASE_ANON_KEY=your-anon-key-here
    NODE_ENV=development
    ```
-   **Do not** use plain `SUPABASE_URL`/`SUPABASE_ANON_KEY` unless you plan
-   to manually copy them into `window.ENV` on startup; you'll otherwise see
-   configuration errors.  The console will warn if mis‑prefixed variables are
-   detected.
+   **Do not** use plain `SUPABASE_URL`/`SUPABASE_ANON_KEY` in client builds.
+   Use only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` so Vite can
+   inject them correctly.
 
 2. Verify `.gitignore` includes `.env`:
    ```bash
