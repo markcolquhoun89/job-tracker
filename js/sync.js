@@ -83,7 +83,7 @@ export class SyncEngine {
         eq: { user_id: this.supabase.userId }
       });
 
-      console.log('[SyncEngine] pullRemoteJobs result:', remoteJobs);
+      console.log('[SyncEngine] pullRemoteJobs received array:', Array.isArray(remoteJobs), 'count:', Array.isArray(remoteJobs) ? remoteJobs.length : 0);
       
       if (!Array.isArray(remoteJobs)) {
         console.warn('[SyncEngine] No remote jobs found or fetch failed, result type:', typeof remoteJobs);
@@ -93,7 +93,7 @@ export class SyncEngine {
       console.log(`[SyncEngine] Pulled ${remoteJobs.length} remote jobs`);
       
       if (remoteJobs.length > 0) {
-        console.log('[SyncEngine] Sample remote job:', remoteJobs[0]);
+        console.log('[SyncEngine] Sample remote job id:', remoteJobs[0]?.id);
       }
       
       let changesDetected = false;
@@ -574,8 +574,6 @@ export class SyncEngine {
         
         console.log(`[SyncEngine] ✓ Merged update from ${source}: ${remoteJob.id}`);
         return true; // change detected
-      } else {
-        console.log(`[SyncEngine] Skipping job ${remoteJob.id} - local is up to date`);
       }
     }
     
