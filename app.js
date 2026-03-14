@@ -620,11 +620,37 @@ function initBackgroundAnimation() {
         });
     }
 
-    const waveLines = [
-        { amp: 18, len: 0.012, speed: 0.018, offset: 0, y: 0.3 },
-        { amp: 24, len: 0.009, speed: 0.014, offset: 1.7, y: 0.5 },
-        { amp: 16, len: 0.015, speed: 0.021, offset: 3.2, y: 0.7 }
-    ];
+    function hexToRgb(hex) {
+        const safe = (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) ? hex : '#58a6ff';
+        return {
+            r: parseInt(safe.slice(1, 3), 16),
+            g: parseInt(safe.slice(3, 5), 16),
+            b: parseInt(safe.slice(5, 7), 16)
+        };
+    }
+
+    function buildHues(hex, mode) {
+        const color = hexToRgb(hex);
+        if (mode === 'light') {
+            return [
+                color,
+                { r: 180, g: 200, b: 220 },
+                { r: Math.round(color.r * 0.7), g: Math.round(color.g * 0.7), b: Math.round(color.b * 0.85) },
+                { r: Math.round(color.r * 0.5 + 60), g: Math.round(color.g * 0.4 + 40), b: Math.round(color.b * 0.6 + 80) }
+            ];
+        }
+        return [
+            color,
+            { r: 48, g: 54, b: 61 },
+            { r: Math.round(color.r * 0.35), g: Math.round(color.g * 0.5), b: Math.round(color.b * 0.65) },
+            { r: Math.round(color.r * 0.3 + 30), g: Math.round(color.g * 0.2 + 20), b: Math.round(color.b * 0.4 + 60) }
+        ];
+    }
+
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
     let tick = 0;
 
     function animate() {
@@ -648,24 +674,42 @@ function initBackgroundAnimation() {
                 ctx.fill();
             });
         } else if (bgAnim === 'waves') {
-            tick += 1;
-            waveLines.forEach((line, index) => {
-                ctx.beginPath();
-                ctx.lineWidth = index === 1 ? 2.5 : 1.5;
-                ctx.strokeStyle = isDark
-                    ? `rgba(88, 166, 255, ${0.12 + index * 0.06})`
-                    : `rgba(9, 105, 218, ${0.16 + index * 0.05})`;
+            tick += 0.016;
 
-                for (let x = 0; x <= canvas.width; x += 8) {
-                    const y = canvas.height * line.y + Math.sin((x * line.len) + (tick * line.speed) + line.offset) * line.amp;
-                    if (x === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
+            const accent = localStorage.getItem('nx_accent') || (isDark ? '#58a6ff' : '#0969da');
+            const baseHues = buildHues(accent, isDark ? 'dark' : 'light');
+            const layers = 4;
+
+            for (let layerIndex = 0; layerIndex < layers; layerIndex++) {
+                const layerAlpha = 0.18 + layerIndex * 0.07;
+                const speed = 0.6 + layerIndex * 0.3;
+                const amp = 40 + layerIndex * 25;
+                const freq = 0.0015 + layerIndex * 0.0005;
+                const yBase = canvas.height * (0.25 + layerIndex * 0.18);
+                const phase = layerIndex * 1.2;
+                const base = baseHues[layerIndex % baseHues.length];
+                const r = lerp(base.r, base.r, 0);
+                const g = lerp(base.g, base.g, 0);
+                const b = lerp(base.b, base.b, 0);
+
+                ctx.beginPath();
+                ctx.moveTo(0, canvas.height);
+                for (let x = 0; x <= canvas.width; x += 3) {
+                    const wave1 = Math.sin(x * freq + tick * speed + phase) * amp;
+                    const wave2 = Math.sin(x * freq * 1.8 + tick * speed * 0.7 + phase + 2) * (amp * 0.4);
+                    const wave3 = Math.sin(x * freq * 0.5 + tick * speed * 1.3 + phase + 4) * (amp * 0.25);
+                    ctx.lineTo(x, yBase + wave1 + wave2 + wave3);
                 }
-                ctx.stroke();
-            });
+                ctx.lineTo(canvas.width, canvas.height);
+                ctx.closePath();
+
+                const grad = ctx.createLinearGradient(0, yBase - amp, 0, canvas.height);
+                grad.addColorStop(0, `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${layerAlpha})`);
+                grad.addColorStop(0.5, `rgba(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)},${layerAlpha * 0.5})`);
+                grad.addColorStop(1, `rgba(${Math.round(r * 0.2)},${Math.round(g * 0.2)},${Math.round(b * 0.2)},${layerAlpha * 0.15})`);
+                ctx.fillStyle = grad;
+                ctx.fill();
+            }
         }
 
         bgAnimationFrame = requestAnimationFrame(animate);
