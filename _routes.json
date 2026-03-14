@@ -1,7 +1,7 @@
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/js/*", "/css/*", "/*.js", "/*.css", "/api/*"],
+  "exclude": ["/js/*", "/css/*", "/*.js", "/*.css", "/runtime-config*"],
   "rules": [
     {
       "type": "rewrite",
