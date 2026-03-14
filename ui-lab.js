@@ -1,10 +1,10 @@
 const seedJobs = [
-  { id: "j1", premise: "Ridgeway 12", type: "UG", status: "pending", eta: "10:40", fiber: "Port 8", risk: "low", pay: 42 },
-  { id: "j2", premise: "Hawthorn 77", type: "OH", status: "pending", eta: "11:05", fiber: "Port 2", risk: "med", pay: 44 },
-  { id: "j3", premise: "Mayfield 5", type: "HyUG", status: "done", eta: "11:20", fiber: "Port 11", risk: "low", pay: 55 },
-  { id: "j4", premise: "Kingfisher 18", type: "BTTW", status: "failed", eta: "12:00", fiber: "Port 4", risk: "high", pay: 20 },
-  { id: "j5", premise: "Cedar Mews 9", type: "HyOH", status: "pending", eta: "12:25", fiber: "Port 1", risk: "med", pay: 55 },
-  { id: "j6", premise: "Brookfield 20", type: "UG", status: "pending", eta: "13:10", fiber: "Port 6", risk: "low", pay: 42 }
+  { id: "j1", premise: "12 Ridgeway Close",  type: "CBT", location: "Pole 14",        status: "pending", eta: "10:40", port: "Spl-8 P3",  risk: "low",  pay: 42 },
+  { id: "j2", premise: "77 Hawthorn Ave",    type: "CSP", location: "External box",   status: "pending", eta: "11:05", port: "Spl-2 P1",  risk: "med",  pay: 44 },
+  { id: "j3", premise: "5 Mayfield Road",    type: "ONT", location: "Hallway",         status: "done",    eta: "11:20", port: "Spl-11 P4", risk: "low",  pay: 55 },
+  { id: "j4", premise: "18 Kingfisher Dr",   type: "CBT", location: "Pit C14",         status: "failed",  eta: "12:00", port: "Spl-4 P7",  risk: "high", pay: 20 },
+  { id: "j5", premise: "9 Cedar Mews",       type: "CSP", location: "Flats block B",   status: "pending", eta: "12:25", port: "Spl-1 P2",  risk: "med",  pay: 55 },
+  { id: "j6", premise: "20 Brookfield Way",  type: "ONT", location: "Living room",     status: "pending", eta: "13:10", port: "Spl-6 P5",  risk: "low",  pay: 42 }
 ];
 
 const state = {
@@ -52,16 +52,35 @@ function randomTime() {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+function randomLocation(type) {
+  if (type === "CBT") return ["Pole 4", "Pole 9", "Pit A3", "Pit C12", "Pole 17"][Math.floor(Math.random() * 5)];
+  if (type === "CSP") return ["External box", "Side wall", "Flats block A", "Flats block B", "Front elevation"][Math.floor(Math.random() * 5)];
+  return ["Hallway", "Living room", "Kitchen", "Flat 2", "Utility room"][Math.floor(Math.random() * 5)];
+}
+
+function randomPort() {
+  const sp = Math.ceil(Math.random() * 12);
+  const p = Math.ceil(Math.random() * 8);
+  return `Spl-${sp} P${p}`;
+}
+
 function shuffledJobs() {
+  const types = ["CBT", "CSP", "ONT"];
   const risks = ["low", "med", "high"];
   return [...state.jobs]
     .sort(() => Math.random() - 0.5)
-    .map((job) => ({
-      ...job,
-      eta: randomTime(),
-      pay: Math.max(18, job.pay + Math.round((Math.random() - 0.5) * 12)),
-      risk: risks[Math.floor(Math.random() * risks.length)]
-    }));
+    .map((job) => {
+      const type = types[Math.floor(Math.random() * types.length)];
+      return {
+        ...job,
+        type,
+        location: randomLocation(type),
+        port: randomPort(),
+        eta: randomTime(),
+        pay: Math.max(18, job.pay + Math.round((Math.random() - 0.5) * 12)),
+        risk: risks[Math.floor(Math.random() * risks.length)]
+      };
+    });
 }
 
 function setView(view) {
@@ -80,16 +99,20 @@ function setJobStatus(id, status) {
   state.energy = Math.min(1.6, state.energy + 0.25);
   if (navigator.vibrate) navigator.vibrate(10);
   renderAll();
-  showToast(`Job ${id.toUpperCase()} -> ${status.toUpperCase()}`);
+  const changed = next.find((j) => j.id === id);
+  showToast(`${changed ? changed.premise : id} â†’ ${status}`);
 }
+
+const TYPE_LABELS = { CBT: "Pole / Pit", CSP: "Ext. Access", ONT: "Internal" };
 
 function swipeTemplate(job) {
   const statusClass = job.status === "done" ? "done" : (job.status === "failed" ? "failed" : "pending");
+  const typeKey = job.type.toLowerCase();
   return `
     <div class="swipe-wrap" data-job-id="${job.id}">
       <div class="action-rail">
         <div class="rail-left">
-          <button class="rail-btn done" data-action="done">Done</button>
+          <button class="rail-btn done" data-action="done">Complete</button>
           <button class="rail-btn int" data-action="pending">Reopen</button>
         </div>
         <div class="rail-right">
@@ -98,16 +121,17 @@ function swipeTemplate(job) {
       </div>
       <article class="job-card" data-job-id="${job.id}">
         <div class="job-top">
-          <strong class="job-name">${job.type} · ${job.premise}</strong>
+          <span class="type-badge type-${typeKey}">${job.type}<em>${TYPE_LABELS[job.type] ?? ""}</em></span>
           <span class="job-status ${statusClass}">${job.status.toUpperCase()}</span>
         </div>
+        <strong class="job-premise">${job.premise}</strong>
         <div class="job-bottom">
           <span>${job.eta}</span>
           <strong>GBP ${job.pay.toFixed(2)}</strong>
         </div>
         <div class="job-meta">
-          <span>Fiber ${job.fiber}</span>
-          <span>Risk ${job.risk}</span>
+          <span>${job.location}</span>
+          <span>${job.port}</span>
         </div>
       </article>
     </div>

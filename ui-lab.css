@@ -292,9 +292,38 @@ h1 {
   gap: 8px;
 }
 
-.job-name {
-  font-weight: 700;
+.job-name { font-weight: 700; }
+
+.job-premise {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 4px 0 2px;
 }
+
+/* CBT = amber/street  CSP = sky-blue  ONT = teal/green */
+.type-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.type-badge em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: 0.75;
+}
+.type-cbt { color: #f6b93b; border-color: #f6b93b44; background: #f6b93b18; }
+.type-csp { color: #74b9ff; border-color: #74b9ff44; background: #74b9ff18; }
+.type-ont { color: #55efc4; border-color: #55efc444; background: #55efc418; }
 
 .job-status {
   font-family: "Space Mono", monospace;

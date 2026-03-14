@@ -54,7 +54,7 @@
         <div class="swipe-legend glass">
           <span><i class="dot done"></i> Right swipe: Complete</span>
           <span><i class="dot fail"></i> Left swipe: Fail</span>
-          <span><i class="dot int"></i> Tap action rail: Internals</span>
+          <span><i class="dot int"></i> Rail: Reopen or mark failed</span>
         </div>
         <div id="job-stream" class="job-stream bounce-scroll"></div>
       </section>
@@ -65,17 +65,17 @@
           <p>Idle pulse map with live route pressure simulation.</p>
         </div>
         <div class="network-grid glass">
-          <div class="network-node"><span>CAB-14</span><b class="ok">Stable</b></div>
-          <div class="network-node"><span>SPL-03</span><b class="warn">Watch</b></div>
-          <div class="network-node"><span>ONT-22</span><b class="ok">Stable</b></div>
-          <div class="network-node"><span>CSP-11</span><b class="warn">Loss 0.05</b></div>
+          <div class="network-node"><span>Exchange</span><b class="ok">Up</b></div>
+          <div class="network-node"><span>Pole / Pit</span><b class="ok">CBT Clear</b></div>
+          <div class="network-node"><span>Ext. Access</span><b class="warn">CSP Watch</b></div>
+          <div class="network-node"><span>Premises</span><b class="ok">ONT Ready</b></div>
         </div>
         <div class="route-timeline glass">
           <div class="route-track"><div class="route-wave"></div></div>
           <div class="route-keys">
-            <span>Pole To CBT</span>
-            <span>CBT To Premises</span>
-            <span>ONT Validation</span>
+            <span>Exchange → Pole/Pit</span>
+            <span>CBT → CSP (Ext. Access)</span>
+            <span>CSP → ONT Install</span>
           </div>
         </div>
       </section>
