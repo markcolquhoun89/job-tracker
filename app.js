@@ -710,12 +710,79 @@ function initBackgroundAnimation() {
                 ctx.fillStyle = grad;
                 ctx.fill();
             }
+        } else if (bgAnim === 'contour') {
+            tick += 0.01;
+
+            const accent = localStorage.getItem('nx_accent') || (isDark ? '#58a6ff' : '#0969da');
+            const baseHues = buildHues(accent, isDark ? 'dark' : 'light');
+
+            // Soft atmospheric glows behind the contour lines.
+            for (let glowIndex = 0; glowIndex < 3; glowIndex++) {
+                const base = baseHues[glowIndex % baseHues.length];
+                const glowX = canvas.width * (0.2 + glowIndex * 0.28) + Math.sin(tick * (0.7 + glowIndex * 0.18) + glowIndex) * 90;
+                const glowY = canvas.height * (0.28 + glowIndex * 0.2) + Math.cos(tick * (0.5 + glowIndex * 0.16) + glowIndex * 1.7) * 60;
+                const glowRadius = 180 + glowIndex * 55;
+                const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, glowRadius);
+                glow.addColorStop(0, `rgba(${base.r},${base.g},${base.b},${isDark ? 0.12 : 0.1})`);
+                glow.addColorStop(1, `rgba(${base.r},${base.g},${base.b},0)`);
+                ctx.fillStyle = glow;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            const lineCount = 9;
+            for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
+                const base = baseHues[lineIndex % baseHues.length];
+                const progress = lineIndex / (lineCount - 1);
+                const yBase = canvas.height * (0.08 + progress * 0.84);
+                const amp = 12 + progress * 30;
+                const fineAmp = 4 + progress * 10;
+                const alpha = isDark ? (0.07 + progress * 0.05) : (0.08 + progress * 0.045);
+
+                ctx.beginPath();
+                ctx.lineWidth = lineIndex % 3 === 0 ? 1.6 : 1;
+                ctx.strokeStyle = `rgba(${base.r},${base.g},${base.b},${alpha})`;
+
+                for (let x = 0; x <= canvas.width; x += 6) {
+                    const major = Math.sin(x * (0.004 + progress * 0.002) + tick * (1.2 - progress * 0.35) + lineIndex * 0.55) * amp;
+                    const minor = Math.cos(x * (0.012 + progress * 0.006) - tick * (0.9 + progress * 0.25) + lineIndex * 1.7) * fineAmp;
+                    const drift = Math.sin((x + tick * 120) * 0.0015 + lineIndex) * 8;
+                    const y = yBase + major + minor + drift;
+                    if (x === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+
+                ctx.stroke();
+            }
+
+            // Sparse beacons moving across the contour field.
+            for (let beaconIndex = 0; beaconIndex < 5; beaconIndex++) {
+                const base = baseHues[(beaconIndex + 1) % baseHues.length];
+                const bx = (canvas.width * ((beaconIndex + 1) / 6) + tick * (18 + beaconIndex * 5)) % (canvas.width + 120) - 60;
+                const by = canvas.height * (0.18 + beaconIndex * 0.15) + Math.sin(tick * (1 + beaconIndex * 0.2) + beaconIndex) * 18;
+                const radius = 2 + (beaconIndex % 2);
+
+                ctx.beginPath();
+                ctx.arc(bx, by, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${base.r},${base.g},${base.b},${isDark ? 0.7 : 0.55})`;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(bx, by, radius * 5, 0, Math.PI * 2);
+                const beaconGlow = ctx.createRadialGradient(bx, by, 0, bx, by, radius * 5);
+                beaconGlow.addColorStop(0, `rgba(${base.r},${base.g},${base.b},${isDark ? 0.18 : 0.12})`);
+                beaconGlow.addColorStop(1, `rgba(${base.r},${base.g},${base.b},0)`);
+                ctx.fillStyle = beaconGlow;
+                ctx.fill();
+            }
         }
 
         bgAnimationFrame = requestAnimationFrame(animate);
     }
 
-    if (bgAnim === 'particles' || bgAnim === 'waves') {
+    if (bgAnim === 'particles' || bgAnim === 'waves' || bgAnim === 'contour') {
         animate();
     }
 }
@@ -2144,6 +2211,7 @@ function buildBgAnimOptions() {
     var anims = [
         { id: 'waves', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>', label: 'Waves' },
         { id: 'particles', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="6" r="1"/><circle cx="19" cy="6" r="1"/><circle cx="6" cy="18" r="1"/><circle cx="18" cy="18" r="1"/><path d="M12 12L5 6"/><path d="M12 12l7-6"/><path d="M12 12l-6 6"/><path d="M12 12l6 6"/></svg>', label: 'Particles' },
+        { id: 'contour', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/><path d="M3 12c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/><path d="M3 17c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/></svg>', label: 'Contour' },
         { id: 'none', icon: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>', label: 'None' }
     ];
     var current = state.getSetting('nx_bg_anim', localStorage.getItem('nx_bg_anim') || 'particles');
