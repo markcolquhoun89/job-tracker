@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Job Tracker UI Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./ui-lab.css">
+</head>
+<body class="motion-on" data-view="queue">
+  <canvas id="lab-canvas" aria-hidden="true"></canvas>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <div class="lab-shell">
+    <header class="lab-header glass">
+      <div class="header-copy">
+        <p class="eyebrow">FTTP Dispatch</p>
+        <h1>Field Operations Interface</h1>
+        <p class="sub">Gesture-first workflow for one-handed engineer operation</p>
+      </div>
+      <div class="header-actions">
+        <a class="pill-btn" href="./index.html">Back To Live App</a>
+        <button id="motion-toggle" class="pill-btn" type="button">Motion On</button>
+      </div>
+    </header>
+
+    <section class="kpi-strip">
+      <article class="kpi glass">
+        <span>Queue</span>
+        <strong id="kpi-queue">0</strong>
+      </article>
+      <article class="kpi glass">
+        <span>Completed</span>
+        <strong id="kpi-done">0</strong>
+      </article>
+      <article class="kpi glass">
+        <span>At Risk</span>
+        <strong id="kpi-risk">0</strong>
+      </article>
+      <article class="kpi glass">
+        <span>Projected</span>
+        <strong id="kpi-pay">0</strong>
+      </article>
+    </section>
+
+    <main class="view-stack">
+      <section class="view-panel active" data-panel="queue">
+        <div class="view-head">
+          <h2>Live Job Stream</h2>
+          <p>Swipe right to complete, swipe left to fail. Tap center to inspect.</p>
+        </div>
+        <div class="swipe-legend glass">
+          <span><i class="dot done"></i> Right swipe: Complete</span>
+          <span><i class="dot fail"></i> Left swipe: Fail</span>
+          <span><i class="dot int"></i> Tap action rail: Internals</span>
+        </div>
+        <div id="job-stream" class="job-stream bounce-scroll"></div>
+      </section>
+
+      <section class="view-panel" data-panel="network">
+        <div class="view-head">
+          <h2>Fiber Network Health</h2>
+          <p>Idle pulse map with live route pressure simulation.</p>
+        </div>
+        <div class="network-grid glass">
+          <div class="network-node"><span>CAB-14</span><b class="ok">Stable</b></div>
+          <div class="network-node"><span>SPL-03</span><b class="warn">Watch</b></div>
+          <div class="network-node"><span>ONT-22</span><b class="ok">Stable</b></div>
+          <div class="network-node"><span>CSP-11</span><b class="warn">Loss 0.05</b></div>
+        </div>
+        <div class="route-timeline glass">
+          <div class="route-track"><div class="route-wave"></div></div>
+          <div class="route-keys">
+            <span>Pole To CBT</span>
+            <span>CBT To Premises</span>
+            <span>ONT Validation</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="view-panel" data-panel="payweek">
+        <div class="view-head">
+          <h2>Payweek Radar</h2>
+          <p>Fast forecasting and workload balancing for the current cycle.</p>
+        </div>
+        <div class="pay-card glass">
+          <small>Expected Friday</small>
+          <strong id="pay-figure">0</strong>
+          <p id="pay-detail">0 jobs resolved this week</p>
+        </div>
+        <div id="micro-bars" class="micro-bars glass"></div>
+      </section>
+
+      <section class="view-panel" data-panel="toolkit">
+        <div class="view-head">
+          <h2>UI Tuning Console</h2>
+          <p>Adjust responsiveness and atmosphere while prototyping.</p>
+        </div>
+        <div class="tool-grid glass">
+          <label>
+            Accent
+            <input id="accent" type="color" value="#58a6ff">
+          </label>
+          <label>
+            Background Intensity
+            <input id="bg-intensity" type="range" min="15" max="90" value="52">
+          </label>
+          <label>
+            Particle Density
+            <select id="density">
+              <option value="regular">Regular</option>
+              <option value="dense">Dense</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label>
+            Idle Animation Pack
+            <select id="idle-pack">
+              <option value="pulse">Pulse</option>
+              <option value="drift">Drift</option>
+              <option value="calm">Calm</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <nav class="smart-nav glass" aria-label="UI Lab Navigation">
+      <button class="nav-chip active" data-view="queue">Queue</button>
+      <button class="nav-chip" data-view="network">Network</button>
+      <button class="nav-chip" data-view="payweek">Payweek</button>
+      <button class="nav-chip" data-view="toolkit">Toolkit</button>
+    </nav>
+
+    <div class="thumb-dock">
+      <button id="shuffle-jobs" class="thumb-btn primary" type="button">Shuffle Jobs</button>
+      <button id="boost-energy" class="thumb-btn" type="button">Pulse Boost</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./ui-lab.js"></script>
+</body>
+</html>
