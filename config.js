@@ -5,25 +5,42 @@
  */
 
 // Read credentials from Vite-exposed environment variables.
-// For Cloudflare Pages, provide these as build-time env vars:
-// VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+// Supports both VITE_* and SUPABASE_* names (via vite.config envPrefix).
+// Also supports legacy runtime values stored in localStorage.
 
 let _viteEnvUrl = '';
 let _viteEnvKey = '';
+let _legacyEnvUrl = '';
+let _legacyEnvKey = '';
+let _storedUrl = '';
+let _storedKey = '';
 try {
   _viteEnvUrl = import.meta?.env?.VITE_SUPABASE_URL || '';
   _viteEnvKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || '';
+  _legacyEnvUrl = import.meta?.env?.SUPABASE_URL || '';
+  _legacyEnvKey = import.meta?.env?.SUPABASE_ANON_KEY || '';
 } catch (e) {
   // import.meta may not exist in some contexts
 }
 
-const DEFAULT_SUPABASE_URL = _viteEnvUrl || '';
-const DEFAULT_SUPABASE_KEY = _viteEnvKey || '';
+try {
+  _storedUrl = localStorage.getItem('nx_supabase_url') || '';
+  _storedKey = localStorage.getItem('nx_supabase_key') || '';
+} catch (e) {
+  // storage may be unavailable
+}
+
+const DEFAULT_SUPABASE_URL = _viteEnvUrl || _legacyEnvUrl || _storedUrl || '';
+const DEFAULT_SUPABASE_KEY = _viteEnvKey || _legacyEnvKey || _storedKey || '';
 
 // Log what we found for debugging
 console.log('[Config] Sources checked:', {
   viteUrl: _viteEnvUrl ? '✓ set' : '✗ empty',
   viteKey: _viteEnvKey ? '✓ set' : '✗ empty',
+  legacyUrl: _legacyEnvUrl ? '✓ set' : '✗ empty',
+  legacyKey: _legacyEnvKey ? '✓ set' : '✗ empty',
+  storedUrl: _storedUrl ? '✓ set' : '✗ empty',
+  storedKey: _storedKey ? '✓ set' : '✗ empty',
   finalUrl: DEFAULT_SUPABASE_URL ? DEFAULT_SUPABASE_URL.substring(0, 30) + '...' : '✗ EMPTY',
   finalKey: DEFAULT_SUPABASE_KEY ? '✓ set' : '✗ EMPTY'
 });
@@ -36,7 +53,7 @@ export const SUPABASE_CONFIG = {
 // warn if we ended up with empty values after initialization
 if (!DEFAULT_SUPABASE_URL || !DEFAULT_SUPABASE_KEY) {
   console.error('[Config] ❌ Supabase config is MISSING - app will not work');
-  console.error('[Config] Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in environment variables');
+  console.error('[Config] Set VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY (or SUPABASE_URL/SUPABASE_ANON_KEY) in build environment');
 }
 
 const APP_CONFIG = {
