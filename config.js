@@ -12,9 +12,19 @@ let _viteEnvUrl = '';
 let _viteEnvKey = '';
 let _legacyEnvUrl = '';
 let _legacyEnvKey = '';
+let _runtimeEnvUrl = '';
+let _runtimeEnvKey = '';
 let _storedUrl = '';
 let _storedKey = '';
 let _isLocalDev = false;
+
+try {
+  _runtimeEnvUrl = window?.RUNTIME_ENV?.VITE_SUPABASE_URL || window?.RUNTIME_ENV?.SUPABASE_URL || '';
+  _runtimeEnvKey = window?.RUNTIME_ENV?.VITE_SUPABASE_ANON_KEY || window?.RUNTIME_ENV?.SUPABASE_ANON_KEY || '';
+} catch (e) {
+  // runtime env may not be available
+}
+
 try {
   _viteEnvUrl = import.meta?.env?.VITE_SUPABASE_URL || '';
   _viteEnvKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || '';
@@ -34,12 +44,14 @@ try {
 
 // Allow storage fallback only on localhost/dev, never in production deployments.
 const allowStorageFallback = _isLocalDev;
-const DEFAULT_SUPABASE_URL = _viteEnvUrl || _legacyEnvUrl || (allowStorageFallback ? _storedUrl : '') || '';
-const DEFAULT_SUPABASE_KEY = _viteEnvKey || _legacyEnvKey || (allowStorageFallback ? _storedKey : '') || '';
+const DEFAULT_SUPABASE_URL = _runtimeEnvUrl || _viteEnvUrl || _legacyEnvUrl || (allowStorageFallback ? _storedUrl : '') || '';
+const DEFAULT_SUPABASE_KEY = _runtimeEnvKey || _viteEnvKey || _legacyEnvKey || (allowStorageFallback ? _storedKey : '') || '';
 
 // Log what we found for debugging
 console.log('[Config] Sources checked:', {
   mode: _isLocalDev ? 'development' : 'production',
+  runtimeUrl: _runtimeEnvUrl ? '✓ set' : '✗ empty',
+  runtimeKey: _runtimeEnvKey ? '✓ set' : '✗ empty',
   viteUrl: _viteEnvUrl ? '✓ set' : '✗ empty',
   viteKey: _viteEnvKey ? '✓ set' : '✗ empty',
   legacyUrl: _legacyEnvUrl ? '✓ set' : '✗ empty',
