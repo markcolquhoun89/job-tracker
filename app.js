@@ -118,7 +118,7 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         
         // Setup service worker
         if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
+            navigator.serviceWorker.register('./sw.js?v=2').catch(() => {});
         }
         
         // Restore wake lock if it was active

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'job-tracker-v1';
+const CACHE_NAME = 'job-tracker-v2';
 
 // simple offline caching of shell assets;
 // update list when you add new build outputs
@@ -26,13 +26,53 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key !== CACHE_NAME)
+        .map((key) => caches.delete(key))
+    );
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', (event) => {
-  // cache-first strategy for GET requests
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then(resp => resp || fetch(event.request))
-  );
+
+  const url = new URL(event.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isAppShell =
+    event.request.mode === 'navigate' ||
+    event.request.destination === 'script' ||
+    event.request.destination === 'style';
+
+  if (isSameOrigin && isAppShell) {
+    // Network-first for app code to avoid stale bundles causing old runtime bugs.
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(event.request);
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(event.request, fresh.clone());
+        return fresh;
+      } catch {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        throw new Error('Offline and no cached shell asset available');
+      }
+    })());
+    return;
+  }
+
+  // Cache-first for non-critical/static assets.
+  event.respondWith((async () => {
+    const cached = await caches.match(event.request);
+    if (cached) return cached;
+    const response = await fetch(event.request);
+    if (isSameOrigin) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(event.request, response.clone());
+    }
+    return response;
+  })());
 });
