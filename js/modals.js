@@ -510,10 +510,11 @@ export const JobTrackerModals = {
      * Profile modal for authenticated users
      */
     async showProfile() {
+        const { sanitizeHTML } = getUtils();
         const session = JSON.parse(localStorage.getItem('nx_supabase_session') || 'null');
         const user = session?.user || {};
-        const email = user?.email || 'Unknown';
-        const displayName = user?.user_metadata?.display_name || localStorage.getItem('nx_displayName') || 'User';
+        const email = sanitizeHTML(user?.email || 'Unknown');
+        const displayName = sanitizeHTML(user?.user_metadata?.display_name || localStorage.getItem('nx_displayName') || 'User');
         const content = `
             <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
             <h3 style="margin-bottom:8px;">Profile</h3>
