@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Job Tracker – New UI</title>
+  <title>Job Tracker - New UI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -18,14 +18,14 @@
     <!-- -- Header --------------------------------------------------- -->
     <header class="lab-header glass">
       <div class="header-top">
-        <a class="pill-btn" href="./index.html">? Live App</a>
+        <a class="pill-btn" href="./index.html"><span aria-hidden="true">&lt;</span> Live App</a>
         <button id="auth-btn" class="pill-btn auth-pill" type="button">Account</button>
       </div>
       <div class="date-nav">
         <button class="nav-arrow" id="prev-btn" type="button" onclick="labAdjDate(-1)">&#8249;</button>
         <div class="date-center" id="lab-date-label">Today</div>
         <button class="nav-arrow" id="next-btn" type="button" onclick="labAdjDate(1)">&#8250;</button>
-        <button class="today-chip" type="button" onclick="labGoToday()">•</button>
+        <button class="today-chip" type="button" onclick="labGoToday()">Today</button>
       </div>
       <div class="range-bar">
         <button class="range-chip active" data-range="day"   onclick="labSetRange('day',this)">Day</button>
@@ -51,7 +51,7 @@
       </article>
       <article class="kpi glass">
         <span>Earned</span>
-        <strong id="kpi-pay">£0</strong>
+        <strong id="kpi-pay">GBP 0</strong>
       </article>
     </section>
 
@@ -62,7 +62,17 @@
       <section class="view-panel active" data-panel="queue">
         <div class="view-head">
           <h2>Job Queue</h2>
-          <p>Swipe right to complete &middot; left to fail &middot; action rail for internals</p>
+          <p>Swipe right to complete, left to fail. Tap a card to edit.</p>
+        </div>
+        <div class="queue-tools glass">
+          <input id="queue-search" class="queue-search" type="search" placeholder="Search type, job ID or notes">
+          <select id="queue-filter" class="queue-select">
+            <option value="all">All statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Completed">Completed</option>
+            <option value="Internals">Internals</option>
+            <option value="Failed">Failed</option>
+          </select>
         </div>
         <div id="job-stream" class="job-stream bounce-scroll"></div>
       </section>
@@ -80,12 +90,12 @@
       <section class="view-panel" data-panel="payweek">
         <div class="view-head">
           <h2>Pay Week</h2>
-          <p>Sat–Fri pay cycle overview.</p>
+          <p>Sat-Fri pay cycle overview.</p>
         </div>
         <div class="pay-card glass">
           <small>Current week total</small>
-          <strong id="pay-figure">£0.00</strong>
-          <p id="pay-detail">Loading…</p>
+          <strong id="pay-figure">GBP 0.00</strong>
+          <p id="pay-detail">Loading...</p>
         </div>
         <div id="micro-bars" class="micro-bars glass"></div>
       </section>

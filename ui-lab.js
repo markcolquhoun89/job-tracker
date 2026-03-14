@@ -10,7 +10,7 @@ import { initModules }            from './js/bridge.js';
 window.JobTrackerModals = JobTrackerModals;
 
 const { STATUS }                                           = JobTrackerConstants;
-const { sanitizeHTML, showToast, formatDate, getWeekNumber } = JobTrackerUtils;
+const { sanitizeHTML, showToast, getWeekNumber } = JobTrackerUtils;
 const state                                                = JobTrackerState;
 const { calculate, getPayPeriod, getPayPeriodHistory }     = JobTrackerCalculations;
 const jobOps                                               = JobTrackerJobs;
@@ -96,7 +96,7 @@ function updateDateLabel() {
     const sat   = new Date(ref); sat.setDate(ref.getDate() - toSat);
     const fri   = new Date(sat); fri.setDate(sat.getDate() + 6);
     const fmt   = x => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    el.textContent = `Wk ${getWeekNumber(d)} · ${fmt(sat)} – ${fmt(fri)}`;
+    el.textContent = `Wk ${getWeekNumber(d)} | ${fmt(sat)} - ${fmt(fri)}`;
   } else if (state.range === 'month') {
     el.textContent = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   } else {
@@ -109,7 +109,7 @@ function updateKpi(s) {
   document.getElementById('kpi-pending').textContent = String(s.pend ?? 0);
   document.getElementById('kpi-done').textContent    = String(s.done ?? 0);
   document.getElementById('kpi-rate').textContent    = s.compRate != null ? s.compRate + '%' : '--';
-  document.getElementById('kpi-pay').textContent     = '£' + (s.totalCash ?? 0).toFixed(0);
+  document.getElementById('kpi-pay').textContent     = 'GBP ' + (s.totalCash ?? 0).toFixed(0);
 }
 
 // -- Type badge colours --------------------------------------------
@@ -140,6 +140,9 @@ function jobCardHTML(job) {
   const s = job.status.toLowerCase().replace(' ', '-');
   const fee = parseFloat(job.fee || 0).toFixed(2);
   const jobID = job.jobID ? `<span class="job-id">${sanitizeHTML(job.jobID)}</span>` : '';
+  const notesPreview = job.notes
+    ? `<span class="job-notes-preview">${sanitizeHTML(job.notes.slice(0, 72))}${job.notes.length > 72 ? '...' : ''}</span>`
+    : '<span class="job-notes-preview empty">No notes yet</span>';
   return `
     <div class="swipe-wrap" data-job-id="${job.id}">
       <div class="action-rail">
@@ -158,11 +161,11 @@ function jobCardHTML(job) {
         </div>
         <div class="job-mid">
           ${jobID}
-          ${job.notes ? `<span class="job-notes-preview">${sanitizeHTML(job.notes.slice(0,60))}${job.notes.length > 60 ? '…' : ''}</span>` : ''}
+          ${notesPreview}
         </div>
         <div class="job-bottom">
           <span class="job-date">${job.date}</span>
-          <strong class="job-fee">£${fee}</strong>
+          <strong class="job-fee">GBP ${fee}</strong>
         </div>
       </article>
     </div>`;
@@ -183,34 +186,69 @@ async function setStatus(id, newStatus) {
 function attachCardGestures(wrap) {
   const card   = wrap.querySelector('.job-card');
   const jobId  = card.dataset.jobId;
-  let startX   = 0;
+  let startX = 0;
+  let startY = 0;
   let currentX = 0;
-  let dragging  = false;
+  let moved = false;
+  let activePointerId = null;
+  let axisLock = null;
+  let ignoreSwipe = false;
+
+  const resetGesture = () => {
+    activePointerId = null;
+    axisLock = null;
+    ignoreSwipe = false;
+    currentX = 0;
+    moved = false;
+    card.style.setProperty('--drag', '0px');
+    wrap.classList.remove('swiping');
+  };
 
   card.addEventListener('pointerdown', (e) => {
-    dragging = true; startX = e.clientX; currentX = 0;
-    card.setPointerCapture(e.pointerId);
+    if (e.target.closest('.rail-btn')) return;
+    activePointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    currentX = 0;
+    moved = false;
+    axisLock = null;
+    ignoreSwipe = e.pointerType === 'touch' && e.clientX < 20;
   });
+
   card.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    currentX = e.clientX - startX;
-    const clamped = Math.max(-160, Math.min(160, currentX));
+    if (activePointerId !== e.pointerId || ignoreSwipe) return;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    if (!axisLock) {
+      if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) return;
+      axisLock = Math.abs(deltaX) > Math.abs(deltaY) * 1.2 ? 'x' : 'y';
+      if (axisLock === 'x') {
+        card.setPointerCapture(e.pointerId);
+        wrap.classList.add('swiping');
+      }
+    }
+
+    if (axisLock !== 'x') return;
+    e.preventDefault();
+    moved = true;
+    currentX = deltaX;
+    const clamped = Math.max(-128, Math.min(128, currentX));
     card.style.setProperty('--drag', `${clamped}px`);
   });
-  card.addEventListener('pointerup', () => {
-    if (!dragging) return;
-    dragging = false;
-    if      (currentX >  110) setStatus(jobId, STATUS.COMPLETED);
-    else if (currentX < -110) setStatus(jobId, STATUS.FAILED);
-    card.style.setProperty('--drag', '0px');
+
+  card.addEventListener('pointerup', (e) => {
+    if (activePointerId !== e.pointerId) return;
+    if (axisLock === 'x') {
+      if (currentX > 96) setStatus(jobId, STATUS.COMPLETED);
+      else if (currentX < -96) setStatus(jobId, STATUS.FAILED);
+    } else if (!moved && !e.target.closest('.rail-btn')) {
+      JobTrackerModals.editJob(jobId);
+    }
+    resetGesture();
   });
-  card.addEventListener('pointercancel', () => {
-    dragging = false;
-    card.style.setProperty('--drag', '0px');
-  });
-  card.addEventListener('click', (e) => {
-    if (Math.abs(currentX) < 8) JobTrackerModals.editJob(jobId);
-  });
+
+  card.addEventListener('pointercancel', resetGesture);
 
   wrap.querySelectorAll('.rail-btn').forEach(btn => {
     btn.addEventListener('click', () => setStatus(jobId, btn.dataset.action));
@@ -221,10 +259,21 @@ function attachCardGestures(wrap) {
 function renderQueue(list) {
   const stream = document.getElementById('job-stream');
   if (!stream) return;
-  if (list.length === 0) { stream.innerHTML = emptyCard(); return; }
+  const q = (state.searchQuery || '').trim().toLowerCase();
+  const filtered = list.filter((job) => {
+    if (state.statusFilter !== 'all' && job.status !== state.statusFilter) return false;
+    if (!q) return true;
+    return (
+      job.type.toLowerCase().includes(q) ||
+      (job.jobID || '').toLowerCase().includes(q) ||
+      (job.notes || '').toLowerCase().includes(q)
+    );
+  });
+
+  if (filtered.length === 0) { stream.innerHTML = emptyCard(); return; }
 
   // Sort: pending first, then completed/failed/internals
-  const sorted = [...list].sort((a, b) => {
+  const sorted = [...filtered].sort((a, b) => {
     const ap = a.status === STATUS.PENDING ? 0 : 1;
     const bp = b.status === STATUS.PENDING ? 0 : 1;
     if (ap !== bp) return ap - bp;
@@ -251,20 +300,20 @@ function renderStats() {
     <div class="type-row">
       ${typeBadge(type)}
       <span>${tb.count} jobs</span>
-      <span style="color:var(--success)">?${tb.done}</span>
-      <span style="color:var(--danger)">?${tb.fails}</span>
-      <span style="color:var(--warning)">?${tb.ints}</span>
-      <b>£${tb.rev.toFixed(0)}</b>
+      <span style="color:var(--success)">Done ${tb.done}</span>
+      <span style="color:var(--danger)">Fail ${tb.fails}</span>
+      <span style="color:var(--warning)">Int ${tb.ints}</span>
+      <b>GBP ${tb.rev.toFixed(0)}</b>
     </div>`).join('');
 
   el.innerHTML = `
     <div class="stat-card glass">
       <div class="stat-row"><span>Completion</span><b>${s.compRate}%</b></div>
       <div class="stat-row"><span>Excl. Hybrid</span><b>${s.exclHy}%</b></div>
-      <div class="stat-row"><span>Streak</span><b>${s.streak} ??</b></div>
+      <div class="stat-row"><span>Streak</span><b>${s.streak}</b></div>
       <div class="stat-row"><span>Jobs</span><b>${s.vol}</b></div>
-      <div class="stat-row"><span>Avg / Job</span><b>£${s.avgJobPay}</b></div>
-      <div class="stat-row"><span>Avg / Day</span><b>£${s.avgDailyPay}</b></div>
+      <div class="stat-row"><span>Avg / Job</span><b>GBP ${s.avgJobPay}</b></div>
+      <div class="stat-row"><span>Avg / Day</span><b>GBP ${s.avgDailyPay}</b></div>
       <div class="stat-row"><span>Days worked</span><b>${s.daysWorked}</b></div>
     </div>
     <div class="stat-card glass type-breakdown">
@@ -278,8 +327,8 @@ function renderPayweek() {
   const current = getPayPeriod();
   const fig     = document.getElementById('pay-figure');
   const det     = document.getElementById('pay-detail');
-  if (fig) fig.textContent = `£${current.total.toFixed(2)}`;
-  if (det) det.textContent = `${current.label} · ${current.count} job${current.count !== 1 ? 's' : ''}`;
+  if (fig) fig.textContent = `GBP ${current.total.toFixed(2)}`;
+  if (det) det.textContent = `${current.label} | ${current.count} job${current.count !== 1 ? 's' : ''}`;
 
   const history = getPayPeriodHistory(8);
   const bars    = document.getElementById('micro-bars');
@@ -292,7 +341,7 @@ function renderPayweek() {
       <div class="micro-track">
         <div class="micro-fill" style="width:${(period.total / maxPay) * 100}%"></div>
       </div>
-      <b>£${period.total.toFixed(0)}</b>
+      <b>GBP ${period.total.toFixed(0)}</b>
     </div>`).join('');
 }
 
@@ -307,7 +356,7 @@ function showAddJobPicker() {
   }).join('');
 
   JobTrackerModals.showModal(`
-    <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+    <button class="close-btn" onclick="JobTrackerModals.closeModal()">x</button>
     <h3 style="margin-bottom:4px">ADD JOB</h3>
     <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:14px">${date}</p>
     <input type="text" id="lab-add-jobid" class="input-box" placeholder="Job ID (optional)" style="margin-bottom:14px">
@@ -442,6 +491,8 @@ function wireToolkit() {
   const bgEl       = document.getElementById('bg-intensity');
   const densityEl  = document.getElementById('density');
   const idlePackEl = document.getElementById('idle-pack');
+  const searchEl   = document.getElementById('queue-search');
+  const filterEl   = document.getElementById('queue-filter');
 
   motionBtn?.addEventListener('click', () => {
     lab.motion = !lab.motion;
@@ -470,6 +521,16 @@ function wireToolkit() {
   idlePackEl?.addEventListener('change', (e) => {
     lab.idlePack = e.target.value;
     showToast(`Idle: ${lab.idlePack}`);
+  });
+
+  searchEl?.addEventListener('input', (e) => {
+    state.searchQuery = e.target.value;
+    render();
+  });
+
+  filterEl?.addEventListener('change', (e) => {
+    state.statusFilter = e.target.value;
+    render();
   });
 
   document.getElementById('add-job-btn')?.addEventListener('click', showAddJobPicker);
