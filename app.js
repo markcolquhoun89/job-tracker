@@ -22,6 +22,34 @@ function showSignInModal() {
     JobTrackerModals.showSignIn();
 }
 
+function getSignedInLabel() {
+    const session = JSON.parse(localStorage.getItem('nx_supabase_session') || 'null');
+    const user = session?.user || null;
+    const displayName = (state?.displayName || localStorage.getItem('nx_displayName') || '').trim();
+    if (displayName) return displayName;
+    if (user?.user_metadata?.display_name) return user.user_metadata.display_name;
+    if (user?.email) return user.email.split('@')[0];
+    return 'Account';
+}
+
+function updateAuthButton() {
+    const btn = document.getElementById('auth-btn');
+    if (!btn) return;
+
+    const isAuthenticated = !!window.supabaseClient?.getStatus?.().isAuthenticated;
+    if (isAuthenticated) {
+        const label = getSignedInLabel();
+        btn.textContent = `👤 ${label}`;
+        btn.title = `Signed in as ${label}`;
+        btn.setAttribute('onclick', 'showSignInModal()');
+        return;
+    }
+
+    btn.textContent = '🔐 Sign In';
+    btn.title = 'Authentication';
+    btn.setAttribute('onclick', 'showSignInModal()');
+}
+
 // Locals for convenience
 const { STATUS, RANGES, NOTE_TEMPLATES, SATURDAY_MULTIPLIER } = JobTrackerConstants;
 const { generateID, timeAgo, debounce, sanitizeHTML, isSaturday, formatDate, getWeekNumber, showToast } = JobTrackerUtils;
@@ -49,6 +77,7 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         const supabase = window.supabaseClient;
         const isAuthenticated = !!hasAuthenticatedSession || !!supabase?.getStatus?.().isAuthenticated;
         console.log('[App] User authenticated:', isAuthenticated);
+        updateAuthButton();
         
         // Subscribe to state changes for reactive updates
         state.subscribe((event, data) => {
@@ -81,6 +110,7 @@ const { customAlert, confirmModal, editJob: editJobModal, showSaturdayRecalculat
         // If user is not authenticated, show sign-in modal instead of main app
         if (!isAuthenticated) {
             console.log('[App] User not authenticated - checking supabase config');
+            updateAuthButton();
             // If Supabase is not configured, show config modal first
             if (!SUPABASE_CONFIG?.url || !SUPABASE_CONFIG?.anonKey) {
                 console.log('[App] Supabase not configured - showing config modal');
@@ -667,6 +697,7 @@ function shareReport(stats, list) {
  * @param {boolean} softUpdate - Whether this is a soft update (data change) or full render
  */
 function render(softUpdate) {
+    updateAuthButton();
     const container = document.getElementById('view-container');
     const scrollY = container.scrollTop;
    
