@@ -1335,9 +1335,81 @@ function renderStats(container, list, s) {
         bonusQualified: false
     };
     const bonusQualifiedCount = weeklyRows.filter(w => w.bonusQualified).length;
+
+    const weeklyTrendChart = (() => {
+        if (!weeklyRows.length) {
+            return '<div style="font-size:0.75rem; color:var(--text-muted);">No weekly trend data in this scope.</div>';
+        }
+
+        const rows = [...weeklyRows].reverse();
+        const width = 460;
+        const height = 170;
+        const left = 24;
+        const right = width - 14;
+        const top = 12;
+        const bottom = height - 24;
+        const chartH = bottom - top;
+        const step = rows.length > 1 ? (right - left) / (rows.length - 1) : 0;
+        const maxY = Math.max(
+            pointsTarget,
+            bonusCompletedTarget,
+            ...rows.map(r => r.points),
+            ...rows.map(r => r.completedEligible),
+            1
+        );
+        const y = (v) => bottom - ((v / maxY) * chartH);
+        const pointsPath = rows.map((r, i) => `${left + (i * step)},${y(r.points)}`).join(' ');
+
+        return `<div style="overflow-x:auto;">
+            <svg viewBox="0 0 ${width} ${height}" style="width:100%; min-width:360px; height:auto;">
+                <line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="var(--border-t)" stroke-width="1"/>
+                <line x1="${left}" y1="${y(pointsTarget)}" x2="${right}" y2="${y(pointsTarget)}" stroke="var(--primary)" stroke-dasharray="4 4" stroke-width="1.2" opacity="0.65"/>
+                <line x1="${left}" y1="${y(bonusCompletedTarget)}" x2="${right}" y2="${y(bonusCompletedTarget)}" stroke="var(--warning)" stroke-dasharray="4 4" stroke-width="1.2" opacity="0.65"/>
+                ${rows.map((r, i) => {
+                    const x = left + (i * step);
+                    const barW = Math.max(8, Math.min(16, (right - left) / Math.max(rows.length, 10)));
+                    const barY = y(r.completedEligible);
+                    return `<rect x="${x - (barW / 2)}" y="${barY}" width="${barW}" height="${bottom - barY}" rx="3" fill="color-mix(in srgb, var(--success) 70%, transparent)" opacity="0.75"><title>${r.label} - Done ${r.completedEligible}</title></rect>`;
+                }).join('')}
+                <polyline points="${pointsPath}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                ${rows.map((r, i) => {
+                    const x = left + (i * step);
+                    const py = y(r.points);
+                    return `<circle cx="${x}" cy="${py}" r="2.8" fill="var(--primary)"><title>${r.label} - Points ${r.points.toFixed(1)}</title></circle>`;
+                }).join('')}
+            </svg>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:0.65rem; color:var(--text-muted); margin-top:4px;">
+                <span><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:color-mix(in srgb, var(--success) 70%, transparent); margin-right:5px;"></span>Eligible Done</span>
+                <span><span style="display:inline-block; width:10px; height:2px; background:var(--primary); margin-right:5px; vertical-align:middle;"></span>Points</span>
+                <span><span style="display:inline-block; width:10px; height:2px; background:var(--warning); margin-right:5px; vertical-align:middle;"></span>18 Done Target</span>
+                <span><span style="display:inline-block; width:10px; height:2px; background:var(--primary); margin-right:5px; vertical-align:middle;"></span>20 Points Target</span>
+            </div>
+        </div>`;
+    })();
+
+    const typePivotRows = Object.entries(stats.typeBreakdown).map(([type, d]) => {
+        const pts = (toNum(d.done) * typePoints(type)) + (toNum(d.ints) * internalPoints);
+        const rev = toNum(d.rev);
+        return { type, jobs: toNum(d.count), done: toNum(d.done), ints: toNum(d.ints), points: pts, rev };
+    }).sort((a, b) => b.points - a.points);
    
     // Build panel contents
     const panels = [
+        {
+            id: 'overview-stats',
+            title: 'Overview',
+            content: `<div class="stat-grid" style="margin:-8px;">
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Completion</small><b style="font-size:1.55rem; color:${rc1};">${stats.compRate}%</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Weekly Bonus</small><b style="font-size:1.55rem; color:${activeWeek.bonusQualified ? 'var(--success)' : 'var(--warning)'};">${activeWeek.bonusQualified ? 'true' : 'false'}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Weekly Points</small><b style="font-size:1.55rem; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--text-main)'};">${activeWeek.points.toFixed(1)} / ${pointsTarget}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Period Earnings</small><b style="font-size:1.55rem; color:var(--success);">&pound;${stats.totalCash.toFixed(0)}</b></div>
+            </div>`
+        },
+        {
+            id: 'weekly-performance',
+            title: 'Weekly Performance Trend',
+            content: weeklyTrendChart
+        },
         {
             id: 'completion',
             title: 'Completion Metrics',
@@ -1520,6 +1592,35 @@ function renderStats(container, list, s) {
             </div>`
         }
     ];
+
+    if (typePivotRows.length > 0) {
+        panels.push({
+            id: 'type-pivot',
+            title: 'Type Pivot (Jobs, Points, Revenue)',
+            content: `<div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+                    <thead><tr style="border-bottom:2px solid var(--border-t); text-align:left;">
+                        <th style="padding:6px 4px; color:var(--text-muted);">Type</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Jobs</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Done</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Int</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Points</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Revenue</th>
+                    </tr></thead>
+                    <tbody>
+                        ${typePivotRows.map(r => `<tr style="border-bottom:1px solid var(--border-t);">
+                            <td style="padding:8px 4px; font-weight:700;">${r.type}</td>
+                            <td style="padding:8px 4px; text-align:right;">${r.jobs}</td>
+                            <td style="padding:8px 4px; text-align:right; color:var(--success);">${r.done}</td>
+                            <td style="padding:8px 4px; text-align:right; color:var(--warning);">${r.ints}</td>
+                            <td style="padding:8px 4px; text-align:right; font-weight:700;">${r.points.toFixed(1)}</td>
+                            <td style="padding:8px 4px; text-align:right; font-weight:700;">&pound;${r.rev.toFixed(0)}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`
+        });
+    }
    
     if (Object.keys(s.typeBreakdown).length) {
         panels.push({
@@ -1553,6 +1654,11 @@ function renderStats(container, list, s) {
     }
    
     // Apply saved order or use default
+    seedPanelLayoutDefaults(
+        'stats',
+        ['completion', 'status-grid', 'momentum', 'performance', 'volume-chart', 'streaks', 'weekday', 'type-breakdown'],
+        ['overview-stats', 'weekly-performance', 'bonus-system', 'points-system', 'type-pivot', 'completion', 'status-grid', 'momentum', 'performance', 'volume-chart', 'streaks', 'weekday', 'type-breakdown']
+    );
     const savedOrder = getPanelOrder('stats');
     const orderedPanels = savedOrder.length > 0
         ? savedOrder.map(id => panels.find(p => p.id === id)).filter(p => p)
@@ -1624,6 +1730,47 @@ function renderFunds(container, list, s) {
     });
     let bestWeek = { key: null, val: 0 };
     Object.entries(weeklyTotals).forEach(([k, v]) => { if (v > bestWeek.val) bestWeek = { key: k, val: v }; });
+    const weeklyRevenueRows = Object.entries(weeklyTotals)
+        .map(([key, val]) => {
+            const start = new Date(`${key}T00:00:00`);
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            return {
+                key,
+                start,
+                label: `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
+                val
+            };
+        })
+        .sort((a, b) => a.start - b.start);
+    const weeklyRevenueMax = Math.max(...weeklyRevenueRows.map(w => w.val), 1);
+
+    const weeklyCashTrendChart = (() => {
+        if (!weeklyRevenueRows.length) {
+            return '<div style="font-size:0.75rem; color:var(--text-muted);">No weekly revenue data in this scope.</div>';
+        }
+        const width = 460;
+        const height = 160;
+        const left = 24;
+        const right = width - 12;
+        const top = 10;
+        const bottom = height - 20;
+        const chartH = bottom - top;
+        const step = weeklyRevenueRows.length > 1 ? (right - left) / (weeklyRevenueRows.length - 1) : 0;
+
+        return `<div style="overflow-x:auto;">
+            <svg viewBox="0 0 ${width} ${height}" style="width:100%; min-width:360px; height:auto;">
+                <line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="var(--border-t)" stroke-width="1"/>
+                ${weeklyRevenueRows.map((w, i) => {
+                    const x = left + (i * step);
+                    const h = (w.val / weeklyRevenueMax) * chartH;
+                    const y = bottom - h;
+                    const barW = Math.max(10, Math.min(20, (right - left) / Math.max(weeklyRevenueRows.length, 10)));
+                    return `<rect x="${x - (barW / 2)}" y="${y}" width="${barW}" height="${h}" rx="3" fill="color-mix(in srgb, var(--primary) 76%, transparent)"><title>${w.label} - £${w.val.toFixed(0)}</title></rect>`;
+                }).join('')}
+            </svg>
+        </div>`;
+    })();
     // Completed revenue as % of total
     const completedPct = s.totalCash > 0 ? ((s.completedRev / s.totalCash) * 100).toFixed(0) : 0;
     // Cumulative daily running total
@@ -1638,6 +1785,21 @@ function renderFunds(container, list, s) {
     const netEarnings = s.totalCash - chargebacksTotal;
     // Build panel contents
     const panels = [
+        {
+            id: 'overview-funds',
+            title: 'Overview',
+            content: `<div class="stat-grid" style="margin:-8px;">
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Work Week Pay</small><b style="font-size:1.45rem; color:var(--success);">&pound;${pp.total.toFixed(0)}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Net Earnings</small><b style="font-size:1.45rem; color:${netEarnings >= 0 ? 'var(--success)' : 'var(--danger)'};">&pound;${netEarnings.toFixed(0)}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Avg/Job</small><b style="font-size:1.45rem;">&pound;${parseFloat(s.avgJobPay || 0).toFixed(0)}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">vs Previous</small><b style="font-size:1.45rem; color:${trendColor(earningsDelta)};">${earningsDelta >= 0 ? '+' : ''}&pound;${earningsDelta.toFixed(0)}</b></div>
+            </div>`
+        },
+        {
+            id: 'weekly-cash-trend',
+            title: 'Weekly Cash Trend',
+            content: weeklyCashTrendChart
+        },
         {
             id: 'total-revenue',
             title: 'Total Period Revenue',
@@ -1836,9 +1998,48 @@ function renderFunds(container, list, s) {
             </div>`
         });
     }
+    if (weeklyRevenueRows.length > 0) {
+        panels.push({
+            id: 'weekly-funds-pivot',
+            title: 'Weekly Funds Pivot',
+            content: `<div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+                    <thead><tr style="border-bottom:2px solid var(--border-t); text-align:left;">
+                        <th style="padding:6px 4px; color:var(--text-muted);">Week</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Jobs</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Revenue</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Avg/Job</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Share</th>
+                    </tr></thead>
+                    <tbody>
+                        ${weeklyRevenueRows.map(w => {
+                            const jobsInWeek = list.filter(j => {
+                                const jd = new Date(j.date + 'T00:00:00');
+                                return jd >= w.start && jd <= new Date(w.start.getFullYear(), w.start.getMonth(), w.start.getDate() + 6);
+                            }).length;
+                            const avg = jobsInWeek > 0 ? (w.val / jobsInWeek) : 0;
+                            const share = s.totalCash > 0 ? ((w.val / s.totalCash) * 100) : 0;
+                            return `<tr style="border-bottom:1px solid var(--border-t);">
+                                <td style="padding:8px 4px; font-weight:700;">${w.label}</td>
+                                <td style="padding:8px 4px; text-align:right;">${jobsInWeek}</td>
+                                <td style="padding:8px 4px; text-align:right; font-weight:700;">&pound;${w.val.toFixed(0)}</td>
+                                <td style="padding:8px 4px; text-align:right;">&pound;${avg.toFixed(0)}</td>
+                                <td style="padding:8px 4px; text-align:right;">${share.toFixed(0)}%</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>`
+        });
+    }
     // Apply saved order or use default
     // Filter out null panels (conditional panels that didn't meet criteria)
     const validPanels = panels.filter(p => p);
+    seedPanelLayoutDefaults(
+        'funds',
+        ['total-revenue', 'milestones', 'insights', 'daily-earnings', 'revenue-status', 'pay-history', 'cumulative', 'revenue-goal', 'projected', 'period-earnings', 'type-revenue', 'weekly-funds-pivot'],
+        ['overview-funds', 'weekly-cash-trend', 'total-revenue', 'revenue-status', 'pay-history', 'weekly-funds-pivot', 'insights', 'period-earnings', 'type-revenue', 'daily-earnings', 'cumulative', 'projected', 'revenue-goal', 'milestones', 'chargebacks']
+    );
     const savedOrder = getPanelOrder('funds');
     const orderedPanels = savedOrder.length > 0
         ? savedOrder.map(id => validPanels.find(p => p.id === id)).filter(p => p)
@@ -2323,6 +2524,35 @@ function setPanelState(tab, panelId, collapsed) {
 function getPanelOrder(tab) {
     const key = `nx_panel_order_${tab}`;
     return JSON.parse(localStorage.getItem(key) || '[]');
+}
+
+/**
+ * Seed default panel collapse/order one time for a tab.
+ * This keeps dense analytics available but out of the initial scroll path.
+ */
+function seedPanelLayoutDefaults(tab, collapsedIds = [], order = []) {
+    const versionKey = `nx_panel_layout_${tab}_20260317_v2`;
+    if (localStorage.getItem(versionKey) === '1') return;
+
+    const states = getPanelStates(tab);
+    let changed = false;
+    collapsedIds.forEach(id => {
+        if (states[id] === undefined) {
+            states[id] = true;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        localStorage.setItem(`nx_panels_${tab}`, JSON.stringify(states));
+    }
+
+    const existingOrder = getPanelOrder(tab);
+    if (existingOrder.length === 0 && order.length > 0) {
+        setPanelOrder(tab, order);
+    }
+
+    localStorage.setItem(versionKey, '1');
 }
 
 /**
