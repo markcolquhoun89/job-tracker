@@ -1286,6 +1286,7 @@ function renderStats(container, list, s) {
                 end,
                 label: `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
                 completedEligible: 0,
+                fullJobs: 0,
                 internals: 0,
                 points: 0,
                 qualityFlagged: false
@@ -1293,6 +1294,9 @@ function renderStats(container, list, s) {
         }
 
         const bucket = weeklyMap.get(key);
+        if (job.status === STATUS.COMPLETED || job.status === STATUS.INTERNALS) {
+            bucket.fullJobs += 1;
+        }
         if (job.status === STATUS.COMPLETED && isCompletionEligibleType(job)) {
             bucket.completedEligible += 1;
             bucket.points += typePoints(job.type);
@@ -1324,6 +1328,7 @@ function renderStats(container, list, s) {
 
     const activeWeek = weeklyRows.find(w => w.key === activeWeekStart) || {
         completedEligible: 0,
+        fullJobs: 0,
         internals: 0,
         points: 0,
         targetMet: false,
@@ -1417,19 +1422,21 @@ function renderStats(container, list, s) {
                     <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--text-main)'};">${activeWeek.points.toFixed(1)}</div>
                 </div>
                 <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--warning) 14%, transparent), transparent); border:1px solid var(--border-t);">
-                    <div style="font-size:0.6rem; color:var(--text-muted);">Internals (Active Week)</div>
-                    <div style="font-size:1.1rem; font-weight:800; color:var(--warning);">${activeWeek.internals}</div>
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Full Jobs (Active Week)</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:var(--text-main);">${activeWeek.fullJobs}</div>
                 </div>
                 <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--success) 14%, transparent), transparent); border:1px solid var(--border-t);">
                     <div style="font-size:0.6rem; color:var(--text-muted);">Weekly Target</div>
                     <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--warning)'};">${pointsTarget}</div>
                 </div>
             </div>
+            <button class="btn" style="margin:0 0 10px 0; background:var(--border); color:var(--text-main);" onclick="showPointsQuickView()">Quick View: Points By Type</button>
             <div style="overflow-x:auto; border:1px solid var(--border-t); border-radius:10px;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
                     <thead>
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-bottom:1px solid var(--border-t);">
                             <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Week</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Jobs</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Int</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Points</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Target</th>
@@ -1439,15 +1446,17 @@ function renderStats(container, list, s) {
                         ${weeklyRows.length > 0 ? weeklyRows.map((w, i) => `
                             <tr style="border-bottom:1px solid var(--border-t); ${i === 0 ? 'background:color-mix(in srgb, var(--primary) 10%, transparent);' : ''}">
                                 <td style="padding:8px 6px; font-weight:700;">${w.label}</td>
+                                <td style="padding:8px 6px; text-align:right;">${w.fullJobs}</td>
                                 <td style="padding:8px 6px; text-align:right; color:var(--warning);">${w.internals}</td>
                                 <td style="padding:8px 6px; text-align:right; font-weight:800; color:${w.targetMet ? 'var(--success)' : 'var(--text-main)'};">${w.points.toFixed(1)}</td>
                                 <td style="padding:8px 6px; text-align:right; color:${w.targetMet ? 'var(--success)' : 'var(--warning)'};">${w.targetMet ? 'MET' : `${pointsTarget - w.points > 0 ? (pointsTarget - w.points).toFixed(1) : '0.0'} to go`}</td>
                             </tr>
-                        `).join('') : `<tr><td colspan="4" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
+                        `).join('') : `<tr><td colspan="5" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
                     </tbody>
                     <tfoot>
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-top:1px solid var(--border-t); font-weight:700;">
                             <td style="padding:8px 6px;">Totals</td>
+                            <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.fullJobs, 0)}</td>
                             <td style="padding:8px 6px; text-align:right; color:var(--warning);">${weeklyRows.reduce((sum, w) => sum + w.internals, 0)}</td>
                             <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.points, 0).toFixed(1)}</td>
                             <td style="padding:8px 6px; text-align:right;">${pointsTarget}</td>
@@ -2454,6 +2463,29 @@ function pickGradient(index) {
     localStorage.setItem('nx_gradient', grad);
     localStorage.removeItem('nx_accent');
 }
+
+function showPointsQuickView() {
+    const pointsByType = JobTrackerConstants.POINTS_BY_TYPE || {};
+    const internalPoints = JobTrackerConstants.INTERNAL_POINTS || 0.5;
+    const order = ['HYUG', 'HYOH', 'UG', 'OH', 'STEP1', 'BTTW', 'MDU', 'RC'];
+
+    const rows = order
+        .filter(code => pointsByType[code] != null)
+        .map(code => `<div class="metric-row"><span>${sanitizeHTML(code)}</span><b>${pointsByType[code].toFixed(1)}</b></div>`)
+        .join('');
+
+    const content = `
+        <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+        <h3 style="margin-bottom:12px;">Points By Job Type</h3>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:10px;">Quick reference for weekly points scoring.</div>
+        <div style="padding:10px; border:1px solid var(--border-t); border-radius:10px; background:var(--surface-elev);">
+            ${rows}
+            <div class="metric-row"><span>INTERNALS</span><b>${internalPoints.toFixed(1)}</b></div>
+        </div>
+    `;
+
+    JobTrackerModals.showModal(content);
+}
 async function setBgAnimation(id) {
     localStorage.setItem('nx_bg_anim', id);
     await state.saveSetting('nx_bg_anim', id);
@@ -2556,6 +2588,7 @@ Object.assign(window, {
     setDisplayNameGlobal,
     setAccentColour,
     pickGradient,
+    showPointsQuickView,
     setBgAnimation,
     editTypeModal,
     addTypeModal,
