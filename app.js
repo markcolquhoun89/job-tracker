@@ -1369,12 +1369,12 @@ function renderStats(container, list, s) {
             </div>`
         },
         {
-            id: 'bonus-points',
-            title: 'Bonus + Points (Weekly)',
+            id: 'bonus-system',
+            title: 'Bonus System (Weekly)',
             content: `<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
                 <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--success) 14%, transparent), transparent); border:1px solid var(--border-t);">
                     <div style="font-size:0.6rem; color:var(--text-muted);">Bonus (Active Week)</div>
-                    <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.bonusQualified ? 'var(--success)' : 'var(--warning)'};">${activeWeek.bonusQualified ? 'ON' : 'OFF'}</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.bonusQualified ? 'var(--success)' : 'var(--warning)'};">${activeWeek.bonusQualified ? 'true' : 'false'}</div>
                 </div>
                 <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent); border:1px solid var(--border-t);">
                     <div style="font-size:0.6rem; color:var(--text-muted);">Completed Toward Bonus</div>
@@ -1391,8 +1391,6 @@ function renderStats(container, list, s) {
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-bottom:1px solid var(--border-t);">
                             <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Week</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Done</th>
-                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Int</th>
-                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Points</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Target</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Bonus</th>
                         </tr>
@@ -1402,21 +1400,57 @@ function renderStats(container, list, s) {
                             <tr style="border-bottom:1px solid var(--border-t); ${i === 0 ? 'background:color-mix(in srgb, var(--primary) 10%, transparent);' : ''}">
                                 <td style="padding:8px 6px; font-weight:700;">${w.label}</td>
                                 <td style="padding:8px 6px; text-align:right;">${w.completedEligible}</td>
+                                <td style="padding:8px 6px; text-align:right; color:${w.completedEligible >= bonusCompletedTarget ? 'var(--success)' : 'var(--warning)'};">${w.completedEligible >= bonusCompletedTarget ? 'MET' : `${bonusCompletedTarget - w.completedEligible > 0 ? (bonusCompletedTarget - w.completedEligible) : 0} to go`}</td>
+                                <td style="padding:8px 6px; text-align:right; color:${w.bonusQualified ? 'var(--success)' : 'var(--text-muted)'}; font-weight:700;">${w.bonusQualified ? 'true' : 'false'}</td>
+                            </tr>
+                        `).join('') : `<tr><td colspan="4" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
+                    </tbody>
+                </table>
+            </div>`
+        },
+        {
+            id: 'points-system',
+            title: 'Points System (Weekly)',
+            content: `<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
+                <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent); border:1px solid var(--border-t);">
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Points (Active Week)</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--text-main)'};">${activeWeek.points.toFixed(1)}</div>
+                </div>
+                <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--warning) 14%, transparent), transparent); border:1px solid var(--border-t);">
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Internals (Active Week)</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:var(--warning);">${activeWeek.internals}</div>
+                </div>
+                <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--success) 14%, transparent), transparent); border:1px solid var(--border-t);">
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Weekly Target</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--warning)'};">${pointsTarget}</div>
+                </div>
+            </div>
+            <div style="overflow-x:auto; border:1px solid var(--border-t); border-radius:10px;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+                    <thead>
+                        <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-bottom:1px solid var(--border-t);">
+                            <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Week</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Int</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Points</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Target</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${weeklyRows.length > 0 ? weeklyRows.map((w, i) => `
+                            <tr style="border-bottom:1px solid var(--border-t); ${i === 0 ? 'background:color-mix(in srgb, var(--primary) 10%, transparent);' : ''}">
+                                <td style="padding:8px 6px; font-weight:700;">${w.label}</td>
                                 <td style="padding:8px 6px; text-align:right; color:var(--warning);">${w.internals}</td>
                                 <td style="padding:8px 6px; text-align:right; font-weight:800; color:${w.targetMet ? 'var(--success)' : 'var(--text-main)'};">${w.points.toFixed(1)}</td>
                                 <td style="padding:8px 6px; text-align:right; color:${w.targetMet ? 'var(--success)' : 'var(--warning)'};">${w.targetMet ? 'MET' : `${pointsTarget - w.points > 0 ? (pointsTarget - w.points).toFixed(1) : '0.0'} to go`}</td>
-                                <td style="padding:8px 6px; text-align:right; color:${w.bonusQualified ? 'var(--success)' : 'var(--text-muted)'}; font-weight:700;">${w.bonusQualified ? 'ON' : 'OFF'}</td>
                             </tr>
-                        `).join('') : `<tr><td colspan="6" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
+                        `).join('') : `<tr><td colspan="4" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
                     </tbody>
                     <tfoot>
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-top:1px solid var(--border-t); font-weight:700;">
                             <td style="padding:8px 6px;">Totals</td>
-                            <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.completedEligible, 0)}</td>
                             <td style="padding:8px 6px; text-align:right; color:var(--warning);">${weeklyRows.reduce((sum, w) => sum + w.internals, 0)}</td>
                             <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.points, 0).toFixed(1)}</td>
                             <td style="padding:8px 6px; text-align:right;">${pointsTarget}</td>
-                            <td style="padding:8px 6px; text-align:right;">${bonusQualifiedCount}</td>
                         </tr>
                     </tfoot>
                 </table>
