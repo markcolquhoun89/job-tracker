@@ -292,9 +292,14 @@ export const JobTrackerCalculations = {
      */
     getPayPeriod(date = new Date()) {
         const d = new Date(date);
-        const daysBackToFri = (d.getDay() + 2) % 7;
-        const friday = new Date(d);
-        friday.setDate(d.getDate() - daysBackToFri);
+        const daysUntilFri = (5 - d.getDay() + 7) % 7;
+        const payDate = new Date(d);
+        payDate.setDate(d.getDate() + daysUntilFri);
+        payDate.setHours(0, 0, 0, 0);
+
+        // Paid on Friday for the work week that ended two Fridays earlier.
+        const friday = new Date(payDate);
+        friday.setDate(payDate.getDate() - 14);
         friday.setHours(0, 0, 0, 0);
 
         const saturday = new Date(friday);
@@ -314,11 +319,12 @@ export const JobTrackerCalculations = {
 
         const fmt = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
         
-        return { 
+        return {
             payWeekMon: saturday,
             thisFriday: friday,
-            start: saturday, 
+            start: saturday,
             end: friday,
+            payDate,
             total,
             count,
             label: fmt(saturday) + ' – ' + fmt(friday)
@@ -332,13 +338,17 @@ export const JobTrackerCalculations = {
         const periods = [];
         const now = new Date();
         const daysBackToFri = (now.getDay() + 2) % 7;
-        const thisFriday = new Date(now);
-        thisFriday.setDate(now.getDate() - daysBackToFri);
-        thisFriday.setHours(0, 0, 0, 0);
+        const lastPaidFriday = new Date(now);
+        lastPaidFriday.setDate(now.getDate() - daysBackToFri);
+        lastPaidFriday.setHours(0, 0, 0, 0);
 
         for (let i = 0; i < numPeriods; i++) {
-            const friday = new Date(thisFriday);
-            friday.setDate(thisFriday.getDate() - (i * 7));
+            const payDate = new Date(lastPaidFriday);
+            payDate.setDate(lastPaidFriday.getDate() - (i * 7));
+            payDate.setHours(0, 0, 0, 0);
+
+            const friday = new Date(payDate);
+            friday.setDate(payDate.getDate() - 14);
             friday.setHours(0, 0, 0, 0);
 
             const saturday = new Date(friday);
@@ -364,7 +374,8 @@ export const JobTrackerCalculations = {
                 total,
                 count,
                 label: `${fmt(saturday)} – ${fmt(friday)}`,
-                payDate: fmt(friday)
+                payDate,
+                payDateLabel: fmt(payDate)
             });
         }
 

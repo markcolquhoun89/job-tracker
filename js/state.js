@@ -94,18 +94,12 @@ class AppState {
                     const existing = byCode.get(code);
                     if (existing) {
                         const merged = { ...defaults, ...existing };
-                        if (code === 'BTTW' && (merged.upgradePay == null)) {
-                            merged.upgradePay = 44;
-                        }
                         if (JSON.stringify(existing) !== JSON.stringify(merged)) {
                             byCode.set(code, merged);
                             typesChanged = true;
                         }
                     } else {
                         const created = { code, ...defaults };
-                        if (code === 'BTTW' && (created.upgradePay == null)) {
-                            created.upgradePay = 44;
-                        }
                         byCode.set(code, created);
                         typesChanged = true;
                     }
@@ -115,6 +109,27 @@ class AppState {
 
                 if (typesChanged) {
                     await db.bulkPut(STORES.TYPES, this.types);
+                }
+
+                // One-time migration: align built-in defaults with current payout/rule sheet.
+                const defaultsMigrationKey = 'nx_defaults_20260317';
+                if (localStorage.getItem(defaultsMigrationKey) !== '1') {
+                    const defaultCodes = new Set(Object.keys(DEFAULT_TYPES));
+                    const migratedTypes = this.types.map(typeObj => {
+                        if (!defaultCodes.has(typeObj.code)) return typeObj;
+                        const defaults = DEFAULT_TYPES[typeObj.code] || {};
+                        return {
+                            ...typeObj,
+                            pay: defaults.pay,
+                            int: defaults.int,
+                            countTowardsCompletion: defaults.countTowardsCompletion !== false,
+                            isUpgradeType: defaults.isUpgradeType === true
+                        };
+                    });
+
+                    this.types = migratedTypes;
+                    await db.bulkPut(STORES.TYPES, this.types);
+                    localStorage.setItem(defaultsMigrationKey, '1');
                 }
             }
 

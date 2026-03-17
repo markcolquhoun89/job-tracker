@@ -31,12 +31,29 @@ export const JobTrackerConstants = {
 
     // Default job types
     DEFAULT_TYPES: {
-        OH: { pay: 44, int: 21 },
-        UG: { pay: 42, int: 21 },
-        HyOH: { pay: 55, int: 21 },
-        HyUG: { pay: 55, int: 21 },
-        RC: { pay: 20, int: null },
-        BTTW: { pay: 20, int: null, upgradePay: 44 }
+        OH: { pay: 44, int: 21, countTowardsCompletion: true, isUpgradeType: false },
+        UG: { pay: 44, int: 21, countTowardsCompletion: true, isUpgradeType: false },
+        HyOH: { pay: 55, int: 21, countTowardsCompletion: true, isUpgradeType: false },
+        HyUG: { pay: 55, int: 21, countTowardsCompletion: true, isUpgradeType: false },
+        Step1: { pay: 29, int: null, countTowardsCompletion: true, isUpgradeType: false },
+        BTTW: { pay: 21, int: null, countTowardsCompletion: true, isUpgradeType: true },
+        MDU: { pay: 32, int: null, countTowardsCompletion: true, isUpgradeType: false },
+        RC: { pay: 20, int: null, countTowardsCompletion: true, isUpgradeType: false }
+    },
+
+    // Weekly bonus and points rules
+    BONUS_WEEKLY_COMPLETED_TARGET: 18,
+    POINTS_WEEKLY_TARGET: 20,
+    INTERNAL_POINTS: 0.5,
+    POINTS_BY_TYPE: {
+        HYUG: 1.4,
+        HYOH: 1.3,
+        UG: 1,
+        OH: 1,
+        STEP1: 0.9,
+        BTTW: 0.6,
+        MDU: 0.8,
+        RC: 0.4
     },
 
     // Note templates

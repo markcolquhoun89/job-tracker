@@ -199,7 +199,9 @@ export const JobTrackerCompat = {
             typesObj[t.code] = {
                 pay: t.pay,
                 int: t.int,
-                upgradePay: t.code === 'BTTW' ? (resolvedUpgrade ?? 44) : resolvedUpgrade
+                upgradePay: resolvedUpgrade,
+                countTowardsCompletion: t.countTowardsCompletion,
+                isUpgradeType: t.isUpgradeType
             };
         });
         window.state.types = { ...existingTypes, ...typesObj };
