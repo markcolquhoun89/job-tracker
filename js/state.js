@@ -10,6 +10,8 @@ import { JobTrackerUtils } from './utils.js';
 const { DEFAULT_TYPES, RANGES } = JobTrackerConstants;
 const { db, STORES } = JobTrackerDB;
 
+const normalizeTypeCode = (code) => String(code || '').replace(/\s+/g, '').toUpperCase();
+
 class AppState {
     constructor() {
         // Core data
@@ -242,7 +244,8 @@ class AppState {
      * Get job type by code
      */
     getType(code) {
-        return this.types.find(t => t.code === code);
+        const normalizedCode = normalizeTypeCode(code);
+        return this.types.find(t => normalizeTypeCode(t.code) === normalizedCode);
     }
 
     /**
@@ -286,7 +289,7 @@ class AppState {
     async saveType(type) {
         await db.put(STORES.TYPES, type);
         
-        const index = this.types.findIndex(t => t.code === type.code);
+        const index = this.types.findIndex(t => normalizeTypeCode(t.code) === normalizeTypeCode(type.code));
         if (index >= 0) {
             this.types[index] = type;
         } else {

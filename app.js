@@ -1266,7 +1266,8 @@ function renderStats(container, list, s) {
         start.setHours(0, 0, 0, 0);
         return start;
     };
-    const typePoints = (typeCode) => pointsByType[String(typeCode || '').toUpperCase()] || 0;
+    const normalizeTypeCode = (typeCode) => String(typeCode || '').replace(/\s+/g, '').toUpperCase();
+    const typePoints = (typeCode) => pointsByType[normalizeTypeCode(typeCode)] || 0;
     const isCompletionEligibleType = (job) => {
         const cfg = state.getTypeConfig(job.type);
         return cfg ? cfg.countTowardsCompletion !== false : true;
