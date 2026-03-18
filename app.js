@@ -1286,24 +1286,33 @@ function renderStats(container, list, s) {
                 end,
                 label: `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
                 completedEligible: 0,
-                fullJobs: 0,
+                failedEligible: 0,
                 internals: 0,
                 points: 0,
+                potentialPoints: 0,
+                missedPoints: 0,
                 qualityFlagged: false
             });
         }
 
         const bucket = weeklyMap.get(key);
-        if (job.status === STATUS.COMPLETED || job.status === STATUS.INTERNALS) {
-            bucket.fullJobs += 1;
-        }
-        if (job.status === STATUS.COMPLETED && isCompletionEligibleType(job)) {
+        const eligible = isCompletionEligibleType(job);
+        const jobTypePoints = eligible ? typePoints(job.type) : 0;
+
+        if (job.status === STATUS.COMPLETED && eligible) {
             bucket.completedEligible += 1;
-            bucket.points += typePoints(job.type);
+            bucket.points += jobTypePoints;
+            bucket.potentialPoints += jobTypePoints;
         }
         if (job.status === STATUS.INTERNALS) {
             bucket.internals += 1;
             bucket.points += internalPoints;
+            bucket.potentialPoints += internalPoints;
+        }
+        if (job.status === STATUS.FAILED && eligible) {
+            bucket.failedEligible += 1;
+            bucket.potentialPoints += jobTypePoints;
+            bucket.missedPoints += jobTypePoints;
         }
         if (job.candids || job.elf) {
             bucket.qualityFlagged = true;
@@ -1328,9 +1337,11 @@ function renderStats(container, list, s) {
 
     const activeWeek = weeklyRows.find(w => w.key === activeWeekStart) || {
         completedEligible: 0,
-        fullJobs: 0,
+        failedEligible: 0,
         internals: 0,
         points: 0,
+        potentialPoints: 0,
+        missedPoints: 0,
         targetMet: false,
         bonusQualified: false
     };
@@ -1401,7 +1412,7 @@ function renderStats(container, list, s) {
             content: `<div class="stat-grid" style="margin:-8px;">
                 <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Completion</small><b style="font-size:1.55rem; color:${rc1};">${stats.compRate}%</b></div>
                 <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Weekly Bonus</small><b style="font-size:1.55rem; color:${activeWeek.bonusQualified ? 'var(--success)' : 'var(--warning)'};">${activeWeek.bonusQualified ? 'true' : 'false'}</b></div>
-                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Weekly Points</small><b style="font-size:1.55rem; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--text-main)'};">${activeWeek.points.toFixed(1)} / ${pointsTarget}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Weekly Points</small><b style="font-size:1.55rem; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--text-main)'};">${activeWeek.points.toFixed(1)}</b></div>
                 <div class="panel" style="margin-bottom:0; padding:12px;"><small style="font-size:0.62rem;">Period Earnings</small><b style="font-size:1.55rem; color:var(--success);">&pound;${stats.totalCash.toFixed(0)}</b></div>
             </div>`
         },
@@ -1490,16 +1501,16 @@ function renderStats(container, list, s) {
             title: 'Points System (Weekly)',
             content: `<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
                 <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent); border:1px solid var(--border-t);">
-                    <div style="font-size:0.6rem; color:var(--text-muted);">Points (Active Week)</div>
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Actual (Active Week)</div>
                     <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--text-main)'};">${activeWeek.points.toFixed(1)}</div>
                 </div>
                 <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--warning) 14%, transparent), transparent); border:1px solid var(--border-t);">
-                    <div style="font-size:0.6rem; color:var(--text-muted);">Full Jobs (Active Week)</div>
-                    <div style="font-size:1.1rem; font-weight:800; color:var(--text-main);">${activeWeek.fullJobs}</div>
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Potential (Active Week)</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:var(--text-main);">${activeWeek.potentialPoints.toFixed(1)}</div>
                 </div>
-                <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--success) 14%, transparent), transparent); border:1px solid var(--border-t);">
-                    <div style="font-size:0.6rem; color:var(--text-muted);">Weekly Target</div>
-                    <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.targetMet ? 'var(--success)' : 'var(--warning)'};">${pointsTarget}</div>
+                <div style="padding:10px; border-radius:10px; background:linear-gradient(145deg, color-mix(in srgb, var(--danger) 14%, transparent), transparent); border:1px solid var(--border-t);">
+                    <div style="font-size:0.6rem; color:var(--text-muted);">Missed (Active Week)</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:${activeWeek.missedPoints > 0 ? 'var(--danger)' : 'var(--text-main)'};">${activeWeek.missedPoints.toFixed(1)}</div>
                 </div>
             </div>
             <button class="btn" style="margin:0 0 10px 0; background:var(--border); color:var(--text-main);" onclick="showPointsQuickView()">Quick View: Points By Type</button>
@@ -1510,28 +1521,34 @@ function renderStats(container, list, s) {
                             <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Week</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Jobs</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Int</th>
-                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Points</th>
-                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Target</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Failed</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Total Potential</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Total Actual</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Total Missed</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${weeklyRows.length > 0 ? weeklyRows.map((w, i) => `
                             <tr style="border-bottom:1px solid var(--border-t); ${i === 0 ? 'background:color-mix(in srgb, var(--primary) 10%, transparent);' : ''}">
                                 <td style="padding:8px 6px; font-weight:700;">${w.label}</td>
-                                <td style="padding:8px 6px; text-align:right;">${w.fullJobs}</td>
+                                <td style="padding:8px 6px; text-align:right;">${w.completedEligible}</td>
                                 <td style="padding:8px 6px; text-align:right; color:var(--warning);">${w.internals}</td>
+                                <td style="padding:8px 6px; text-align:right; color:var(--danger);">${w.failedEligible}</td>
+                                <td style="padding:8px 6px; text-align:right; font-weight:700;">${w.potentialPoints.toFixed(1)}</td>
                                 <td style="padding:8px 6px; text-align:right; font-weight:800; color:${w.targetMet ? 'var(--success)' : 'var(--text-main)'};">${w.points.toFixed(1)}</td>
-                                <td style="padding:8px 6px; text-align:right; color:${w.targetMet ? 'var(--success)' : 'var(--warning)'};">${w.targetMet ? 'MET' : `${pointsTarget - w.points > 0 ? (pointsTarget - w.points).toFixed(1) : '0.0'} to go`}</td>
+                                <td style="padding:8px 6px; text-align:right; color:${w.missedPoints > 0 ? 'var(--danger)' : 'var(--text-muted)'}; font-weight:700;">${w.missedPoints.toFixed(1)}</td>
                             </tr>
-                        `).join('') : `<tr><td colspan="5" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
+                        `).join('') : `<tr><td colspan="7" style="padding:10px; color:var(--text-muted); text-align:center;">No weekly data in this scope</td></tr>`}
                     </tbody>
                     <tfoot>
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-top:1px solid var(--border-t); font-weight:700;">
                             <td style="padding:8px 6px;">Totals</td>
-                            <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.fullJobs, 0)}</td>
+                            <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.completedEligible, 0)}</td>
                             <td style="padding:8px 6px; text-align:right; color:var(--warning);">${weeklyRows.reduce((sum, w) => sum + w.internals, 0)}</td>
+                            <td style="padding:8px 6px; text-align:right; color:var(--danger);">${weeklyRows.reduce((sum, w) => sum + w.failedEligible, 0)}</td>
+                            <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.potentialPoints, 0).toFixed(1)}</td>
                             <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.points, 0).toFixed(1)}</td>
-                            <td style="padding:8px 6px; text-align:right;">${pointsTarget}</td>
+                            <td style="padding:8px 6px; text-align:right;">${weeklyRows.reduce((sum, w) => sum + w.missedPoints, 0).toFixed(1)}</td>
                         </tr>
                     </tfoot>
                 </table>
