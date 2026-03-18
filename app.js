@@ -1311,7 +1311,12 @@ function renderStats(container, list, s) {
         if (normalizedStatus === normalizeStatus(STATUS.INTERNALS)) {
             bucket.internals += 1;
             bucket.points += internalPoints;
-            bucket.potentialPoints += internalPoints;
+            if (eligible) {
+                bucket.potentialPoints += jobTypePoints;
+                bucket.missedPoints += Math.max(0, jobTypePoints - internalPoints);
+            } else {
+                bucket.potentialPoints += internalPoints;
+            }
         }
         if (normalizedStatus === normalizeStatus(STATUS.FAILED) && eligible) {
             bucket.failedEligible += 1;
@@ -2771,7 +2776,8 @@ function showPointsWeekAudit(weekKey) {
                 potential = basePoints;
             } else if (normalizedStatus === 'INTERNALS') {
                 actual = internalPoints;
-                potential = internalPoints;
+                potential = eligible ? basePoints : internalPoints;
+                missed = Math.max(0, potential - actual);
             } else if (normalizedStatus === 'FAILED' && eligible) {
                 potential = basePoints;
                 missed = basePoints;
