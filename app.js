@@ -1528,7 +1528,7 @@ function renderStats(container, list, s) {
                     <thead>
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-bottom:1px solid var(--border-t);">
                             <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Week</th>
-                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Jobs</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Completed</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Int</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Failed</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Total Potential</th>
