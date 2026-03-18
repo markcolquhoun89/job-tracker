@@ -1266,7 +1266,8 @@ function renderStats(container, list, s) {
         start.setHours(0, 0, 0, 0);
         return start;
     };
-    const normalizeTypeCode = (typeCode) => String(typeCode || '').replace(/\s+/g, '').toUpperCase();
+    const normalizeTypeCode = (typeCode) => String(typeCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normalizeStatus = (status) => String(status || '').trim().toUpperCase();
     const typePoints = (typeCode) => pointsByType[normalizeTypeCode(typeCode)] || 0;
     const isCompletionEligibleType = (job) => {
         const cfg = state.getTypeConfig(job.type);
@@ -1298,19 +1299,21 @@ function renderStats(container, list, s) {
 
         const bucket = weeklyMap.get(key);
         const eligible = isCompletionEligibleType(job);
-        const jobTypePoints = eligible ? typePoints(job.type) : 0;
+        const resolvedTypeCode = state.getTypeConfig(job.type)?.code || job.type;
+        const jobTypePoints = eligible ? typePoints(resolvedTypeCode) : 0;
+        const normalizedStatus = normalizeStatus(job.status);
 
-        if (job.status === STATUS.COMPLETED && eligible) {
+        if (normalizedStatus === normalizeStatus(STATUS.COMPLETED) && eligible) {
             bucket.completedEligible += 1;
             bucket.points += jobTypePoints;
             bucket.potentialPoints += jobTypePoints;
         }
-        if (job.status === STATUS.INTERNALS) {
+        if (normalizedStatus === normalizeStatus(STATUS.INTERNALS)) {
             bucket.internals += 1;
             bucket.points += internalPoints;
             bucket.potentialPoints += internalPoints;
         }
-        if (job.status === STATUS.FAILED && eligible) {
+        if (normalizedStatus === normalizeStatus(STATUS.FAILED) && eligible) {
             bucket.failedEligible += 1;
             bucket.potentialPoints += jobTypePoints;
             bucket.missedPoints += jobTypePoints;
@@ -1530,7 +1533,7 @@ function renderStats(container, list, s) {
                     </thead>
                     <tbody>
                         ${weeklyRows.length > 0 ? weeklyRows.map((w, i) => `
-                            <tr style="border-bottom:1px solid var(--border-t); ${i === 0 ? 'background:color-mix(in srgb, var(--primary) 10%, transparent);' : ''}">
+                            <tr style="border-bottom:1px solid var(--border-t); cursor:pointer; ${i === 0 ? 'background:color-mix(in srgb, var(--primary) 10%, transparent);' : ''}" onclick="showPointsWeekAudit('${w.key}')">
                                 <td style="padding:8px 6px; font-weight:700;">${w.label}</td>
                                 <td style="padding:8px 6px; text-align:right;">${w.completedEligible}</td>
                                 <td style="padding:8px 6px; text-align:right; color:var(--warning);">${w.internals}</td>
@@ -2734,6 +2737,103 @@ function showPointsQuickView() {
 
     JobTrackerModals.showModal(content);
 }
+
+function showPointsWeekAudit(weekKey) {
+    const pointsByType = JobTrackerConstants.POINTS_BY_TYPE || {};
+    const internalPoints = JobTrackerConstants.INTERNAL_POINTS || 0.5;
+    const normalizeTypeCode = (typeCode) => String(typeCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normalizeStatus = (status) => String(status || '').trim().toUpperCase();
+
+    const start = new Date(`${weekKey}T00:00:00`);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    const jobs = state.jobs
+        .filter(job => {
+            const jd = new Date(`${job.date}T00:00:00`);
+            return jd >= start && jd <= end;
+        })
+        .map(job => {
+            const cfg = state.getTypeConfig(job.type);
+            const normalizedType = normalizeTypeCode(cfg?.code || job.type);
+            const normalizedStatus = normalizeStatus(job.status);
+            const eligible = cfg ? cfg.countTowardsCompletion !== false : true;
+            const basePoints = pointsByType[normalizedType] || 0;
+
+            let actual = 0;
+            let potential = 0;
+            let missed = 0;
+
+            if (normalizedStatus === 'COMPLETED' && eligible) {
+                actual = basePoints;
+                potential = basePoints;
+            } else if (normalizedStatus === 'INTERNALS') {
+                actual = internalPoints;
+                potential = internalPoints;
+            } else if (normalizedStatus === 'FAILED' && eligible) {
+                potential = basePoints;
+                missed = basePoints;
+            }
+
+            return {
+                date: job.date,
+                rawType: job.type,
+                normalizedType,
+                status: job.status,
+                actual,
+                potential,
+                missed
+            };
+        })
+        .sort((a, b) => a.date.localeCompare(b.date) || a.rawType.localeCompare(b.rawType));
+
+    const totals = jobs.reduce((sum, job) => {
+        sum.actual += job.actual;
+        sum.potential += job.potential;
+        sum.missed += job.missed;
+        return sum;
+    }, { actual: 0, potential: 0, missed: 0 });
+
+    const content = `
+        <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+        <h3 style="margin-bottom:12px;">Points Audit</h3>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:10px;">${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+        <div style="overflow-x:auto; border:1px solid var(--border-t); border-radius:10px;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+                <thead><tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-bottom:1px solid var(--border-t);">
+                    <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Date</th>
+                    <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Raw Type</th>
+                    <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Norm</th>
+                    <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Status</th>
+                    <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Potential</th>
+                    <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Actual</th>
+                    <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Missed</th>
+                </tr></thead>
+                <tbody>
+                    ${jobs.map(job => `<tr style="border-bottom:1px solid var(--border-t);">
+                        <td style="padding:8px 6px;">${sanitizeHTML(job.date)}</td>
+                        <td style="padding:8px 6px; font-weight:700;">${sanitizeHTML(job.rawType)}</td>
+                        <td style="padding:8px 6px; color:var(--text-muted);">${sanitizeHTML(job.normalizedType)}</td>
+                        <td style="padding:8px 6px;">${sanitizeHTML(job.status)}</td>
+                        <td style="padding:8px 6px; text-align:right;">${job.potential.toFixed(1)}</td>
+                        <td style="padding:8px 6px; text-align:right; color:var(--success);">${job.actual.toFixed(1)}</td>
+                        <td style="padding:8px 6px; text-align:right; color:${job.missed > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${job.missed.toFixed(1)}</td>
+                    </tr>`).join('')}
+                </tbody>
+                <tfoot><tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-top:1px solid var(--border-t); font-weight:700;">
+                    <td colspan="4" style="padding:8px 6px;">Totals</td>
+                    <td style="padding:8px 6px; text-align:right;">${totals.potential.toFixed(1)}</td>
+                    <td style="padding:8px 6px; text-align:right;">${totals.actual.toFixed(1)}</td>
+                    <td style="padding:8px 6px; text-align:right;">${totals.missed.toFixed(1)}</td>
+                </tr></tfoot>
+            </table>
+        </div>
+    `;
+
+    JobTrackerModals.showModal(content);
+}
 async function setBgAnimation(id) {
     localStorage.setItem('nx_bg_anim', id);
     await state.saveSetting('nx_bg_anim', id);
@@ -2836,6 +2936,7 @@ Object.assign(window, {
     setDisplayNameGlobal,
     setAccentColour,
     pickGradient,
+    showPointsWeekAudit,
     showPointsQuickView,
     setBgAnimation,
     editTypeModal,

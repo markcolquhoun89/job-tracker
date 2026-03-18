@@ -10,7 +10,7 @@ import { JobTrackerUtils } from './utils.js';
 const { DEFAULT_TYPES, RANGES } = JobTrackerConstants;
 const { db, STORES } = JobTrackerDB;
 
-const normalizeTypeCode = (code) => String(code || '').replace(/\s+/g, '').toUpperCase();
+const normalizeTypeCode = (code) => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 class AppState {
     constructor() {
