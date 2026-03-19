@@ -92,6 +92,15 @@ export async function initModules() {
                         window.syncEngine = syncEngine;
                         client.syncEngine = syncEngine;
                         console.log('✓ Sync engine initialized');
+                        
+                        // Auto-run full sync on session restore to catch mobile/other-device jobs
+                        console.log('[Bridge] Running full sync after session restore...');
+                        try {
+                            await syncEngine.fullSync();
+                            console.log('[Bridge] Full sync complete after session restore');
+                        } catch (syncErr) {
+                            console.warn('[Bridge] Full sync after session restore failed:', syncErr);
+                        }
                     } catch (syncError) {
                         console.warn('[Bridge] Sync engine init failed (non-critical):', syncError);
                     }

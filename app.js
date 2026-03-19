@@ -405,6 +405,10 @@ function jumpToDate(val) {
 // ===========================
 
 async function quickStatus(jobId, status) {
+    if (state.syncInProgress) {
+        showToast('Please wait - sync in progress', 2000);
+        return;
+    }
     try {
         await jobOps.updateJobStatus(jobId, status);
         
@@ -482,6 +486,10 @@ function showSingleAdd() {
 }
 
 async function saveNewJob(type) {
+    if (state.syncInProgress) {
+        customAlert('Sync in Progress', 'Please wait for your data to sync before adding new jobs.', true);
+        return;
+    }
     const date = state.viewDate.toISOString().split('T')[0];
     const jobID = document.getElementById('add-jobid')?.value?.trim() || null;
     try {
@@ -543,6 +551,10 @@ function adjMulti(type, dir) {
 }
 
 async function saveMultiJobs() {
+    if (state.syncInProgress) {
+        customAlert('Sync in Progress', 'Please wait for your data to sync before adding new jobs.', true);
+        return;
+    }
     const date = state.viewDate.toISOString().split('T')[0];
     let added = 0;
     for (const [type, count] of Object.entries(_multiCounts)) {
@@ -767,6 +779,10 @@ function renderBatchBar() {
 }
 
 async function batchSetStatus(status) {
+    if (state.syncInProgress) {
+        showToast('Please wait - sync in progress', 2000);
+        return;
+    }
     try {
         const jobIds = Array.from(state.batchSelected);
 
@@ -809,6 +825,10 @@ async function batchSetStatus(status) {
 }
 
 async function batchDeleteSelected() {
+    if (state.syncInProgress) {
+        customAlert('Sync in Progress', 'Please wait for sync to complete before deleting jobs.', true);
+        return;
+    }
     try {
         const jobIds = Array.from(state.batchSelected);
         if (jobIds.length === 0) return;

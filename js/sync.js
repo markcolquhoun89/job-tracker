@@ -388,6 +388,7 @@ export class SyncEngine {
     }
 
     this.isSyncing = true;
+    if (window.state) window.state.syncInProgress = true;
     this.syncCycleDeletions = []; // Reset for this cycle
     console.log('[SyncEngine] Starting full sync');
     
@@ -400,6 +401,14 @@ export class SyncEngine {
       console.log('[SyncEngine] Step 2: Pull remote jobs after push completes');
       const pullResult = await this.pullRemoteJobs();
       console.log('[SyncEngine] Pull result:', pullResult);
+      
+      console.log('[SyncEngine] Step 3: Reconcile remote deletions to catch jobs deleted on other devices');
+      const remoteJobs = await this.supabase.select('jobs', {
+        eq: { user_id: this.supabase.userId }
+      });
+      if (Array.isArray(remoteJobs)) {
+        await this.reconcileRemoteDeletions(remoteJobs);
+      }
 
       this.dedupeLocalJobsById();
       
@@ -419,11 +428,15 @@ export class SyncEngine {
       console.error('[SyncEngine] ✗ Full sync failed:', error);
     } finally {
       this.isSyncing = false;
+      if (window.state) window.state.syncInProgress = false;
       
       // Clear deletion-in-progress flag after sync completes
       if (window.clearDeletionInProgress) {
         window.clearDeletionInProgress();
       }
+      
+      // Dispatch event to notify UI that sync is complete
+      window.dispatchEvent(new Event('nx-sync-complete'));
     }
   }
 

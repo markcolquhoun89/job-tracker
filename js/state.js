@@ -47,6 +47,7 @@ class AppState {
         this.deletedJobIds = [];
         this.deleteTimer = null;
         this.wakeLock = null;
+        this.syncInProgress = false;
 
         // Observers for reactive updates
         this.observers = [];

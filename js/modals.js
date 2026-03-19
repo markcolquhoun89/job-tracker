@@ -1057,6 +1057,10 @@ export const JobTrackerModals = {
      */
     async saveJobEdit(jobId) {
         const state = getState();
+        if (state.syncInProgress) {
+            this.customAlert('Sync in Progress', 'Please wait for sync to complete before editing jobs.', true);
+            return;
+        }
         const jobOps = getJobOps();
         const { showToast } = getUtils();
         
@@ -1104,6 +1108,11 @@ export const JobTrackerModals = {
      * Delete job confirmation
      */
     deleteJobConfirm(jobId) {
+        const state = getState();
+        if (state.syncInProgress) {
+            this.customAlert('Sync in Progress', 'Please wait for sync to complete before deleting jobs.', true);
+            return;
+        }
         const jobOps = getJobOps();
         const { showToast } = getUtils();
         
@@ -1410,10 +1419,11 @@ export const JobTrackerModals = {
                 console.log('[Modals] Sign in successful:', result.user.id);
                 // Revoke all other active sessions for shared-device security
                 try { await client.signOutOtherSessions(); } catch (_) {}
+                
+                // Reload to fully reinitialize sync engine and auth
                 JobTrackerModals.closeModal();
-                showToast('Signed in! Loading your data...', 2000);
-                // Reload to fully reinitialise: sync engine, render, auth button
-                setTimeout(() => window.location.reload(), 400);
+                showToast('Signed in! Syncing your data...');
+                setTimeout(() => window.location.reload(), 500);
             } else {
                 console.warn('[Modals] Sign in failed:', result.error);
                 this.customAlert('Sign In Failed', result.error, true);
@@ -1464,16 +1474,24 @@ export const JobTrackerModals = {
                     this.customAlert('Success', `Welcome, ${displayName}!`);
                     try { await client.signOutOtherSessions(); } catch (_) {}
                     JobTrackerModals.closeModal();
-                    showToast('Loading your jobs...', 2000);
-                    // Don't reload - instead update UI in place
-                    setTimeout(() => {
-                        // Trigger sync to pull remote jobs
-                        if (window.syncEngine) {
-                            window.syncEngine.fullSync().catch(e => console.error('Sync failed:', e));
-                        }
-                        // Re-render with authenticated user
-                        if (window.appRender) {
-                            window.appRender();
+                    showToast('Loading your jobs...');
+                    // Trigger full sync before rendering
+                    setTimeout(async () => {
+                        try {
+                            if (window.syncEngine) {
+                                console.log('[Modals] Starting full sync after signup...');
+                                await window.syncEngine.fullSync();
+                                console.log('[Modals] Full sync complete after signup');
+                            }
+                            // Re-render with authenticated user and synced data
+                            if (window.render) {
+                                window.render();
+                            }
+                            showToast('Your jobs are ready!');
+                        } catch (e) {
+                            console.error('[Modals] Post-signup sync failed:', e);
+                            showToast('Sync encountered an error, but your jobs are loaded', 3000);
+                            if (window.render) window.render();
                         }
                     }, 500);
                 }
