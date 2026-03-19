@@ -44,6 +44,7 @@ class AppState {
 
         // Temporary state
         this.deletedJob = null;
+        this.deletedJobIds = [];
         this.deleteTimer = null;
         this.wakeLock = null;
 
@@ -254,6 +255,34 @@ class AppState {
         return this.activeUserId;
     }
 
+    getDeletedJobsStorageKey() {
+        const userId = this.getCurrentUserId();
+        return userId ? `nx_deleted_job_ids_user_${userId}` : 'nx_deleted_job_ids_user_anonymous';
+    }
+
+    loadDeletedJobIds() {
+        const key = this.getDeletedJobsStorageKey();
+        const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    }
+
+    persistDeletedJobIds(ids) {
+        const key = this.getDeletedJobsStorageKey();
+        localStorage.setItem(key, JSON.stringify(ids));
+        this.deletedJobIds = ids;
+    }
+
+    trackDeletedJobId(jobId) {
+        if (!jobId) return;
+        const ids = this.loadDeletedJobIds();
+        if (!ids.includes(jobId)) {
+            ids.push(jobId);
+            this.persistDeletedJobIds(ids);
+        } else {
+            this.deletedJobIds = ids;
+        }
+    }
+
     /**
      * Add or update a job
      */
@@ -296,6 +325,7 @@ class AppState {
 
         await db.delete(STORES.JOBS, jobId);
         this.jobs = this.jobs.filter(j => j.id !== jobId);
+        this.trackDeletedJobId(jobId);
 
         this.notify('job:deleted', job);
         if (typeof window !== 'undefined') {

@@ -91,6 +91,8 @@ export class SyncEngine {
       }
 
       console.log(`[SyncEngine] Pulled ${remoteJobs.length} remote jobs`);
+
+      await this.reconcileRemoteDeletions(remoteJobs);
       
       if (remoteJobs.length > 0) {
         console.log('[SyncEngine] Sample remote job id:', remoteJobs[0]?.id);
@@ -130,6 +132,86 @@ export class SyncEngine {
     } catch (error) {
       console.error('[SyncEngine] Pull failed:', error);
       return false;
+    }
+  }
+
+  getDeletedIdsStorageKey() {
+    return `nx_deleted_job_ids_user_${this.supabase.userId}`;
+  }
+
+  loadDeletedIds() {
+    const parsed = JSON.parse(localStorage.getItem(this.getDeletedIdsStorageKey()) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  saveDeletedIds(ids) {
+    const unique = Array.from(new Set(ids.filter(Boolean)));
+    localStorage.setItem(this.getDeletedIdsStorageKey(), JSON.stringify(unique));
+    if (window.state) {
+      window.state.deletedJobIds = unique;
+    }
+  }
+
+  addDeletedIds(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    const current = this.loadDeletedIds();
+    this.saveDeletedIds(current.concat(ids));
+  }
+
+  getKnownRemoteIdsStorageKey() {
+    return `nx_known_remote_job_ids_user_${this.supabase.userId}`;
+  }
+
+  loadKnownRemoteIds() {
+    const parsed = JSON.parse(localStorage.getItem(this.getKnownRemoteIdsStorageKey()) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  saveKnownRemoteIds(ids) {
+    const unique = Array.from(new Set(ids.filter(Boolean)));
+    localStorage.setItem(this.getKnownRemoteIdsStorageKey(), JSON.stringify(unique));
+  }
+
+  async reconcileRemoteDeletions(remoteJobs) {
+    if (!Array.isArray(remoteJobs)) return;
+
+    const previousRemoteIds = this.loadKnownRemoteIds();
+    const currentRemoteIds = remoteJobs.map(job => job?.id).filter(Boolean);
+    const currentRemoteSet = new Set(currentRemoteIds);
+
+    if (previousRemoteIds.length > 0) {
+      const removedRemotely = previousRemoteIds.filter(id => !currentRemoteSet.has(id));
+      if (removedRemotely.length > 0) {
+        console.log('[SyncEngine] Detected remote deletions:', removedRemotely.length);
+        await this.removeLocalJobsById(removedRemotely);
+        this.addDeletedIds(removedRemotely);
+      }
+    }
+
+    this.saveKnownRemoteIds(currentRemoteIds);
+  }
+
+  async removeLocalJobsById(jobIds) {
+    if (!Array.isArray(jobIds) || jobIds.length === 0) return;
+
+    const stateRef = (window.state && Array.isArray(window.state.jobs))
+      ? window.state
+      : (this.state && Array.isArray(this.state.jobs) ? this.state : null);
+    if (!stateRef) return;
+
+    const idSet = new Set(jobIds);
+    const before = stateRef.jobs.length;
+    stateRef.jobs = stateRef.jobs.filter(job => !idSet.has(job.id));
+
+    await Promise.all(jobIds.map(jobId => this.db.delete(this.db.STORES.JOBS, jobId)));
+
+    if (window.state) {
+      const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
+      localStorage.setItem(jobsKey, JSON.stringify(window.state.jobs));
+    }
+
+    if (before !== stateRef.jobs.length) {
+      console.log('[SyncEngine] Removed locally-deleted remote jobs. Before:', before, 'After:', stateRef.jobs.length);
     }
   }
   
