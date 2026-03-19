@@ -310,12 +310,16 @@ export class SyncEngine {
     console.log('[SyncEngine] Starting full sync');
     
     try {
+      this.dedupeLocalJobsById();
+
       console.log('[SyncEngine] Step 1: Push local jobs (including deletions) FIRST');
       await this.pushLocalJobs();
       
       console.log('[SyncEngine] Step 2: Pull remote jobs after push completes');
       const pullResult = await this.pullRemoteJobs();
       console.log('[SyncEngine] Pull result:', pullResult);
+
+      this.dedupeLocalJobsById();
       
       // Don't clear deletion tracking - keep it persistent so subsequent syncs continue filtering deleted jobs
       // This prevents restored jobs from reappearing if cloud deletion races with pull
@@ -614,6 +618,36 @@ export class SyncEngine {
       updated_at: remoteJob.updated_at,
       synced_at: new Date().toISOString()
     };
+  }
+
+  dedupeLocalJobsById() {
+    const stateRef = (window.state && Array.isArray(window.state.jobs)) ? window.state : (this.state && Array.isArray(this.state.jobs) ? this.state : null);
+    if (!stateRef) return;
+
+    const source = stateRef.jobs;
+    if (!Array.isArray(source) || source.length <= 1) return;
+
+    const byId = new Map();
+    source.forEach(job => {
+      if (!job?.id) return;
+      const existing = byId.get(job.id);
+      if (!existing) {
+        byId.set(job.id, job);
+        return;
+      }
+
+      const existingUpdated = new Date(existing.updated_at || existing.updatedAt || 0).getTime();
+      const candidateUpdated = new Date(job.updated_at || job.updatedAt || 0).getTime();
+      if (candidateUpdated >= existingUpdated) {
+        byId.set(job.id, job);
+      }
+    });
+
+    if (byId.size !== source.length) {
+      const deduped = Array.from(byId.values());
+      stateRef.jobs.splice(0, stateRef.jobs.length, ...deduped);
+      console.log('[SyncEngine] Dedupe applied. Before:', source.length, 'After:', deduped.length);
+    }
   }
 
   /**

@@ -76,6 +76,9 @@ export async function initModules() {
                 
                 if (hasSession) {
                     console.log('✓ Supabase client initialized with existing session');
+
+                    // Enforce single active editing session per user/device login.
+                    try { await client.signOutOtherSessions(); } catch (_) {}
                     
                     // Initialize sync engine only if we have an active session
                     try {

@@ -1462,6 +1462,7 @@ export const JobTrackerModals = {
                     this.customAlert('Account Created', 'Check your email to verify your account before signing in.');
                 } else {
                     this.customAlert('Success', `Welcome, ${displayName}!`);
+                    try { await client.signOutOtherSessions(); } catch (_) {}
                     JobTrackerModals.closeModal();
                     showToast('Loading your jobs...', 2000);
                     // Don't reload - instead update UI in place

@@ -621,6 +621,30 @@ async function requestNotifications() {
     }
 }
 
+async function runFullSyncNow() {
+    const client = window.supabaseClient;
+    const status = client?.getStatus?.();
+    if (!status?.isAuthenticated) {
+        customAlert('Sign In Required', 'Please sign in first to run a cloud sync.', true);
+        return;
+    }
+
+    if (!window.syncEngine?.fullSync) {
+        customAlert('Sync Unavailable', 'Sync engine is not ready yet. Try again in a moment.', true);
+        return;
+    }
+
+    try {
+        showToast('Starting full sync...');
+        await window.syncEngine.fullSync();
+        render(true);
+        showToast('Full sync complete');
+    } catch (error) {
+        console.error('[App] Full sync failed:', error);
+        customAlert('Sync Error', error?.message || 'Could not complete full sync.', true);
+    }
+}
+
 // ===========================
 // Batch Mode
 // ===========================
@@ -2714,6 +2738,9 @@ function renderSettings(container) {
                 IMPORT CSV
                 <input type=\"file\" onchange=\"importCSV(event)\" style=\"position:absolute; top:0; right:0; bottom:0; left:0; opacity:0; cursor:pointer;\">
             </div>
+            <button class=\"btn\" style=\"background:var(--primary); color:#fff; margin-top:10px;\" onclick=\"runFullSyncNow()\">
+                <span style=\"margin-right:6px;\">↻</span> FULL SYNC NOW
+            </button>
             <button class=\"btn\" style=\"background:var(--primary); color:#fff; margin-top:10px;\" onclick=\"window.JobTrackerModals.showDataManagement()\">
                 <span style=\"margin-right:6px;\">💾</span> ADVANCED DATA TOOLS
             </button>
@@ -3248,6 +3275,7 @@ Object.assign(window, {
     toggleLeaderboardParticipation,
     toggleWakeLock,
     requestNotifications,
+    runFullSyncNow,
     exportCSV,
     importCSV,
     confirmWipe,
