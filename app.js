@@ -150,6 +150,7 @@ const { customAlert, editJob: editJobModal } = JobTrackerModals;
         // Initial render
         console.log('[App] Rendering UI...');
         render();
+        setupPullToRefresh();
         console.log('[App] UI rendered');
         
         // Initialize background animations
@@ -196,6 +197,113 @@ const { customAlert, editJob: editJobModal } = JobTrackerModals;
 // ===========================
 
 let _inactivityTimer = null;
+
+// ===========================
+// Pull To Refresh
+// ===========================
+
+let _ptrEnabled = false;
+let _ptrPulling = false;
+let _ptrRefreshing = false;
+let _ptrStartY = 0;
+let _ptrDistance = 0;
+
+function setupPullToRefresh() {
+    if (_ptrEnabled) return;
+
+    const viewport = document.getElementById('view-container');
+    const indicator = document.querySelector('.ptr-indicator');
+    if (!viewport || !indicator) return;
+
+    const threshold = 72;
+    const maxPull = 110;
+
+    const resetVisuals = () => {
+        _ptrDistance = 0;
+        viewport.style.transform = '';
+        indicator.classList.remove('active');
+        indicator.textContent = '↓ Release to refresh';
+    };
+
+    const doRefresh = async () => {
+        if (_ptrRefreshing) return;
+        _ptrRefreshing = true;
+
+        indicator.classList.add('active');
+        indicator.textContent = '↻ Refreshing...';
+        viewport.style.transform = 'translateY(44px)';
+
+        try {
+            render(true);
+            if (window.syncEngine?.fullSync) {
+                await window.syncEngine.fullSync();
+            }
+            showToast('Refreshed');
+        } catch (error) {
+            console.error('[PTR] Refresh failed:', error);
+            showToast('Refresh failed');
+        } finally {
+            setTimeout(() => {
+                _ptrRefreshing = false;
+                _ptrPulling = false;
+                resetVisuals();
+            }, 240);
+        }
+    };
+
+    viewport.addEventListener('touchstart', (e) => {
+        if (_ptrRefreshing || viewport.scrollTop > 0) {
+            _ptrPulling = false;
+            return;
+        }
+
+        const modal = document.getElementById('modal');
+        if (modal && modal.style.display === 'flex') {
+            _ptrPulling = false;
+            return;
+        }
+
+        _ptrPulling = true;
+        _ptrStartY = e.touches[0].clientY;
+        _ptrDistance = 0;
+    }, { passive: true });
+
+    viewport.addEventListener('touchmove', (e) => {
+        if (!_ptrPulling || _ptrRefreshing) return;
+
+        const currentY = e.touches[0].clientY;
+        const rawDistance = currentY - _ptrStartY;
+        if (rawDistance <= 0 || viewport.scrollTop > 0) {
+            resetVisuals();
+            return;
+        }
+
+        _ptrDistance = Math.min(maxPull, rawDistance * 0.55);
+        viewport.style.transform = `translateY(${_ptrDistance}px)`;
+        indicator.classList.add('active');
+        indicator.textContent = _ptrDistance >= threshold ? '↑ Release to refresh' : '↓ Pull to refresh';
+
+        if (rawDistance > 4) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', () => {
+        if (!_ptrPulling || _ptrRefreshing) return;
+
+        const shouldRefresh = _ptrDistance >= threshold;
+        _ptrPulling = false;
+
+        if (shouldRefresh) {
+            doRefresh();
+            return;
+        }
+
+        resetVisuals();
+    }, { passive: true });
+
+    _ptrEnabled = true;
+}
 
 function setupInactivityTimeout(minutes = 60) {
     const ms = minutes * 60 * 1000;
