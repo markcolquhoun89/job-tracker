@@ -348,9 +348,50 @@
         .search-bar input { flex: 1; background: var(--surface-elev); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px 14px; border-radius: var(--radius-md); font-family: inherit; font-size: 0.82rem; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
         .search-bar input:focus { border-color: var(--primary); outline: none; }
         .search-bar select { background: var(--surface-elev); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px 8px; border-radius: var(--radius-md); font-family: inherit; font-size: 0.72rem; font-weight: 700; }
-        .job-tile.batch-selected { outline: 2px solid var(--primary); outline-offset: -2px; box-shadow: 0 0 0 2px var(--primary-dim); }
-        .batch-bar { position: fixed; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; background: var(--surface-t); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); border-top: 1px solid var(--border-subtle); padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; z-index: 999; animation: fadeIn 0.25s ease-out; box-shadow: 0 -2px 16px var(--shadow); }
-        .batch-bar button { padding: 10px 16px; border: none; border-radius: var(--radius-md); font-weight: 700; font-size: 0.75rem; color: #fff; cursor: pointer; transition: var(--transition); }
+        .job-tile.batch-selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 8px 24px color-mix(in srgb, var(--primary) 18%, transparent); background: color-mix(in srgb, var(--primary) 7%, var(--surface-t)); }
+        .batch-check { width: 22px; height: 22px; border: 2px solid var(--border); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; color: #fff; background: transparent; flex-shrink: 0; transition: all 0.22s ease; }
+        .batch-check span { font-size: 0.78rem; opacity: 0; transform: scale(0.7); transition: all 0.18s ease; }
+        .job-tile.batch-selected .batch-check,
+        .batch-check.checked { background: var(--primary-grad, var(--primary)); border-color: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent); }
+        .job-tile.batch-selected .batch-check span,
+        .batch-check.checked span { opacity: 1; transform: scale(1); }
+        .status-badge { display: inline-flex; align-items: center; justify-content: center; margin-top: 5px; padding: 4px 8px; border-radius: 7px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; width: fit-content; }
+        .status-badge.status-done { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+        .status-badge.status-pending { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
+        .status-badge.status-internal { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
+        .status-badge.status-failed { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+        .job-tile.batch-updating .status-badge { animation: statusUpdatePulse 0.4s ease infinite; }
+        @keyframes statusUpdatePulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.6; filter: brightness(1.3); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .job-tile.just-updated { animation: batchSuccessFlash 0.65s ease-out; }
+        @keyframes batchSuccessFlash {
+            0% { box-shadow: 0 0 0 0 transparent; }
+            45% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 24%, transparent), 0 12px 24px color-mix(in srgb, var(--success) 15%, transparent); border-color: var(--success); }
+            100% { box-shadow: 0 0 0 0 transparent; }
+        }
+        .job-tile.batch-removing { transform: translateX(90px); opacity: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
+        .batch-pill { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(100px); background: var(--surface-t); border: 1px solid var(--border-subtle); border-radius: 999px; padding: 8px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); opacity: 0; z-index: 999; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); max-width: calc(100vw - 24px); }
+        .batch-pill.active { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .batch-pill .count-tag { background: var(--primary-grad, var(--primary)); color: #fff; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 800; min-width: 28px; text-align: center; }
+        .batch-pill .default-actions { display: flex; align-items: center; gap: 4px; }
+        .batch-pill .status-menu { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .batch-pill.choosing-status .default-actions { display: none; }
+        .batch-pill.choosing-status .status-menu { display: flex; }
+        .batch-pill .btn-pill { background: transparent; border: none; color: var(--text-main); font-size: 0.82rem; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s ease, color 0.2s ease; white-space: nowrap; }
+        .batch-pill .btn-pill:hover { background: color-mix(in srgb, #fff 5%, transparent); color: #fff; }
+        .batch-pill .btn-pill-icon { display: inline-flex; width: 14px; justify-content: center; opacity: 0.8; }
+        .batch-pill .btn-icon-only { padding-left: 10px; padding-right: 10px; }
+        .batch-pill .btn-danger:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+        .batch-pill .btn-danger-soft:hover { color: var(--danger); }
+        .batch-pill .divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+        .batch-pill .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .batch-pill .status-dot.completed { background: var(--primary); }
+        .batch-pill .status-dot.pending { background: var(--warning); }
+        .batch-pill .status-dot.internals { background: var(--success); }
+        .batch-pill .status-dot.failed { background: var(--danger); }
         .ptr-indicator { text-align: center; padding: 10px; color: var(--primary); font-size: 0.72rem; font-weight: 700; display: none; }
         .ptr-indicator.active { display: block; animation: fadeIn 0.3s ease-out; }
         .goal-bar { height: 10px; background: var(--border-subtle); border-radius: 6px; overflow: hidden; margin: 10px 0; }

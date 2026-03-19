@@ -517,8 +517,19 @@ async function requestNotifications() {
 // Batch Mode
 // ===========================
 
+let batchStatusMenuOpen = false;
+
+function canBatchUseInternals() {
+    if (state.batchSelected.size === 0) return false;
+    return Array.from(state.batchSelected).every(jobId => {
+        const job = state.getJob(jobId);
+        return !!job && state.getTypeConfig(job.type)?.int != null;
+    });
+}
+
 function toggleBatchMode() {
     state.toggleBatchMode();
+    batchStatusMenuOpen = false;
     const bar = document.getElementById('batch-bar');
     if (bar) bar.remove();
     render();
@@ -536,28 +547,89 @@ function toggleBatchSelect(jobId, e) {
     renderBatchBar();
 }
 
+function enterBatchStatusMode() {
+    if (!state.batchMode || state.batchSelected.size === 0) return;
+    batchStatusMenuOpen = true;
+    renderBatchBar();
+}
+
+function exitBatchStatusMode() {
+    batchStatusMenuOpen = false;
+    renderBatchBar();
+}
+
+function clearBatchSelection(exitMode = false) {
+    state.batchSelected.clear();
+    batchStatusMenuOpen = false;
+
+    document.querySelectorAll('.job-tile.batch-selected').forEach(tile => {
+        tile.classList.remove('batch-selected');
+    });
+
+    if (exitMode) {
+        state.batchMode = false;
+        const bar = document.getElementById('batch-bar');
+        if (bar) bar.remove();
+        render();
+        return;
+    }
+
+    renderBatchBar();
+}
+
 function renderBatchBar() {
     let bar = document.getElementById('batch-bar');
     
     if (!state.batchMode || state.batchSelected.size === 0) {
         if (bar) bar.remove();
+        batchStatusMenuOpen = false;
         return;
     }
     
     if (!bar) {
         bar = document.createElement('div');
         bar.id = 'batch-bar';
-        bar.className = 'batch-bar';
+        bar.className = 'batch-pill';
         document.body.appendChild(bar);
     }
+
+    const choosingClass = batchStatusMenuOpen ? ' choosing-status' : '';
+    const canUseInternals = canBatchUseInternals();
     
+    bar.className = `batch-pill active${choosingClass}`;
+    bar.setAttribute('aria-hidden', 'false');
     bar.innerHTML = `
-        <span style="font-size:0.8rem; font-weight:700;">${state.batchSelected.size} selected</span>
-        <div style="display:flex; gap:6px;">
-            <button style="background:var(--success);" onclick="batchSetStatus('${STATUS.COMPLETED}')">✓ DONE</button>
-            <button style="background:var(--warning);" onclick="batchSetStatus('${STATUS.INTERNALS}')">⚠ INT</button>
-            <button style="background:var(--danger);" onclick="batchSetStatus('${STATUS.FAILED}')">✕ FAIL</button>
-            <button style="background:var(--border);" onclick="toggleBatchMode()">CANCEL</button>
+        <div class="count-tag">${state.batchSelected.size}</div>
+        <div class="default-actions">
+            <button class="btn-pill" onclick="enterBatchStatusMode()">
+                <span class="btn-pill-icon">◌</span>
+                <span>Status</span>
+            </button>
+            <button class="btn-pill btn-danger" onclick="batchDeleteSelected()">
+                <span class="btn-pill-icon">✕</span>
+                <span>Delete</span>
+            </button>
+            <div class="divider"></div>
+            <button class="btn-pill btn-icon-only" onclick="clearBatchSelection(true)">✕</button>
+        </div>
+        <div class="status-menu">
+            <button class="btn-pill" onclick="batchSetStatus('${STATUS.COMPLETED}')">
+                <span class="status-dot completed"></span>
+                <span>Done</span>
+            </button>
+            <button class="btn-pill" onclick="batchSetStatus('${STATUS.PENDING}')">
+                <span class="status-dot pending"></span>
+                <span>Pending</span>
+            </button>
+            ${canUseInternals ? `<button class="btn-pill" onclick="batchSetStatus('${STATUS.INTERNALS}')">
+                <span class="status-dot internals"></span>
+                <span>Internal</span>
+            </button>` : ''}
+            <button class="btn-pill btn-danger-soft" onclick="batchSetStatus('${STATUS.FAILED}')">
+                <span class="status-dot failed"></span>
+                <span>Failed</span>
+            </button>
+            <button class="btn-pill" onclick="exitBatchStatusMode()">← Cancel</button>
         </div>
     `;
 }
@@ -565,17 +637,69 @@ function renderBatchBar() {
 async function batchSetStatus(status) {
     try {
         const jobIds = Array.from(state.batchSelected);
+
+        if (status === STATUS.INTERNALS && !canBatchUseInternals()) {
+            showToast('Internal is only available when all selected jobs support it');
+            return;
+        }
+
+        jobIds.forEach(jobId => {
+            const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
+            if (tile) tile.classList.add('batch-updating');
+        });
+
         await jobOps.batchUpdateStatus(jobIds, status);
         
         state.batchMode = false;
         state.batchSelected.clear();
+        batchStatusMenuOpen = false;
         
         const bar = document.getElementById('batch-bar');
         if (bar) bar.remove();
         
-        showToast(`Updated ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}`);
         render(true);
+
+        setTimeout(() => {
+            jobIds.forEach(jobId => {
+                const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
+                if (!tile) return;
+                tile.classList.remove('batch-updating');
+                tile.classList.add('just-updated');
+                setTimeout(() => tile.classList.remove('just-updated'), 650);
+            });
+        }, 40);
+
+        showToast(`Updated ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}`);
     } catch (error) {
+        document.querySelectorAll('.job-tile.batch-updating').forEach(tile => tile.classList.remove('batch-updating'));
+        customAlert('Error', error.message, true);
+    }
+}
+
+async function batchDeleteSelected() {
+    try {
+        const jobIds = Array.from(state.batchSelected);
+        if (jobIds.length === 0) return;
+        if (!confirm(`Permanently delete ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}?`)) return;
+
+        jobIds.forEach(jobId => {
+            const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
+            if (tile) tile.classList.add('batch-removing');
+        });
+
+        await Promise.all(jobIds.map(jobId => jobOps.deleteJob(jobId)));
+
+        state.batchMode = false;
+        state.batchSelected.clear();
+        batchStatusMenuOpen = false;
+
+        const bar = document.getElementById('batch-bar');
+        if (bar) bar.remove();
+
+        showToast(`Deleted ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}`);
+        render();
+    } catch (error) {
+        document.querySelectorAll('.job-tile.batch-removing').forEach(tile => tile.classList.remove('batch-removing'));
         customAlert('Error', error.message, true);
     }
 }
@@ -1000,13 +1124,16 @@ function render(softUpdate) {
                 const existing = dragContainer.querySelector(`.job-tile[data-id="${j.id}"]`);
                 if (existing) {
                     // Update in-place: status class, border, fee, status text, actions
-                    existing.className = `job-tile ${j.status.toLowerCase()}`;
+                    existing.className = `job-tile ${j.status.toLowerCase()}${state.batchSelected.has(j.id) ? ' batch-selected' : ''}`;
                     existing.style.transform = ''; // Reset any swipe transform
                     existing.style.setProperty('--pulse-color', pulseMap[j.status] || 'var(--primary)');
                     const header = existing.querySelector('.job-card-header');
                     if (header) {
-                        const statusSpan = header.querySelector('span[style*="font-weight:700"]');
-                        if (statusSpan) statusSpan.textContent = j.status.toUpperCase();
+                        const statusSpan = header.querySelector('.status-badge');
+                        if (statusSpan) {
+                            statusSpan.textContent = j.status;
+                            statusSpan.className = `status-badge ${getStatusBadgeClass(j.status)}`;
+                        }
                         const feeB = header.querySelectorAll('b');
                         const satFee = getSaturdayDisplayFees(j);
                         if (feeB.length >= 2) {
@@ -1024,6 +1151,8 @@ function render(softUpdate) {
                             }
                         }
                     }
+                    const check = existing.querySelector('.batch-check');
+                    if (check) check.classList.toggle('checked', state.batchSelected.has(j.id));
                     // Toggle action buttons
                     const actions = existing.querySelector('.job-actions');
                     if (j.status === 'Pending' && !actions) {
@@ -1153,6 +1282,7 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
     const delay = animate ? (typeof index === 'number' ? `animation: slideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: ${index * 50}ms;` : `animation: slideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;`) : '';
     const batchAttr = state.batchMode ? `onclick="toggleBatchSelect('${j.id}', event)"` : `onclick="if(!event.target.closest('button')) pressEdit(this, '${j.id}')")`;
     const batchClass = state.batchSelected.has(j.id) ? ' batch-selected' : '';
+    const badgeClass = getStatusBadgeClass(j.status);
     const satFee = getSaturdayDisplayFees(j);
     const feeHtml = satFee
         ? `<b class="fee-amount sat-premium" data-base="${satFee.base.toFixed(2)}" data-final="${satFee.final.toFixed(2)}" style="font-size:1.1rem; color:var(--text-main); pointer-events:none;">&pound;${satFee.base.toFixed(2)}</b>`
@@ -1168,11 +1298,11 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
                 ${showDate ? `<span class="date-badge">${new Date(j.date + 'T00:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'short'})}</span>` : ''}
                 <div class="job-card-header">
                     <div style="display:flex; align-items:center;">
-                        <div class="job-drag-handle" ontouchstart="handleJobTouch(event, '${j.id}')">&#8942;&#8942;</div>
+                        ${state.batchMode ? `<div class="batch-check ${state.batchSelected.has(j.id) ? 'checked' : ''}" aria-hidden="true"><span>✓</span></div>` : `<div class="job-drag-handle" ontouchstart="handleJobTouch(event, '${j.id}')">&#8942;&#8942;</div>`}
                         <div style="pointer-events:none;">
                             <b style="font-size:1.1rem; display:block;">${j.type}${j.jobID ? ` <span style="font-size:0.7rem; color:var(--text-muted)">#${j.jobID}</span>` : ''}
                             ${j.isUpgraded ? '<span style="color:var(--primary); font-size:0.6rem; vertical-align:middle;">[UPGRADED]</span>' : ''}${j.notes ? '<span class="notes-indicator" title="Has notes"></span>' : ''}</b>
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700">${j.status.toUpperCase()}</span>
+                            <span class="status-badge ${badgeClass}">${j.status}</span>
                             ${elfIcon || candidsIcon ? `<div style="margin-top:4px; font-size:0.8rem;">${elfIcon} ${candidsIcon}</div>` : ''}
                         </div>
                     </div>
@@ -1186,6 +1316,21 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
                 </div>` : ''}
             </div>
         </div>`;
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case STATUS.COMPLETED:
+            return 'status-done';
+        case STATUS.PENDING:
+            return 'status-pending';
+        case STATUS.INTERNALS:
+            return 'status-internal';
+        case STATUS.FAILED:
+            return 'status-failed';
+        default:
+            return 'status-pending';
+    }
 }
 
 /**
@@ -2970,10 +3115,15 @@ Object.assign(window, {
     renderMultiAddList,
     saveMultiJobs,
     toggleBatchMode,
+    enterBatchStatusMode,
+    exitBatchStatusMode,
+    clearBatchSelection,
     clearJobOrder,
     quickStatus,
     pressEdit,
     toggleBatchSelect,
+    batchDeleteSelected,
+    batchSetStatus,
     editTarget,
     shareReport,
     jumpToPayWeek,
