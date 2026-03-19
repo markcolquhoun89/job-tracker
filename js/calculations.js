@@ -14,7 +14,14 @@ export const JobTrackerCalculations = {
      * Calculate comprehensive statistics for a list of jobs
      */
     calculate(list) {
-        const resolved = list.filter(j => [STATUS.COMPLETED, STATUS.FAILED, STATUS.INTERNALS].includes(j.status));
+        const isCompletionEligibleType = (job) => {
+            const cfg = state.getTypeConfig(job.type);
+            if (!cfg) return true;
+            const raw = cfg.countTowardsCompletion;
+            return !(raw === false || raw === 'false' || raw === 0 || raw === '0' || raw === 'off');
+        };
+
+        const resolved = list.filter(j => [STATUS.COMPLETED, STATUS.FAILED, STATUS.INTERNALS].includes(j.status) && isCompletionEligibleType(j));
         const noHybrid = resolved.filter(j => !j.type.toUpperCase().startsWith('HY'));
 
         // Completion rate calculator
@@ -216,10 +223,14 @@ export const JobTrackerCalculations = {
     /**
      * Calculate projection based on current progress
      */
-    getProjection(list, stats, viewDate, range) {
-        const d = new Date(viewDate);
+    getProjection(list, stats, viewDate = state.viewDate, range = state.range) {
+        const d = new Date(viewDate || state.viewDate || new Date());
+        if (isNaN(d.getTime())) {
+            return Number.isFinite(Number(stats?.totalCash)) ? Number(stats.totalCash) : 0;
+        }
+        const totalCash = Number.isFinite(Number(stats?.totalCash)) ? Number(stats.totalCash) : 0;
         
-        if (range === 'day') return stats.totalCash;
+        if (range === 'day') return totalCash;
 
         let elapsed, total;
 
@@ -236,8 +247,9 @@ export const JobTrackerCalculations = {
             total = 365;
         }
 
-        if (elapsed === 0) return stats.totalCash;
-        return (stats.totalCash / elapsed) * total;
+        if (elapsed === 0) return totalCash;
+        const projected = (totalCash / elapsed) * total;
+        return Number.isFinite(projected) ? projected : totalCash;
     },
 
     /**

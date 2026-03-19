@@ -11,6 +11,7 @@ const { DEFAULT_TYPES, RANGES } = JobTrackerConstants;
 const { db, STORES } = JobTrackerDB;
 
 const normalizeTypeCode = (code) => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const coerceCompletionFlag = (value) => !(value === false || value === 'false' || value === 0 || value === '0' || value === 'off');
 
 class AppState {
     constructor() {
@@ -133,6 +134,36 @@ class AppState {
                     await db.bulkPut(STORES.TYPES, this.types);
                     localStorage.setItem(defaultsMigrationKey, '1');
                 }
+            }
+
+            // Normalize type codes/flags to avoid stringly-typed completion bugs.
+            let normalizedTypesChanged = false;
+            const seenTypeCodes = new Set();
+            const normalizedTypes = [];
+            this.types.forEach(typeObj => {
+                const normalizedCode = normalizeTypeCode(typeObj.code);
+                if (!normalizedCode || seenTypeCodes.has(normalizedCode)) return;
+                seenTypeCodes.add(normalizedCode);
+
+                const normalizedType = {
+                    ...typeObj,
+                    code: normalizedCode,
+                    countTowardsCompletion: coerceCompletionFlag(typeObj.countTowardsCompletion)
+                };
+
+                if (
+                    normalizedType.code !== typeObj.code ||
+                    normalizedType.countTowardsCompletion !== typeObj.countTowardsCompletion
+                ) {
+                    normalizedTypesChanged = true;
+                }
+
+                normalizedTypes.push(normalizedType);
+            });
+
+            this.types = normalizedTypes;
+            if (normalizedTypesChanged) {
+                await db.bulkPut(STORES.TYPES, this.types);
             }
 
             // Load expenses
@@ -287,17 +318,23 @@ class AppState {
      * Save job type
      */
     async saveType(type) {
-        await db.put(STORES.TYPES, type);
+        const normalizedType = {
+            ...type,
+            code: normalizeTypeCode(type.code),
+            countTowardsCompletion: coerceCompletionFlag(type.countTowardsCompletion)
+        };
+
+        await db.put(STORES.TYPES, normalizedType);
         
-        const index = this.types.findIndex(t => normalizeTypeCode(t.code) === normalizeTypeCode(type.code));
+        const index = this.types.findIndex(t => normalizeTypeCode(t.code) === normalizeTypeCode(normalizedType.code));
         if (index >= 0) {
-            this.types[index] = type;
+            this.types[index] = normalizedType;
         } else {
-            this.types.push(type);
+            this.types.push(normalizedType);
         }
 
-        this.notify('type:saved', type);
-        return type;
+        this.notify('type:saved', normalizedType);
+        return normalizedType;
     }
 
     /**

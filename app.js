@@ -387,9 +387,11 @@ async function saveNewJob(type) {
 }
 
 let _multiCounts = {};
+let _multiAddScrollTop = 0;
 
 function showMultiAdd() {
     _multiCounts = {};
+    _multiAddScrollTop = 0;
     state.types.forEach(t => { _multiCounts[t.code] = 0; });
     renderMultiAddList();
 }
@@ -412,15 +414,22 @@ function renderMultiAddList() {
         <button class="close-btn" onclick="window.JobTrackerModals.closeModal()">×</button>
         <h3 style="margin-bottom:4px;">MULTI ADD</h3>
         <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:14px;">${viewDate}</p>
-        <div style="max-height:55vh; overflow-y:auto; margin-bottom:14px; padding-right:4px;">
+            <div id="multi-add-scroll" style="max-height:55vh; overflow-y:auto; margin-bottom:14px; padding-right:4px;">
             ${rows}
         </div>
         <button class="btn" style="${addBtnStyle}" onclick="saveMultiJobs()" ${total === 0 ? 'disabled' : ''}>ADD ${total} JOB${total !== 1 ? 'S' : ''}</button>
     `;
     window.JobTrackerModals.showModal(content);
+
+        const scrollContainer = document.getElementById('multi-add-scroll');
+        if (scrollContainer) {
+            scrollContainer.scrollTop = _multiAddScrollTop;
+        }
 }
 
 function adjMulti(type, dir) {
+    const scrollContainer = document.getElementById('multi-add-scroll');
+    _multiAddScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
     const next = (_multiCounts[type] || 0) + dir;
     if (next >= 0) { _multiCounts[type] = next; renderMultiAddList(); }
 }
@@ -1271,7 +1280,9 @@ function renderStats(container, list, s) {
     const typePoints = (typeCode) => pointsByType[normalizeTypeCode(typeCode)] || 0;
     const isCompletionEligibleType = (job) => {
         const cfg = state.getTypeConfig(job.type);
-        return cfg ? cfg.countTowardsCompletion !== false : true;
+               if (!cfg) return true;
+               const raw = cfg.countTowardsCompletion;
+               return !(raw === false || raw === 'false' || raw === 0 || raw === '0' || raw === 'off');
     };
 
     const weeklyMap = new Map();
@@ -1741,7 +1752,8 @@ function renderFunds(container, list, s) {
     const activeGoal = state.range === 'week' ? goal.weekly : state.range === 'month' ? goal.monthly : 0;
     const goalPct = activeGoal > 0 ? Math.min(100, (s.totalCash / activeGoal) * 100) : 0;
     // Projection
-    const projected = getProjection(list, s);
+    const projectedRaw = getProjection(list, s);
+    const projected = Number.isFinite(Number(projectedRaw)) ? Number(projectedRaw) : 0;
     // Pay period history
     const ppHistory = getPayPeriodHistory();
     // Earnings milestones (all-time)
@@ -2191,7 +2203,9 @@ function renderLeaderboard(container, list, s) {
         const resolved = jobs.filter(j => {
             if (!['Completed', 'Failed', 'Internals'].includes(j.status)) return false;
             const cfg = state.getTypeConfig(j.job_type || j.type);
-            return cfg ? cfg.countTowardsCompletion !== false : true;
+                    if (!cfg) return true;
+                    const raw = cfg.countTowardsCompletion;
+                    return !(raw === false || raw === 'false' || raw === 0 || raw === '0' || raw === 'off');
         });
         if (resolved.length === 0) return 0;
         const completed = resolved.filter(j => j.status === 'Completed').length;
@@ -2781,7 +2795,11 @@ function showPointsWeekAudit(weekKey) {
             const cfg = state.getTypeConfig(job.type);
             const normalizedType = normalizeTypeCode(cfg?.code || job.type);
             const normalizedStatus = normalizeStatus(job.status);
-            const eligible = cfg ? cfg.countTowardsCompletion !== false : true;
+            let eligible = true;
+            if (cfg) {
+                const raw = cfg.countTowardsCompletion;
+                eligible = !(raw === false || raw === 'false' || raw === 0 || raw === '0' || raw === 'off');
+            }
             const basePoints = pointsByType[normalizedType] || 0;
 
             let actual = 0;
