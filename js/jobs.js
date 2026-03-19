@@ -11,16 +11,20 @@ const { STATUS, SATURDAY_MULTIPLIER } = JobTrackerConstants;
 const { generateID, isSaturday, calculateSaturdayFee, shouldApplySaturdayPremium, validateJob } = JobTrackerUtils;
 const state = JobTrackerState;
 
+const getActiveUserId = () => state.getCurrentUserId();
+
 export const JobTrackerJobs = {
     /**
      * Create a new job
      */
     async createJob(jobData) {
+        const activeUserId = getActiveUserId();
         const job = {
             id: generateID(),
             type: jobData.type,
             date: jobData.date,
             status: jobData.status || STATUS.PENDING,
+            user_id: activeUserId,
             jobID: jobData.jobID || '',
             notes: jobData.notes || '',
             fee: 0,
@@ -69,9 +73,12 @@ export const JobTrackerJobs = {
             throw new Error('Job not found');
         }
 
+        const activeUserId = getActiveUserId();
+
         const updatedJob = {
             ...job,
             ...updates,
+            user_id: job.user_id || activeUserId || null,
             updatedAt: Date.now()
         };
 

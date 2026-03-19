@@ -953,7 +953,12 @@ function render(softUpdate) {
             const banner = container.querySelector('.summary-banner');
             if (banner && list.length > 0) {
                 const items = banner.querySelectorAll('.summary-item b');
-                if (items.length >= 4) { items[0].textContent = s.vol; items[1].textContent = s.done; items[2].textContent = s.pend; items[3].innerHTML = '\u00A3' + s.totalCash.toFixed(0); }
+                if (items.length >= 3) {
+                    // Summary banner currently shows: JOBS, PENDING, EARNED
+                    items[0].textContent = s.vol;
+                    items[1].textContent = s.pend;
+                    items[2].innerHTML = '\u00A3' + s.totalCash.toFixed(0);
+                }
             } else if (!banner && list.length > 0) {
                 // Banner needs to appear (was empty, now has jobs)
                 const statGrid = container.querySelector('.stat-grid');

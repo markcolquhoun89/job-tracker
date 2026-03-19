@@ -20,6 +20,7 @@ class AppState {
         this.types = [];
         this.expenses = [];
         this.settings = new Map();
+        this.activeUserId = null;
 
         // User role & profile
         this.userRole = 'engineer'; // 'engineer', 'manager', 'admin'
@@ -55,8 +56,37 @@ class AppState {
      */
     async init() {
         try {
+            // Resolve active authenticated user (if any) before loading local data.
+            const session = JSON.parse(localStorage.getItem('nx_supabase_session') || 'null');
+            this.activeUserId = session?.user?.id || null;
+
             // Load jobs
             this.jobs = await db.getAll(STORES.JOBS);
+
+            // Scope local jobs to current authenticated user on shared devices.
+            const unscopedOwnerKey = 'nx_unscoped_jobs_owner_user';
+            if (this.activeUserId) {
+                const unscopedOwner = localStorage.getItem(unscopedOwnerKey);
+                if (!unscopedOwner) {
+                    // First authenticated user on this device claims legacy unscoped jobs.
+                    let claimedAny = false;
+                    this.jobs = this.jobs.map(job => {
+                        if (job.user_id) return job;
+                        claimedAny = true;
+                        return { ...job, user_id: this.activeUserId };
+                    });
+                    if (claimedAny) {
+                        await db.bulkPut(STORES.JOBS, this.jobs);
+                    }
+                    localStorage.setItem(unscopedOwnerKey, this.activeUserId);
+                }
+
+                this.jobs = this.jobs.filter(job => {
+                    if (job.user_id) return job.user_id === this.activeUserId;
+                    // If any unscoped jobs remain, only show for claimed owner.
+                    return localStorage.getItem(unscopedOwnerKey) === this.activeUserId;
+                });
+            }
             
             // Normalize jobs: add missing fields for backwards compatibility
             this.jobs = this.jobs.map(job => ({
@@ -185,7 +215,8 @@ class AppState {
                 types: this.types.length,
                 expenses: this.expenses.length,
                 settings: this.settings.size,
-                userRole: this.userRole
+                userRole: this.userRole,
+                activeUserId: this.activeUserId
             });
 
             return true;
@@ -216,21 +247,39 @@ class AppState {
         });
     }
 
+    getCurrentUserId() {
+        if (this.activeUserId) return this.activeUserId;
+        const session = JSON.parse(localStorage.getItem('nx_supabase_session') || 'null');
+        this.activeUserId = session?.user?.id || null;
+        return this.activeUserId;
+    }
+
     /**
      * Add or update a job
      */
     async saveJob(job) {
-        await db.put(STORES.JOBS, job);
+        const activeUserId = this.getCurrentUserId();
+        const scopedJob = {
+            ...job,
+            user_id: job.user_id || activeUserId || null
+        };
+
+        await db.put(STORES.JOBS, scopedJob);
         
-        const index = this.jobs.findIndex(j => j.id === job.id);
+        const index = this.jobs.findIndex(j => j.id === scopedJob.id);
+        const canIncludeInMemory = !activeUserId || scopedJob.user_id === activeUserId;
         if (index >= 0) {
-            this.jobs[index] = job;
-        } else {
-            this.jobs.push(job);
+            if (canIncludeInMemory) {
+                this.jobs[index] = scopedJob;
+            } else {
+                this.jobs.splice(index, 1);
+            }
+        } else if (canIncludeInMemory) {
+            this.jobs.push(scopedJob);
         }
 
-        this.notify('job:saved', job);
-        return job;
+        this.notify('job:saved', scopedJob);
+        return scopedJob;
     }
 
     /**
@@ -258,16 +307,28 @@ class AppState {
      * Bulk update jobs
      */
     async bulkUpdateJobs(jobs) {
-        await db.bulkPut(STORES.JOBS, jobs);
+        const activeUserId = this.getCurrentUserId();
+        const scopedJobs = jobs.map(job => ({
+            ...job,
+            user_id: job.user_id || activeUserId || null
+        }));
+
+        await db.bulkPut(STORES.JOBS, scopedJobs);
         
-        jobs.forEach(updatedJob => {
+        scopedJobs.forEach(updatedJob => {
             const index = this.jobs.findIndex(j => j.id === updatedJob.id);
             if (index >= 0) {
-                this.jobs[index] = updatedJob;
+                if (!activeUserId || updatedJob.user_id === activeUserId) {
+                    this.jobs[index] = updatedJob;
+                } else {
+                    this.jobs.splice(index, 1);
+                }
+            } else if (!activeUserId || updatedJob.user_id === activeUserId) {
+                this.jobs.push(updatedJob);
             }
         });
 
-        this.notify('jobs:bulk-updated', jobs);
+        this.notify('jobs:bulk-updated', scopedJobs);
         return true;
     }
 
@@ -581,6 +642,7 @@ class AppState {
         this.batchSelected.clear();
         this.searchQuery = '';
         this.statusFilter = 'all';
+        this.activeUserId = null;
         
         // Clear all IndexedDB stores
         try {
