@@ -259,6 +259,8 @@ class AppState {
      */
     async saveJob(job) {
         const activeUserId = this.getCurrentUserId();
+        const existingIndex = this.jobs.findIndex(j => j.id === job.id);
+        const isUpdate = existingIndex >= 0;
         const scopedJob = {
             ...job,
             user_id: job.user_id || activeUserId || null
@@ -279,6 +281,9 @@ class AppState {
         }
 
         this.notify('job:saved', scopedJob);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event(isUpdate ? 'nx-job-updated' : 'nx-job-added'));
+        }
         return scopedJob;
     }
 
@@ -293,6 +298,9 @@ class AppState {
         this.jobs = this.jobs.filter(j => j.id !== jobId);
 
         this.notify('job:deleted', job);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('nx-job-deleted'));
+        }
         return true;
     }
 
@@ -329,6 +337,9 @@ class AppState {
         });
 
         this.notify('jobs:bulk-updated', scopedJobs);
+        if (typeof window !== 'undefined' && scopedJobs.length > 0) {
+            window.dispatchEvent(new Event('nx-job-updated'));
+        }
         return true;
     }
 
