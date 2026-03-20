@@ -670,6 +670,10 @@ async function runFullSyncNow() {
 // ===========================
 
 let batchStatusMenuOpen = false;
+let _jobPressTimer = null;
+let _jobPressTriggered = false;
+let _jobPressJobId = null;
+let _suppressTapJobId = null;
 
 function canBatchUseInternals() {
     if (state.batchSelected.size === 0) return false;
@@ -689,14 +693,93 @@ function toggleBatchMode() {
 
 function toggleBatchSelect(jobId, e) {
     if (!state.batchMode) return;
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     
     state.toggleBatchSelect(jobId);
+
+    if (state.batchSelected.size === 0) {
+        state.batchMode = false;
+        batchStatusMenuOpen = false;
+        render();
+        return;
+    }
     
     const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
     if (tile) tile.classList.toggle('batch-selected');
     
     renderBatchBar();
+}
+
+function cancelJobPress() {
+    if (_jobPressTimer) {
+        clearTimeout(_jobPressTimer);
+        _jobPressTimer = null;
+    }
+    _jobPressJobId = null;
+}
+
+function handleJobPressStart(e, jobId) {
+    if (e.target.closest('button') || e.target.closest('.job-drag-handle')) return;
+    if (e.type === 'mousedown' && e.button !== 0) return;
+
+    cancelJobPress();
+    _jobPressTriggered = false;
+    _jobPressJobId = jobId;
+
+    _jobPressTimer = setTimeout(() => {
+        _jobPressTriggered = true;
+
+        if (!state.batchMode) {
+            state.batchMode = true;
+            state.batchSelected.clear();
+        }
+
+        if (!state.batchSelected.has(jobId)) {
+            state.toggleBatchSelect(jobId);
+        }
+
+        if (navigator.vibrate) {
+            navigator.vibrate(18);
+        }
+
+        render();
+    }, 420);
+}
+
+function handleJobPressEnd(e, jobId) {
+    if (_jobPressJobId !== jobId) {
+        cancelJobPress();
+        return;
+    }
+
+    if (_jobPressTimer) {
+        clearTimeout(_jobPressTimer);
+        _jobPressTimer = null;
+    }
+
+    if (_jobPressTriggered) {
+        e.preventDefault();
+        e.stopPropagation();
+        _suppressTapJobId = jobId;
+        setTimeout(() => {
+            if (_suppressTapJobId === jobId) _suppressTapJobId = null;
+        }, 260);
+    }
+
+    _jobPressJobId = null;
+}
+
+function handleJobTap(jobId, e) {
+    if (e.target.closest('button')) return;
+    if (_suppressTapJobId === jobId) return;
+
+    if (state.batchMode) {
+        toggleBatchSelect(jobId, e);
+        return;
+    }
+
+    const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
+    if (tile) pressEdit(tile, jobId);
 }
 
 function enterBatchStatusMode() {
@@ -1220,22 +1303,15 @@ function render(softUpdate) {
     const showDate = state.range !== 'day';
     if (state.activeTab === 'jobs') {
         const pulseMap = { 'Completed': 'var(--success)', 'Internals': 'var(--warning)', 'Failed': 'var(--danger)', 'Pending': 'var(--primary)' };
+        const target = parseInt(localStorage.getItem('nx_target')) || 80;
+        const completionTone = s.compRate >= target ? 'var(--success)' : s.compRate >= target * 0.75 ? 'var(--warning)' : 'var(--danger)';
+        const completionPct = Math.max(0, Math.min(100, Number(s.compRate) || 0));
         // On soft updates (data change), try to update cards in-place
         if (softUpdate && container.querySelector('#drag-container')) {
-            // Update stats panels in-place
-            const target = parseInt(localStorage.getItem('nx_target')) || 80;
-            const rc1 = s.compRate >= target ? 'var(--success)' : s.compRate >= target * 0.75 ? 'var(--warning)' : 'var(--danger)';
-            const rc2 = s.exclHy >= target ? 'var(--success)' : s.exclHy >= target * 0.75 ? 'var(--warning)' : 'var(--danger)';
-            const mAll = container.querySelector('[data-meter="all"]');
-            const mExhy = container.querySelector('[data-meter="exhy"]');
-            const fAll = container.querySelector('[data-fill="all"]');
-            const fExhy = container.querySelector('[data-fill="exhy"]');
-            if (mAll) { mAll.textContent = s.compRate + '%'; mAll.style.color = rc1; }
-            if (fAll) { fAll.style.width = Math.min(s.compRate, 100) + '%'; fAll.style.background = rc1; }
-            if (mExhy) { mExhy.textContent = s.exclHy + '%'; mExhy.style.color = rc2; }
-            if (fExhy) { fExhy.style.width = Math.min(s.exclHy, 100) + '%'; fExhy.style.background = rc2; }
             const banner = container.querySelector('.summary-banner');
             if (banner && list.length > 0) {
+                banner.style.setProperty('--completion-progress', `${completionPct}%`);
+                banner.style.setProperty('--completion-tone', completionTone);
                 const items = banner.querySelectorAll('.summary-item b');
                 if (items.length >= 3) {
                     // Summary banner currently shows: JOBS, PENDING, EARNED
@@ -1245,16 +1321,17 @@ function render(softUpdate) {
                 }
             } else if (!banner && list.length > 0) {
                 // Banner needs to appear (was empty, now has jobs)
-                const statGrid = container.querySelector('.stat-grid');
-                if (statGrid) {
+                const dragContainer = container.querySelector('#drag-container');
+                if (dragContainer) {
                     const bannerDiv = document.createElement('div');
                     bannerDiv.className = 'summary-banner';
+                    bannerDiv.style.setProperty('--completion-progress', `${completionPct}%`);
+                    bannerDiv.style.setProperty('--completion-tone', completionTone);
                     bannerDiv.innerHTML = `
                         <div class="summary-item"><small style="font-size:0.6rem;">JOBS</small><b>${s.vol}</b></div>
-                        <div class="summary-item"><small style="font-size:0.6rem;">COMPLETED</small><b style="color:var(--success)">${s.done}</b></div>
                         <div class="summary-item"><small style="font-size:0.6rem;">PENDING</small><b style="color:var(--warning)">${s.pend}</b></div>
                         <div class="summary-item"><small style="font-size:0.6rem;">EARNED</small><b>&pound;${s.totalCash.toFixed(0)}</b></div>`;
-                    statGrid.after(bannerDiv);
+                    dragContainer.before(bannerDiv);
                 }
             } else if (banner && list.length === 0) {
                 banner.remove();
@@ -1359,9 +1436,6 @@ function render(softUpdate) {
             return;
         }
         // Full render (tab switch / date change / first load)
-        const target = parseInt(localStorage.getItem('nx_target')) || 80;
-        const rateColor1 = s.compRate >= target ? 'var(--success)' : s.compRate >= target * 0.75 ? 'var(--warning)' : 'var(--danger)';
-        const rateColor2 = s.exclHy >= target ? 'var(--success)' : s.exclHy >= target * 0.75 ? 'var(--warning)' : 'var(--danger)';
         // Empty states per context
         const emptyJobs = `<div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
             <div style="margin-bottom:12px; opacity:0.3;"><svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div>
@@ -1369,28 +1443,13 @@ function render(softUpdate) {
             <div style="font-size:0.75rem;">Tap the <span style="color:var(--primary); font-weight:800;">+</span> button below to add your first job</div>
         </div>`;
         container.innerHTML = `
-            <div class="panel comp-rates-panel" style="margin-bottom:10px; padding:14px 16px;">
-                <div class="comp-meter comp-meter-compact">
-                    <div class="comp-meter-row">
-                        <div class="comp-meter-pct" data-meter="all" style="color:${rateColor1}">${s.compRate}%</div>
-                        <div class="comp-meter-info">
-                            <div class="comp-meter-label">Completion Rate (eligible job types)</div>
-                            <div class="comp-meter-track"><div class="comp-meter-fill" data-fill="all" style="width:${Math.min(s.compRate,100)}%; background:${rateColor1};"></div><div class="comp-meter-target" style="left:${target}%;"></div></div>
-                        </div>
-                    </div>
-                    <div class="comp-meter-row">
-                        <div class="comp-meter-pct" data-meter="exhy" style="color:${rateColor2}">${s.exclHy}%</div>
-                            <div class="comp-meter-label">Excl. Hybrids</div>
-                        </div>
-                    </div>
             ${list.length > 0 ? `
-            <div class="summary-banner">
+            <div class="summary-banner" style="--completion-progress:${completionPct}%; --completion-tone:${completionTone};" title="Completion progress">
                 <div class="summary-item"><small style="font-size:0.6rem;">JOBS</small><b>${s.vol}</b></div>
                 <div class="summary-item"><small style="font-size:0.6rem;">PENDING</small><b style="color:var(--warning)">${s.pend}</b></div>
                 <div class="summary-item"><small style="font-size:0.6rem;">EARNED</small><b>&pound;${s.totalCash.toFixed(0)}</b></div>
             </div>` : ''}
-            ${list.length > 0 ? `<div class="search-bar">
-                <input type="text" placeholder="\ud83d\udd0d Search jobs..." value="${state.searchQuery}" oninput="state.searchQuery=this.value; render()">
+            ${list.length > 0 ? `<div class="jobs-toolbar">
                 <select onchange="state.statusFilter=this.value; render()">
                     <option value="all" ${state.statusFilter==='all'?'selected':''}>All</option>
                     <option value="Pending" ${state.statusFilter==='Pending'?'selected':''}>Pending</option>
@@ -1398,8 +1457,9 @@ function render(softUpdate) {
                     <option value="Failed" ${state.statusFilter==='Failed'?'selected':''}>Failed</option>
                     <option value="Internals" ${state.statusFilter==='Internals'?'selected':''}>Internals</option>
                 </select>
+                <button style="background:var(--surface-elev); border:1px solid var(--border-subtle); color:var(--text-main); padding:10px 10px; border-radius:var(--radius-md); font-size:0.72rem; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="openSearchPrompt()">🔎 ${state.searchQuery ? 'EDIT SEARCH' : 'SEARCH'}</button>
+                ${state.searchQuery ? `<button style="background:var(--border-t); border:1px solid var(--border-subtle); color:var(--text-muted); padding:10px 10px; border-radius:var(--radius-md); font-size:0.72rem; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="state.searchQuery=''; render()">CLEAR</button>` : ''}
                 ${customOrder.length > 0 ? `<button style="background:var(--warning); color:#fff; padding:6px 10px; border-radius:8px; font-size:0.65rem; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="clearJobOrder(); render()">↻ RESET</button>` : ''}
-                <button style="background:${state.batchMode?'var(--primary)':'var(--border-t)'}; border:1px solid var(--border-t); color:${state.batchMode?'#fff':'var(--text-muted)'}; padding:6px 10px; border-radius:8px; font-size:0.65rem; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="toggleBatchMode()">${state.batchMode?'EXIT':'SELECT'}</button>
             </div>` : ''}
             <div id="drag-container">
                 ${displayList.map((j, i) => renderJobCard(j, showDate, pulseMap, true, i)).join('') || emptyJobs}
@@ -1440,7 +1500,7 @@ function render(softUpdate) {
  */
 function renderJobCard(j, showDate, pulseMap, animate, index) {
     const delay = animate ? (typeof index === 'number' ? `animation: slideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: ${index * 50}ms;` : `animation: slideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;`) : '';
-    const batchAttr = state.batchMode ? `onclick="toggleBatchSelect('${j.id}', event)"` : `onclick="if(!event.target.closest('button')) pressEdit(this, '${j.id}')")`;
+    const pressHandlers = `ontouchstart="handleJobPressStart(event, '${j.id}')" ontouchend="handleJobPressEnd(event, '${j.id}')" ontouchcancel="cancelJobPress()" onmousedown="handleJobPressStart(event, '${j.id}')" onmouseup="handleJobPressEnd(event, '${j.id}')" onmouseleave="cancelJobPress()"`;
     const batchClass = state.batchSelected.has(j.id) ? ' batch-selected' : '';
     const badgeClass = getStatusBadgeClass(j.status);
     const satFee = getSaturdayDisplayFees(j);
@@ -1454,7 +1514,7 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
     
     return `
         <div class="job-tile-wrap" data-job-id="${j.id}">
-            <div class="job-tile ${j.status.toLowerCase()}${batchClass}" data-id="${j.id}" style="--pulse-color:${pulseMap[j.status] || 'var(--primary)'}; ${delay}" ${batchAttr}>
+            <div class="job-tile ${j.status.toLowerCase()}${batchClass}" data-id="${j.id}" style="--pulse-color:${pulseMap[j.status] || 'var(--primary)'}; ${delay}" onclick="handleJobTap('${j.id}', event)" ${pressHandlers}>
                 ${showDate ? `<span class="date-badge">${new Date(j.date + 'T00:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'short'})}</span>` : ''}
                 <div class="job-card-header">
                     <div style="display:flex; align-items:center;">
@@ -3215,6 +3275,15 @@ function toggleLeaderboardParticipation() {
 function showNotesSearch() {
     window.JobTrackerModals.showNotesSearch();
 }
+
+function openSearchPrompt() {
+    const current = state.searchQuery || '';
+    const next = prompt('Search jobs by type, job ID, or notes:', current);
+    if (next === null) return;
+    state.searchQuery = next.trim();
+    render();
+}
+
 function importCSV(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -3284,10 +3353,15 @@ Object.assign(window, {
     clearBatchSelection,
     clearJobOrder,
     quickStatus,
+    handleJobTap,
+    handleJobPressStart,
+    handleJobPressEnd,
+    cancelJobPress,
     pressEdit,
     toggleBatchSelect,
     batchDeleteSelected,
     batchSetStatus,
+    openSearchPrompt,
     editTarget,
     shareReport,
     jumpToPayWeek,
