@@ -316,9 +316,14 @@ export const JobTrackerModals = {
 
             const statusBtn = (s, label, bg, color = '#fff') => {
                 const active = job.status === s;
-                const activeStyle = s === STATUS.PENDING
-                    ? (active ? 'outline:2px solid var(--primary); outline-offset:-3px;' : '')
-                    : (active ? 'outline:2px solid #fff; outline-offset:-3px;' : '');
+                const outlineColor = s === STATUS.PENDING
+                    ? 'var(--primary)'
+                    : s === STATUS.COMPLETED
+                        ? 'var(--success)'
+                        : s === STATUS.INTERNALS
+                            ? 'var(--warning)'
+                            : 'var(--danger)';
+                const activeStyle = active ? `outline:2px solid ${outlineColor}; outline-offset:-3px;` : '';
                 return `<button class="btn" id="status-btn-${s}" style="margin:0; padding:14px 4px; font-size:0.8rem; font-weight:800; background:${bg}; color:${color}; ${activeStyle}" onclick="JobTrackerModals.selectStatus('${s}','${jobId}')">${label}</button>`;
             };
 
@@ -335,9 +340,9 @@ export const JobTrackerModals = {
                 <input type="hidden" id="edit-status-value" value="${job.status}">
                 <div style="display:grid; grid-template-columns:${statusCols}; gap:6px; margin-bottom:12px;">
                     ${statusBtn(STATUS.PENDING, 'PENDING', 'var(--border)', 'var(--text-main)')}
-                    ${statusBtn(STATUS.COMPLETED, 'DONE', 'var(--success)')}
-                    ${supportsInt ? statusBtn(STATUS.INTERNALS, 'INT', 'var(--warning)') : ''}
-                    ${statusBtn(STATUS.FAILED, 'FAIL', 'var(--danger)')}
+                    ${statusBtn(STATUS.COMPLETED, 'COMPLETED', 'var(--success)')}
+                    ${supportsInt ? statusBtn(STATUS.INTERNALS, 'INTERNALS', 'var(--warning)') : ''}
+                    ${statusBtn(STATUS.FAILED, 'FAILED', 'var(--danger)')}
                 </div>
 
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px; display:block;">Date</label>
@@ -433,9 +438,9 @@ export const JobTrackerModals = {
         if (el) el.value = status;
         const outlineColors = {
             [STATUS.PENDING]: 'var(--primary)',
-            [STATUS.COMPLETED]: '#fff',
-            [STATUS.INTERNALS]: '#fff',
-            [STATUS.FAILED]: '#fff'
+            [STATUS.COMPLETED]: 'var(--success)',
+            [STATUS.INTERNALS]: 'var(--warning)',
+            [STATUS.FAILED]: 'var(--danger)'
         };
         [STATUS.PENDING, STATUS.COMPLETED, STATUS.INTERNALS, STATUS.FAILED].forEach(s => {
             const btn = document.getElementById(`status-btn-${s}`);

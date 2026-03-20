@@ -775,7 +775,7 @@ function renderBatchBar() {
             </button>
             ${canUseInternals ? `<button class="btn-pill btn-status btn-status-internals" onclick="batchSetStatus('${STATUS.INTERNALS}')">
                 <span class="status-dot internals"></span>
-                <span>Internal</span>
+                <span>Internals</span>
             </button>` : ''}
             <button class="btn-pill btn-status btn-status-failed" onclick="batchSetStatus('${STATUS.FAILED}')">
                 <span class="status-dot failed"></span>
@@ -795,7 +795,7 @@ async function batchSetStatus(status) {
         const jobIds = Array.from(state.batchSelected);
 
         if (status === STATUS.INTERNALS && !canBatchUseInternals()) {
-            showToast('Internal is only available when all selected jobs support it');
+            showToast('Internals is only available when all selected jobs support it');
             return;
         }
 
@@ -1251,7 +1251,7 @@ function render(softUpdate) {
                     bannerDiv.className = 'summary-banner';
                     bannerDiv.innerHTML = `
                         <div class="summary-item"><small style="font-size:0.6rem;">JOBS</small><b>${s.vol}</b></div>
-                        <div class="summary-item"><small style="font-size:0.6rem;">DONE</small><b style="color:var(--success)">${s.done}</b></div>
+                        <div class="summary-item"><small style="font-size:0.6rem;">COMPLETED</small><b style="color:var(--success)">${s.done}</b></div>
                         <div class="summary-item"><small style="font-size:0.6rem;">PENDING</small><b style="color:var(--warning)">${s.pend}</b></div>
                         <div class="summary-item"><small style="font-size:0.6rem;">EARNED</small><b>&pound;${s.totalCash.toFixed(0)}</b></div>`;
                     statGrid.after(bannerDiv);
@@ -1320,9 +1320,9 @@ function render(softUpdate) {
                         div.className = 'job-actions';
                         const hasInt = state.getTypeConfig(j.type)?.int != null;
                         div.innerHTML = `
-                            <button class="action-btn done" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Completed')"><span>\u2713</span> FINISH</button>
-                            ${hasInt ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INT</button>` : ''}
-                            <button class="action-btn fail" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Failed')"><span>\u2715</span> FAIL</button>`;
+                            <button class="action-btn done" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Completed')"><span>\u2713</span> COMPLETE</button>
+                            ${hasInt ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INTERNALS</button>` : ''}
+                            <button class="action-btn fail" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Failed')"><span>\u2715</span> FAILED</button>`;
                         existing.appendChild(div);
                     } else if (j.status !== 'Pending' && actions) {
                         actions.style.transition = 'opacity 0.2s';
@@ -1396,7 +1396,7 @@ function render(softUpdate) {
                     <option value="Pending" ${state.statusFilter==='Pending'?'selected':''}>Pending</option>
                     <option value="Completed" ${state.statusFilter==='Completed'?'selected':''}>Completed</option>
                     <option value="Failed" ${state.statusFilter==='Failed'?'selected':''}>Failed</option>
-                    <option value="Internals" ${state.statusFilter==='Internals'?'selected':''}>Internal</option>
+                    <option value="Internals" ${state.statusFilter==='Internals'?'selected':''}>Internals</option>
                 </select>
                 ${customOrder.length > 0 ? `<button style="background:var(--warning); color:#fff; padding:6px 10px; border-radius:8px; font-size:0.65rem; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="clearJobOrder(); render()">↻ RESET</button>` : ''}
                 <button style="background:${state.batchMode?'var(--primary)':'var(--border-t)'}; border:1px solid var(--border-t); color:${state.batchMode?'#fff':'var(--text-muted)'}; padding:6px 10px; border-radius:8px; font-size:0.65rem; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="toggleBatchMode()">${state.batchMode?'EXIT':'SELECT'}</button>
@@ -1470,9 +1470,9 @@ function renderJobCard(j, showDate, pulseMap, animate, index) {
                 </div>
                 ${j.status === 'Pending' ? `
                 <div class="job-actions">
-                    <button class="action-btn done" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Completed')"><span>\u2713</span> FINISH</button>
-                    ${(state.getTypeConfig(j.type)?.int != null) ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INT</button>` : ''}
-                    <button class="action-btn fail" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Failed')"><span>\u2715</span> FAIL</button>
+                    <button class="action-btn done" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Completed')"><span>\u2713</span> COMPLETE</button>
+                    ${(state.getTypeConfig(j.type)?.int != null) ? `<button class="action-btn int" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Internals')"><span>\u26a0</span> INTERNALS</button>` : ''}
+                    <button class="action-btn fail" onclick="event.stopPropagation(); quickStatus('${j.id}', 'Failed')"><span>\u2715</span> FAILED</button>
                 </div>` : ''}
             </div>
         </div>`;
@@ -1710,7 +1710,7 @@ function renderStats(container, list, s) {
                     const x = left + (i * step);
                     const barW = Math.max(8, Math.min(16, (right - left) / Math.max(rows.length, 10)));
                     const barY = y(r.completedEligible);
-                    return `<rect x="${x - (barW / 2)}" y="${barY}" width="${barW}" height="${bottom - barY}" rx="3" fill="color-mix(in srgb, var(--success) 70%, transparent)" opacity="0.75"><title>${r.label} - Done ${r.completedEligible}</title></rect>`;
+                    return `<rect x="${x - (barW / 2)}" y="${barY}" width="${barW}" height="${bottom - barY}" rx="3" fill="color-mix(in srgb, var(--success) 70%, transparent)" opacity="0.75"><title>${r.label} - Completed ${r.completedEligible}</title></rect>`;
                 }).join('')}
                 <polyline points="${pointsPath}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 ${rows.map((r, i) => {
@@ -1720,9 +1720,9 @@ function renderStats(container, list, s) {
                 }).join('')}
             </svg>
             <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:0.65rem; color:var(--text-muted); margin-top:4px;">
-                <span><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:color-mix(in srgb, var(--success) 70%, transparent); margin-right:5px;"></span>Eligible Done</span>
+                <span><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:color-mix(in srgb, var(--success) 70%, transparent); margin-right:5px;"></span>Eligible Completed</span>
                 <span><span style="display:inline-block; width:10px; height:2px; background:var(--primary); margin-right:5px; vertical-align:middle;"></span>Points</span>
-                <span><span style="display:inline-block; width:10px; height:2px; background:var(--warning); margin-right:5px; vertical-align:middle;"></span>18 Done Target</span>
+                <span><span style="display:inline-block; width:10px; height:2px; background:var(--warning); margin-right:5px; vertical-align:middle;"></span>18 Completed Target</span>
                 <span><span style="display:inline-block; width:10px; height:2px; background:var(--primary); margin-right:5px; vertical-align:middle;"></span>20 Points Target</span>
             </div>
         </div>`;
@@ -1780,9 +1780,9 @@ function renderStats(container, list, s) {
             id: 'status-grid',
             title: 'Status Summary',
             content: `<div class="stat-grid" style="margin:-8px;">
-                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Done</small><b class="count-up" style="color:var(--success); font-size:1.8rem;">${stats.done}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Completed</small><b class="count-up" style="color:var(--success); font-size:1.8rem;">${stats.done}</b></div>
                 <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Failed</small><b class="count-up" style="color:var(--danger); font-size:1.8rem;">${stats.fails}</b></div>
-                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Internal</small><b class="count-up" style="color:var(--warning); font-size:1.8rem;">${stats.ints}</b></div>
+                <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Internals</small><b class="count-up" style="color:var(--warning); font-size:1.8rem;">${stats.ints}</b></div>
                 <div class="panel" style="margin-bottom:0; padding:14px"><small style="font-size:0.65rem;">Pending</small><b class="count-up" style="color:var(--text-muted); font-size:1.8rem;">${stats.pend}</b></div>
             </div>`
         },
@@ -1808,7 +1808,7 @@ function renderStats(container, list, s) {
                     <thead>
                         <tr style="background:color-mix(in srgb, var(--surface-elev) 75%, transparent); border-bottom:1px solid var(--border-t);">
                             <th style="padding:8px 6px; text-align:left; color:var(--text-muted);">Week</th>
-                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Done</th>
+                            <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Completed</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Target</th>
                             <th style="padding:8px 6px; text-align:right; color:var(--text-muted);">Bonus</th>
                         </tr>
@@ -1870,7 +1870,7 @@ function renderStats(container, list, s) {
                                     <div style="font-size:0.95rem; font-weight:800; color:var(--success);">${w.completedEligible}</div>
                                 </div>
                                 <div style="padding:8px; border-radius:10px; background:color-mix(in srgb, var(--warning) 10%, transparent); text-align:center;">
-                                    <div style="font-size:0.6rem; color:var(--text-muted);">Int</div>
+                                    <div style="font-size:0.6rem; color:var(--text-muted);">Internals</div>
                                     <div style="font-size:0.95rem; font-weight:800; color:var(--warning);">${w.internals}</div>
                                 </div>
                                 <div style="padding:8px; border-radius:10px; background:color-mix(in srgb, var(--danger) 10%, transparent); text-align:center;">
@@ -1890,7 +1890,7 @@ function renderStats(container, list, s) {
                     <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:8px;">Totals</div>
                     <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:8px;">
                         <div style="font-size:0.68rem; color:var(--text-muted);">Completed <b style="display:block; margin-top:2px; font-size:0.92rem; color:var(--success);">${weeklyRows.reduce((sum, w) => sum + w.completedEligible, 0)}</b></div>
-                        <div style="font-size:0.68rem; color:var(--text-muted);">Int <b style="display:block; margin-top:2px; font-size:0.92rem; color:var(--warning);">${weeklyRows.reduce((sum, w) => sum + w.internals, 0)}</b></div>
+                        <div style="font-size:0.68rem; color:var(--text-muted);">Internals <b style="display:block; margin-top:2px; font-size:0.92rem; color:var(--warning);">${weeklyRows.reduce((sum, w) => sum + w.internals, 0)}</b></div>
                         <div style="font-size:0.68rem; color:var(--text-muted);">Failed <b style="display:block; margin-top:2px; font-size:0.92rem; color:var(--danger);">${weeklyRows.reduce((sum, w) => sum + w.failedEligible, 0)}</b></div>
                     </div>
                     <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px;">
@@ -1918,7 +1918,7 @@ function renderStats(container, list, s) {
             <div class="metric-row"><span>Perfect Days</span><b class="count-up" style="color:${perfectDays > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${perfectDays}</b></div>
             <div class="metric-row"><span>Resolution Rate</span><b class="count-up">${stats.vol > 0 ? (((stats.done + stats.fails + stats.ints) / stats.vol) * 100).toFixed(0) : 0}% <span style="font-size:0.6rem; color:var(--text-muted)">resolved</span></b></div>
             <div class="metric-row"><span>Fail Rate</span><b class="count-up" style="color:${stats.fails > 0 ? 'var(--danger)' : 'var(--success)'}">${stats.vol > 0 ? ((stats.fails / stats.vol) * 100).toFixed(1) : 0}%</b></div>
-            <div class="metric-row"><span>Internal Rate</span><b class="count-up" style="color:var(--warning)">${stats.vol > 0 ? ((stats.ints / stats.vol) * 100).toFixed(1) : 0}%</b></div>`
+            <div class="metric-row"><span>Internals Rate</span><b class="count-up" style="color:var(--warning)">${stats.vol > 0 ? ((stats.ints / stats.vol) * 100).toFixed(1) : 0}%</b></div>`
         },
         {
             id: 'volume-chart',
@@ -1966,8 +1966,8 @@ function renderStats(container, list, s) {
                     <thead><tr style="border-bottom:2px solid var(--border-t); text-align:left;">
                         <th style="padding:6px 4px; color:var(--text-muted);">Type</th>
                         <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Jobs</th>
-                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Done</th>
-                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Int</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Completed</th>
+                        <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Internals</th>
                         <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Points</th>
                         <th style="padding:6px 4px; text-align:right; color:var(--text-muted);">Revenue</th>
                     </tr></thead>
@@ -1996,7 +1996,7 @@ function renderStats(container, list, s) {
                         <th style="padding:6px 4px; color:var(--text-muted); font-weight:700;">Type</th>
                         <th style="padding:6px 4px; color:var(--success); font-weight:700; text-align:center;">\u2713</th>
                         <th style="padding:6px 4px; color:var(--danger); font-weight:700; text-align:center;">\u2715</th>
-                        <th style="padding:6px 4px; color:var(--warning); font-weight:700; text-align:center;">INT</th>
+                        <th style="padding:6px 4px; color:var(--warning); font-weight:700; text-align:center;">INTERNALS</th>
                         <th style="padding:6px 4px; color:var(--text-muted); font-weight:700; text-align:right;">Rate</th>
                     </tr></thead>
                     <tbody>${Object.entries(s.typeBreakdown).map(([type, d]) => {
@@ -2232,10 +2232,10 @@ function renderFunds(container, list, s) {
             title: 'Revenue by Status',
             content: `${s.totalCash > 0 ? `<div style="display:flex; height:20px; border-radius:6px; overflow:hidden; margin:10px 0 14px;">
                 ${s.completedRev > 0 ? `<div style="flex:${s.completedRev}; background:var(--success);" title="Completed: \u00a3${s.completedRev.toFixed(2)}"></div>` : ''}
-                ${s.internalRev > 0 ? `<div style="flex:${s.internalRev}; background:var(--warning);" title="Internal: \u00a3${s.internalRev.toFixed(2)}"></div>` : ''}
+                ${s.internalRev > 0 ? `<div style="flex:${s.internalRev}; background:var(--warning);" title="Internals: \u00a3${s.internalRev.toFixed(2)}"></div>` : ''}
             </div>` : ''}
             <div class="metric-row"><span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--success); margin-right:6px;"></span>Completed</span><b class="count-up">&pound;${s.completedRev.toFixed(2)}</b></div>
-            <div class="metric-row"><span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warning); margin-right:6px;"></span>Internal</span><b class="count-up">&pound;${s.internalRev.toFixed(2)}</b></div>`
+            <div class="metric-row"><span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warning); margin-right:6px;"></span>Internals</span><b class="count-up">&pound;${s.internalRev.toFixed(2)}</b></div>`
         },
         {
             id: 'pay-history',
