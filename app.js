@@ -118,6 +118,14 @@ const { customAlert, editJob: editJobModal } = JobTrackerModals;
             updateAuthButton();
             showSignInModal();
         });
+
+        window.addEventListener('nx-sync-complete', () => {
+            if (typeof window.render === 'function') {
+                window.render();
+            } else {
+                render();
+            }
+        });
         
         // Always dismiss the splash screen — sign-in modal lives beneath it
         const splash = document.getElementById('splash');
@@ -3254,6 +3262,7 @@ function confirmWipe() {
 
 // expose globals for inline handlers (compatibility with existing HTML)
 Object.assign(window, {
+    render,
     showProfileModal,
     showSignInModal,
     setRange,
