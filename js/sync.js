@@ -123,6 +123,11 @@ export class SyncEngine {
         changesDetected = true;
         console.log('[SyncEngine] Detected changes by job count increase');
       }
+
+      // Ensure users immediately see remote changes that were pulled.
+      if (changesDetected && typeof window.render === 'function') {
+        window.render(true);
+      }
       
       // Don't re-render during sync (prevents visual flicker)
       // Data is already in state; let the user continue working without interruption
@@ -642,6 +647,7 @@ export class SyncEngine {
       // New remote job - create locally
       const newJob = this.reconstructJobFromCloud(remoteJob);
       stateRef.jobs.push(newJob);
+      await this.db.put(this.db.STORES.JOBS, newJob);
       
       // Update localStorage
       if (window.state) {
@@ -660,6 +666,7 @@ export class SyncEngine {
         console.log(`[SyncEngine] Updating job ${remoteJob.id} - remote is newer (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
         const updatedJob = this.reconstructJobFromCloud(remoteJob);
         Object.assign(localJob, updatedJob);
+        await this.db.put(this.db.STORES.JOBS, localJob);
         
         if (window.state) {
           const jobsKey = window.state.getJobsStorageKey ? window.state.getJobsStorageKey() : `nx_jobs_user_${this.supabase.userId}`;
