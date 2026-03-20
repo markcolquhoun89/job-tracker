@@ -570,6 +570,24 @@ export class SyncEngine {
     });
   }
 
+  hasMaterialDifference(localJob, remoteJob) {
+    const localComparable = this.prepareJobForCloud(localJob);
+    const comparableKeys = [
+      'job_type', 'date', 'status', 'fee', 'base_fee', 'manual_fee', 'job_id_external',
+      'notes', 'is_upgraded', 'saturday_premium',
+      'elf', 'elf_added_by', 'elf_added_date',
+      'candids', 'candids_reason', 'candids_added_by', 'candids_added_date',
+      'chargeback', 'chargeback_reason', 'chargeback_amount', 'chargeback_week', 'chargeback_added_by', 'chargeback_added_date',
+      'completed_at'
+    ];
+
+    return comparableKeys.some(key => {
+      const localVal = localComparable[key] ?? null;
+      const remoteVal = remoteJob[key] ?? null;
+      return localVal !== remoteVal;
+    });
+  }
+
   /**
    * Prepare job for cloud storage
    */
@@ -661,9 +679,11 @@ export class SyncEngine {
       // Update if remote is newer
       const localTime = new Date(localJob.updated_at || 0);
       const remoteTime = new Date(remoteJob.updated_at || 0);
+      const materialDifference = this.hasMaterialDifference(localJob, remoteJob);
 
-      if (remoteTime > localTime) {
-        console.log(`[SyncEngine] Updating job ${remoteJob.id} - remote is newer (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
+      if (remoteTime > localTime || materialDifference) {
+        const reason = remoteTime > localTime ? 'remote timestamp newer' : 'material data differs';
+        console.log(`[SyncEngine] Updating job ${remoteJob.id} - ${reason} (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
         const updatedJob = this.reconstructJobFromCloud(remoteJob);
         Object.assign(localJob, updatedJob);
         await this.db.put(this.db.STORES.JOBS, localJob);
