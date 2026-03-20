@@ -11,7 +11,7 @@ export class SyncEngine {
     this.state = jobTrackerState;
     this.isSyncing = false;
     this.lastSyncTime = localStorage.getItem('nx_last_sync_time') ? new Date(localStorage.getItem('nx_last_sync_time')) : null;
-    this.syncInterval = 1000; // 1 second - fast fallback check for missed updates
+    this.syncInterval = 3000; // 3 seconds - reduces network churn while staying responsive
     this.lastRemoteCheckTime = null;
     this.lastRemoteCount = 0;
     this.periodicSyncId = null;
@@ -227,6 +227,7 @@ export class SyncEngine {
     try {
       // Query jobs updated since last sync or just check count
       const remoteJobs = await this.supabase.select('jobs', {
+        select: 'id,updated_at',
         eq: { user_id: this.supabase.userId }
       });
 
@@ -286,18 +287,21 @@ export class SyncEngine {
         return !job.user_id || job.user_id === activeUserId;
       });
       console.log('[SyncEngine] Pushing', scopedJobs.length, 'jobs from', window.state ? 'app.js' : 'modular', 'state', '(deleted:', deletedJobIdsForFilter.length + ')');
-      
+
+      // Fetch remote jobs once to avoid one SELECT request per local job.
+      const remoteJobsForUser = await this.supabase.select('jobs', {
+        eq: { user_id: activeUserId }
+      });
+      const remoteById = new Map((Array.isArray(remoteJobsForUser) ? remoteJobsForUser : []).map(job => [job.id, job]));
+
       for (const localJob of scopedJobs) {
         if (!localJob.user_id) {
           localJob.user_id = activeUserId;
         }
 
-        // Check if job exists remote
-        const remoteJob = await this.supabase.select('jobs', {
-          eq: { id: localJob.id, user_id: activeUserId }
-        });
+        const remoteJob = remoteById.get(localJob.id);
 
-        if (!remoteJob || remoteJob.length === 0) {
+        if (!remoteJob) {
           // New job - insert
           const jobData = this.prepareJobForCloud(localJob);
           console.log('[SyncEngine] Inserting new job:', localJob.id, 'type:', jobData.job_type);
@@ -316,11 +320,11 @@ export class SyncEngine {
           }
         } else {
           // Existing job - check for conflicts
-          const conflict = this.detectConflict(localJob, remoteJob[0]);
+          const conflict = this.detectConflict(localJob, remoteJob);
           if (conflict) {
             console.log(`[SyncEngine] Conflict detected for ${localJob.id}, resolving...`);
-            await this.resolveConflict(localJob, remoteJob[0]);
-          } else if (this.shouldUpdate(localJob, remoteJob[0])) {
+            await this.resolveConflict(localJob, remoteJob);
+          } else if (this.shouldUpdate(localJob, remoteJob)) {
             // Update if local is newer
             const jobData = this.prepareJobForCloud(localJob);
             const result = await this.supabase.update('jobs', jobData, { id: localJob.id });
@@ -402,14 +406,6 @@ export class SyncEngine {
       const pullResult = await this.pullRemoteJobs();
       console.log('[SyncEngine] Pull result:', pullResult);
       
-      console.log('[SyncEngine] Step 3: Reconcile remote deletions to catch jobs deleted on other devices');
-      const remoteJobs = await this.supabase.select('jobs', {
-        eq: { user_id: this.supabase.userId }
-      });
-      if (Array.isArray(remoteJobs)) {
-        await this.reconcileRemoteDeletions(remoteJobs);
-      }
-
       this.dedupeLocalJobsById();
       
       // Don't clear deletion tracking - keep it persistent so subsequent syncs continue filtering deleted jobs
