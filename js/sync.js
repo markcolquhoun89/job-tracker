@@ -680,9 +680,16 @@ export class SyncEngine {
       const localTime = new Date(localJob.updated_at || 0);
       const remoteTime = new Date(remoteJob.updated_at || 0);
       const materialDifference = this.hasMaterialDifference(localJob, remoteJob);
+      const localTimeMs = localTime.getTime();
+      const remoteTimeMs = remoteTime.getTime();
+      const hasValidLocalTimestamp = Number.isFinite(localTimeMs) && localTimeMs > 0;
 
-      if (remoteTime > localTime || materialDifference) {
-        const reason = remoteTime > localTime ? 'remote timestamp newer' : 'material data differs';
+      const shouldApplyRemote =
+        remoteTimeMs > localTimeMs ||
+        (!hasValidLocalTimestamp && materialDifference);
+
+      if (shouldApplyRemote) {
+        const reason = remoteTimeMs > localTimeMs ? 'remote timestamp newer' : 'local timestamp missing/invalid';
         console.log(`[SyncEngine] Updating job ${remoteJob.id} - ${reason} (remote: ${remoteTime.toISOString()}, local: ${localTime.toISOString()})`);
         const updatedJob = this.reconstructJobFromCloud(remoteJob);
         Object.assign(localJob, updatedJob);
