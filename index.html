@@ -380,7 +380,7 @@
         .batch-pill .status-menu { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
         .batch-pill.choosing-status .default-actions { display: none; }
         .batch-pill.choosing-status .status-menu { display: flex; }
-        .batch-pill .btn-pill { background: transparent; border: none; color: var(--text-main); font-size: 0.82rem; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s ease, color 0.2s ease; white-space: nowrap; }
+        .batch-pill .btn-pill { background: transparent; border: none; color: var(--text-main); font-size: 0.82rem; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; white-space: nowrap; }
         .batch-pill .btn-pill:hover { background: color-mix(in srgb, #fff 5%, transparent); color: #fff; }
         .batch-pill .btn-pill-icon { display: inline-flex; width: 14px; justify-content: center; opacity: 0.8; }
         .batch-pill .btn-icon-only { padding-left: 10px; padding-right: 10px; }
@@ -388,10 +388,20 @@
         .batch-pill .btn-danger-soft:hover { color: var(--danger); }
         .batch-pill .divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
         .batch-pill .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .batch-pill .status-dot.completed { background: var(--primary); }
+        .batch-pill .status-dot.completed { background: var(--success); }
         .batch-pill .status-dot.pending { background: var(--warning); }
-        .batch-pill .status-dot.internals { background: var(--success); }
+        .batch-pill .status-dot.internals { background: var(--warning); }
         .batch-pill .status-dot.failed { background: var(--danger); }
+        .batch-pill .btn-status { border: 1px solid transparent; }
+        .batch-pill .btn-status:hover { color: inherit; }
+        .batch-pill .btn-status-completed { background: var(--success-dim); color: var(--success); border-color: color-mix(in srgb, var(--success) 28%, transparent); }
+        .batch-pill .btn-status-completed:hover { background: color-mix(in srgb, var(--success) 20%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 22%, transparent); }
+        .batch-pill .btn-status-pending { background: var(--warning-dim); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 28%, transparent); }
+        .batch-pill .btn-status-pending:hover { background: color-mix(in srgb, var(--warning) 20%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--warning) 22%, transparent); }
+        .batch-pill .btn-status-internals { background: var(--warning-dim); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 28%, transparent); }
+        .batch-pill .btn-status-internals:hover { background: color-mix(in srgb, var(--warning) 20%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--warning) 22%, transparent); }
+        .batch-pill .btn-status-failed { background: var(--danger-dim); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, transparent); }
+        .batch-pill .btn-status-failed:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 22%, transparent); }
         .ptr-indicator { text-align: center; padding: 10px; color: var(--primary); font-size: 0.72rem; font-weight: 700; display: none; }
         .ptr-indicator.active { display: block; animation: fadeIn 0.3s ease-out; }
         .goal-bar { height: 10px; background: var(--border-subtle); border-radius: 6px; overflow: hidden; margin: 10px 0; }

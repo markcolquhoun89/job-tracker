@@ -765,19 +765,19 @@ function renderBatchBar() {
             <button class="btn-pill btn-icon-only" onclick="clearBatchSelection(true)">✕</button>
         </div>
         <div class="status-menu">
-            <button class="btn-pill" onclick="batchSetStatus('${STATUS.COMPLETED}')">
+            <button class="btn-pill btn-status btn-status-completed" onclick="batchSetStatus('${STATUS.COMPLETED}')">
                 <span class="status-dot completed"></span>
-                <span>Done</span>
+                <span>Completed</span>
             </button>
-            <button class="btn-pill" onclick="batchSetStatus('${STATUS.PENDING}')">
+            <button class="btn-pill btn-status btn-status-pending" onclick="batchSetStatus('${STATUS.PENDING}')">
                 <span class="status-dot pending"></span>
                 <span>Pending</span>
             </button>
-            ${canUseInternals ? `<button class="btn-pill" onclick="batchSetStatus('${STATUS.INTERNALS}')">
+            ${canUseInternals ? `<button class="btn-pill btn-status btn-status-internals" onclick="batchSetStatus('${STATUS.INTERNALS}')">
                 <span class="status-dot internals"></span>
                 <span>Internal</span>
             </button>` : ''}
-            <button class="btn-pill btn-danger-soft" onclick="batchSetStatus('${STATUS.FAILED}')">
+            <button class="btn-pill btn-status btn-status-failed" onclick="batchSetStatus('${STATUS.FAILED}')">
                 <span class="status-dot failed"></span>
                 <span>Failed</span>
             </button>
@@ -1394,7 +1394,7 @@ function render(softUpdate) {
                 <select onchange="state.statusFilter=this.value; render()">
                     <option value="all" ${state.statusFilter==='all'?'selected':''}>All</option>
                     <option value="Pending" ${state.statusFilter==='Pending'?'selected':''}>Pending</option>
-                    <option value="Completed" ${state.statusFilter==='Completed'?'selected':''}>Done</option>
+                    <option value="Completed" ${state.statusFilter==='Completed'?'selected':''}>Completed</option>
                     <option value="Failed" ${state.statusFilter==='Failed'?'selected':''}>Failed</option>
                     <option value="Internals" ${state.statusFilter==='Internals'?'selected':''}>Internal</option>
                 </select>
