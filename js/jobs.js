@@ -19,6 +19,7 @@ export const JobTrackerJobs = {
      */
     async createJob(jobData) {
         const activeUserId = getActiveUserId();
+        const nowIso = new Date().toISOString();
         const job = {
             id: generateID(),
             type: jobData.type,
@@ -44,7 +45,8 @@ export const JobTrackerJobs = {
             chargebackAddedBy: null,
             chargebackAddedDate: null,
             
-            createdAt: new Date().toISOString(),
+            createdAt: nowIso,
+            updated_at: nowIso,
             completedAt: null,
             ...jobData
         };
@@ -74,11 +76,13 @@ export const JobTrackerJobs = {
         }
 
         const activeUserId = getActiveUserId();
+        const nowIso = new Date().toISOString();
 
         const updatedJob = {
             ...job,
             ...updates,
             user_id: job.user_id || activeUserId || null,
+            updated_at: nowIso,
             updatedAt: Date.now()
         };
 
@@ -221,6 +225,7 @@ export const JobTrackerJobs = {
                         ...job,
                         fee: expectedSaturdayFee,
                         baseFee: expectedBaseFee,
+                        updated_at: new Date().toISOString(),
                         updatedAt: Date.now()
                     });
                 }
@@ -255,6 +260,7 @@ export const JobTrackerJobs = {
                 ...job,
                 status,
                 completedAt: status !== STATUS.PENDING && !job.completedAt ? Date.now() : job.completedAt,
+                updated_at: new Date().toISOString(),
                 updatedAt: Date.now()
             };
 
@@ -346,6 +352,7 @@ export const JobTrackerJobs = {
             status: STATUS.PENDING,
             createdAt: Date.now(),
             completedAt: null,
+            updated_at: new Date().toISOString(),
             updatedAt: null,
             manualFee: false
         };
