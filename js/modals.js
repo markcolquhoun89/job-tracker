@@ -105,6 +105,43 @@ export const JobTrackerModals = {
     },
 
     /**
+     * Themed input modal — replaces window.prompt()
+     */
+    inputModal(title, label, defaultValue = '', placeholder = '', onConfirm) {
+        const { sanitizeHTML } = getUtils();
+        const content = `
+            <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+            <h3 style="margin-bottom:12px;">${sanitizeHTML(title)}</h3>
+            ${label ? `<p style="color:var(--text-muted); margin-bottom:10px; font-size:0.9rem;">${sanitizeHTML(label)}</p>` : ''}
+            <input id="input-modal-field" type="text" class="form-control"
+                value="${sanitizeHTML(String(defaultValue))}"
+                placeholder="${sanitizeHTML(placeholder)}"
+                style="width:100%; margin-bottom:16px; box-sizing:border-box;"
+                onkeydown="if(event.key==='Enter'){JobTrackerModals._inputModalConfirm();}"
+            />
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+                <button class="btn" onclick="JobTrackerModals._inputModalConfirm()">OK</button>
+            </div>
+        `;
+        JobTrackerModals._inputModalCallback = onConfirm;
+        JobTrackerModals.showModal(content);
+        setTimeout(() => {
+            const input = document.getElementById('input-modal-field');
+            if (input) { input.focus(); input.select(); }
+        }, 60);
+    },
+
+    _inputModalConfirm() {
+        const input = document.getElementById('input-modal-field');
+        const val = input ? input.value : '';
+        const cb = JobTrackerModals._inputModalCallback;
+        JobTrackerModals._inputModalCallback = null;
+        JobTrackerModals.closeModal();
+        if (cb) cb(val);
+    },
+
+    /**
      * Edit an existing job type from settings.
      */
     editType(typeCode) {
@@ -426,7 +463,7 @@ export const JobTrackerModals = {
         } catch (error) {
             console.error('Error in editJob:', error);
             console.error('Stack:', error.stack);
-            alert('Error opening job editor: ' + error.message);
+            this.customAlert('Error', error.message, true);
         }
     },
 
@@ -921,124 +958,171 @@ export const JobTrackerModals = {
     /**
      * Add, update, or remove Candid flag for admin/manager users.
      */
-    async editCandid(jobId) {
+    editCandid(jobId) {
+        const state = getState();
+        const { sanitizeHTML } = getUtils();
+        const job = state.getJob(jobId);
+        if (!job) return;
+
+        if (job.candids) {
+            const safeId = sanitizeHTML(jobId);
+            const content = `
+                <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+                <h3 style="margin-bottom:12px;">Candid Flag</h3>
+                <p style="color:var(--text-muted); margin-bottom:20px; line-height:1.6;">This job is already flagged. Remove it or edit the reason?</p>
+                <div style="display:grid; gap:8px;">
+                    <button class="btn" style="background:var(--danger);" onclick="JobTrackerModals._candidRemove('${safeId}')">Remove Flag</button>
+                    <button class="btn" onclick="JobTrackerModals._candidEdit('${safeId}')">Edit Reason</button>
+                    <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+                </div>
+            `;
+            JobTrackerModals.showModal(content);
+        } else {
+            JobTrackerModals._candidEdit(jobId);
+        }
+    },
+
+    async _candidRemove(jobId) {
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        try {
+            JobTrackerModals.closeModal();
+            const ok = await jobOps.setCandids(jobId, false, '');
+            if (!ok) throw new Error('Unable to remove Candid flag');
+            showToast('Candid flag removed');
+            await JobTrackerModals.editJob(jobId);
+        } catch (error) {
+            JobTrackerModals.customAlert('Error', error.message, true);
+        }
+    },
+
+    _candidEdit(jobId) {
         const state = getState();
         const jobOps = getJobOps();
         const { showToast } = getUtils();
         const job = state.getJob(jobId);
-        if (!job) return;
-
-        try {
-            if (job.candids) {
-                const remove = window.confirm('Remove Candid flag? Click Cancel to edit reason.');
-                if (remove) {
-                    const ok = await jobOps.setCandids(jobId, false, '');
-                    if (!ok) throw new Error('Unable to remove Candid flag');
-                    showToast('Candid flag removed');
-                    await this.editJob(jobId);
-                    return;
-                }
+        JobTrackerModals.closeModal();
+        JobTrackerModals.inputModal('Candid Reason', 'Enter a reason for flagging this job', job?.candidsReason || '', 'e.g. Flagged for review', async (reason) => {
+            try {
+                const ok = await jobOps.setCandids(jobId, true, reason.trim() || 'Flagged');
+                if (!ok) throw new Error('Unable to save Candid flag');
+                showToast('Candid flag saved');
+                await JobTrackerModals.editJob(jobId);
+            } catch (error) {
+                JobTrackerModals.customAlert('Error', error.message, true);
             }
-
-            const reason = window.prompt('Enter Candid reason:', job.candidsReason || '');
-            if (reason === null) return;
-
-            const ok = await jobOps.setCandids(jobId, true, reason.trim() || 'Flagged');
-            if (!ok) throw new Error('Unable to save Candid flag');
-            showToast('Candid flag saved');
-            await this.editJob(jobId);
-        } catch (error) {
-            this.customAlert('Error', error.message, true);
-        }
+        });
     },
 
     /**
      * Add/update/remove chargeback details for admin/manager users.
      */
-    async editChargeback(jobId) {
+    editChargeback(jobId) {
+        const state = getState();
+        const { sanitizeHTML } = getUtils();
+        const job = state.getJob(jobId);
+        if (!job) return;
+
+        if (job.chargeback) {
+            const safeId = sanitizeHTML(jobId);
+            const content = `
+                <button class="close-btn" onclick="JobTrackerModals.closeModal()">×</button>
+                <h3 style="margin-bottom:12px;">Chargeback</h3>
+                <p style="color:var(--text-muted); margin-bottom:20px; line-height:1.6;">This job already has a chargeback. Remove it or edit the details?</p>
+                <div style="display:grid; gap:8px;">
+                    <button class="btn" style="background:var(--danger);" onclick="JobTrackerModals._chargebackRemove('${safeId}')">Remove Chargeback</button>
+                    <button class="btn" onclick="JobTrackerModals._chargebackEdit('${safeId}')">Edit Details</button>
+                    <button class="btn" style="background:var(--border); color:var(--text-main);" onclick="JobTrackerModals.closeModal()">Cancel</button>
+                </div>
+            `;
+            JobTrackerModals.showModal(content);
+        } else {
+            JobTrackerModals._chargebackEdit(jobId);
+        }
+    },
+
+    async _chargebackRemove(jobId) {
+        const jobOps = getJobOps();
+        const { showToast } = getUtils();
+        try {
+            JobTrackerModals.closeModal();
+            const ok = await jobOps.removeChargeback(jobId);
+            if (!ok) throw new Error('Unable to remove chargeback');
+            showToast('Chargeback removed');
+            await JobTrackerModals.editJob(jobId);
+        } catch (error) {
+            JobTrackerModals.customAlert('Error', error.message, true);
+        }
+    },
+
+    _chargebackEdit(jobId) {
         const state = getState();
         const jobOps = getJobOps();
         const { showToast } = getUtils();
         const job = state.getJob(jobId);
-        if (!job) return;
-
-        try {
-            if (job.chargeback) {
-                const remove = window.confirm('Remove current chargeback? Click Cancel to edit it instead.');
-                if (remove) {
-                    const ok = await jobOps.removeChargeback(jobId);
-                    if (!ok) throw new Error('Unable to remove chargeback');
-                    showToast('Chargeback removed');
-                    await this.editJob(jobId);
+        const defaultReason = job?.chargebackReason || (job?.candids ? 'Candids' : (job?.elf ? 'ELF' : 'other'));
+        const defaultAmount = String(job?.chargebackAmount || job?.fee || 0);
+        const weekDefault = new Date().toISOString().split('T')[0];
+        JobTrackerModals.closeModal();
+        JobTrackerModals.inputModal('Chargeback Reason', 'ELF, Candids, or other:', defaultReason, 'e.g. Candids', (reason) => {
+            if (reason === null || reason === undefined) return;
+            JobTrackerModals.inputModal('Chargeback Amount', 'Amount (£):', defaultAmount, 'e.g. 50.00', (amountStr) => {
+                if (amountStr === null || amountStr === undefined) return;
+                const amount = parseFloat(amountStr);
+                if (!Number.isFinite(amount) || amount < 0) {
+                    JobTrackerModals.customAlert('Validation', 'Please enter a valid non-negative amount', true);
                     return;
                 }
-            }
-
-            const reasonInput = window.prompt(
-                'Chargeback reason (ELF, Candids, other):',
-                (job.chargebackReason || (job.candids ? 'Candids' : (job.elf ? 'ELF' : 'other')))
-            );
-            if (reasonInput === null) return;
-
-            const amountInput = window.prompt('Chargeback amount (£):', String(job.chargebackAmount || job.fee || 0));
-            if (amountInput === null) return;
-            const amount = parseFloat(amountInput);
-            if (!Number.isFinite(amount) || amount < 0) {
-                this.customAlert('Validation', 'Please enter a valid non-negative amount', true);
-                return;
-            }
-
-            const weekDefault = new Date().toISOString().split('T')[0];
-            const weekInput = window.prompt('Week date for deduction (YYYY-MM-DD):', weekDefault);
-            if (weekInput === null) return;
-            const weekDate = new Date(`${weekInput}T00:00:00`);
-            if (Number.isNaN(weekDate.getTime())) {
-                this.customAlert('Validation', 'Invalid date format. Use YYYY-MM-DD', true);
-                return;
-            }
-
-            const reasonRaw = (reasonInput || '').trim().toLowerCase();
-            const normalizedReason = reasonRaw === 'elf'
-                ? 'ELF'
-                : (reasonRaw === 'candids' ? 'Candids' : 'other');
-            const ok = await jobOps.addChargeback(jobId, normalizedReason, amount, weekDate.toDateString());
-            if (!ok) throw new Error('Unable to save chargeback');
-
-            showToast('Chargeback saved');
-            await this.editJob(jobId);
-        } catch (error) {
-            this.customAlert('Error', error.message, true);
-        }
+                JobTrackerModals.inputModal('Week Date', 'Deduction week (YYYY-MM-DD):', weekDefault, 'YYYY-MM-DD', async (weekInput) => {
+                    if (weekInput === null || weekInput === undefined) return;
+                    const weekDate = new Date(`${weekInput}T00:00:00`);
+                    if (Number.isNaN(weekDate.getTime())) {
+                        JobTrackerModals.customAlert('Validation', 'Invalid date format. Use YYYY-MM-DD', true);
+                        return;
+                    }
+                    const reasonRaw = (reason || '').trim().toLowerCase();
+                    const normalizedReason = reasonRaw === 'elf' ? 'ELF' : (reasonRaw === 'candids' ? 'Candids' : 'other');
+                    try {
+                        const ok = await jobOps.addChargeback(jobId, normalizedReason, amount, weekDate.toDateString());
+                        if (!ok) throw new Error('Unable to save chargeback');
+                        showToast('Chargeback saved');
+                        await JobTrackerModals.editJob(jobId);
+                    } catch (error) {
+                        JobTrackerModals.customAlert('Error', error.message, true);
+                    }
+                });
+            });
+        });
     },
 
     /**
      * Revert a completed/failed/internal job back to pending.
      */
-    async revertToPending(jobId) {
-        const state = getState();
-        const jobOps = getJobOps();
-        const { showToast } = getUtils();
-        const job = state.getJob(jobId);
-        if (!job) return;
-
-        const confirmed = window.confirm('Revert this job to Pending status?');
-        if (!confirmed) return;
-
-        try {
-            await jobOps.updateJob(jobId, {
-                status: STATUS.PENDING,
-                fee: 0,
-                completedAt: null,
-                manualFee: false,
-                isUpgraded: false,
-                saturdayPremium: false,
-                baseFee: null
-            });
-            showToast('Job reverted to pending');
-            await this.editJob(jobId);
-        } catch (error) {
-            this.customAlert('Error', error.message, true);
-        }
+    revertToPending(jobId) {
+        JobTrackerModals.confirmModal(
+            'Revert to Pending',
+            'Revert this job back to Pending status?',
+            'Revert',
+            async () => {
+                const jobOps = getJobOps();
+                const { showToast } = getUtils();
+                try {
+                    await jobOps.updateJob(jobId, {
+                        status: STATUS.PENDING,
+                        fee: 0,
+                        completedAt: null,
+                        manualFee: false,
+                        isUpgraded: false,
+                        saturdayPremium: false,
+                        baseFee: null
+                    });
+                    showToast('Job reverted to pending');
+                    await JobTrackerModals.editJob(jobId);
+                } catch (error) {
+                    JobTrackerModals.customAlert('Error', error.message, true);
+                }
+            }
+        );
     },
 
     /**

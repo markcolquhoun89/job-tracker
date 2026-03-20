@@ -915,36 +915,38 @@ async function batchSetStatus(status) {
     }
 }
 
-async function batchDeleteSelected() {
+function batchDeleteSelected() {
     if (state.syncInProgress) {
         customAlert('Sync in Progress', 'Please wait for sync to complete before deleting jobs.', true);
         return;
     }
-    try {
-        const jobIds = Array.from(state.batchSelected);
-        if (jobIds.length === 0) return;
-        if (!confirm(`Permanently delete ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}?`)) return;
-
-        jobIds.forEach(jobId => {
-            const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
-            if (tile) tile.classList.add('batch-removing');
-        });
-
-        await Promise.all(jobIds.map(jobId => jobOps.deleteJob(jobId)));
-
-        state.batchMode = false;
-        state.batchSelected.clear();
-        batchStatusMenuOpen = false;
-
-        const bar = document.getElementById('batch-bar');
-        if (bar) bar.remove();
-
-        showToast(`Deleted ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}`);
-        render();
-    } catch (error) {
-        document.querySelectorAll('.job-tile.batch-removing').forEach(tile => tile.classList.remove('batch-removing'));
-        customAlert('Error', error.message, true);
-    }
+    const jobIds = Array.from(state.batchSelected);
+    if (jobIds.length === 0) return;
+    window.JobTrackerModals.confirmModal(
+        'Delete Jobs',
+        `Permanently delete ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}?`,
+        'Delete',
+        async () => {
+            try {
+                jobIds.forEach(jobId => {
+                    const tile = document.querySelector(`.job-tile[data-id="${jobId}"]`);
+                    if (tile) tile.classList.add('batch-removing');
+                });
+                await Promise.all(jobIds.map(jobId => jobOps.deleteJob(jobId)));
+                state.batchMode = false;
+                state.batchSelected.clear();
+                batchStatusMenuOpen = false;
+                const bar = document.getElementById('batch-bar');
+                if (bar) bar.remove();
+                showToast(`Deleted ${jobIds.length} job${jobIds.length !== 1 ? 's' : ''}`);
+                render();
+            } catch (error) {
+                document.querySelectorAll('.job-tile.batch-removing').forEach(tile => tile.classList.remove('batch-removing'));
+                customAlert('Error', error.message, true);
+            }
+        },
+        true
+    );
 }
 
 // ===========================
@@ -3080,13 +3082,15 @@ function getActiveUserId() {
     }
     return id;
 }
-function editTarget() { 
+function editTarget() {
     const current = parseInt(localStorage.getItem('nx_target')) || 80;
-    const newTarget = prompt('Enter completion rate target (%):', current);
-    if (newTarget !== null && !isNaN(newTarget)) {
-        localStorage.setItem('nx_target', newTarget);
-        render();
-    }
+    window.JobTrackerModals.inputModal('Completion Target', 'Target completion rate (%)', String(current), 'e.g. 80', (val) => {
+        const num = parseInt(val);
+        if (!isNaN(num)) {
+            localStorage.setItem('nx_target', num);
+            render();
+        }
+    });
 }
 function jumpToPayWeek(monIsoDate) {
     if (!monIsoDate) return;
@@ -3278,10 +3282,10 @@ function showNotesSearch() {
 
 function openSearchPrompt() {
     const current = state.searchQuery || '';
-    const next = prompt('Search jobs by type, job ID, or notes:', current);
-    if (next === null) return;
-    state.searchQuery = next.trim();
-    render();
+    window.JobTrackerModals.inputModal('Search Jobs', 'Search by type, job ID, or notes', current, 'Type to filter…', (val) => {
+        state.searchQuery = val.trim();
+        render();
+    });
 }
 
 function importCSV(event) {
@@ -3319,14 +3323,26 @@ function importCSV(event) {
     event.target.value = '';
 }
 function confirmWipe() {
-    if (confirm('Are you sure you want to wipe ALL data? This cannot be undone!')) {
-        if (confirm('Really delete everything? This will remove all jobs and settings!')) {
-            state.clearAllData().then(() => {
-                showToast('All data wiped');
-                render();
-            });
-        }
-    }
+    window.JobTrackerModals.confirmModal(
+        'Wipe All Data',
+        'This will permanently delete ALL jobs and settings. This cannot be undone.',
+        'Wipe Everything',
+        () => {
+            window.JobTrackerModals.confirmModal(
+                'Are You Sure?',
+                'Last chance — this is irreversible. Really delete everything?',
+                'Yes, Delete All',
+                () => {
+                    state.clearAllData().then(() => {
+                        showToast('All data wiped');
+                        render();
+                    });
+                },
+                true
+            );
+        },
+        true
+    );
 }
 
 // expose globals for inline handlers (compatibility with existing HTML)
