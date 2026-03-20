@@ -596,6 +596,11 @@ export class SyncEngine {
     const jobType = job.jobType || job.type;
     const upgraded = job.upgraded !== undefined ? job.upgraded : job.isUpgraded;
     const jobId = job.jobId || job.jobID;
+    const completedAt = job.completedAt == null
+      ? null
+      : (typeof job.completedAt === 'number'
+          ? new Date(job.completedAt).toISOString()
+          : new Date(job.completedAt).toISOString());
     
     return {
       id: job.id,
@@ -623,7 +628,7 @@ export class SyncEngine {
       chargeback_week: job.chargebackWeek,
       chargeback_added_by: job.chargebackAddedBy,
       chargeback_added_date: job.chargebackAddedDate,
-      completed_at: job.completedAt,
+      completed_at: completedAt,
       updated_at: job.updated_at || new Date().toISOString()
     };
   }
@@ -739,7 +744,7 @@ export class SyncEngine {
       chargebackWeek: remoteJob.chargeback_week,
       chargebackAddedBy: remoteJob.chargeback_added_by,
       chargebackAddedDate: remoteJob.chargeback_added_date,
-      completedAt: remoteJob.completed_at,
+      completedAt: remoteJob.completed_at ? new Date(remoteJob.completed_at).getTime() : null,
       updated_at: remoteJob.updated_at,
       synced_at: new Date().toISOString()
     };
